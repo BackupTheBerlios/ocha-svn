@@ -38,7 +38,7 @@ struct entry_definition entries[] = {
 };
 #define entries_length (sizeof(entries)/sizeof(struct entry_definition))
 
-static void catalog_cmd(struct catalog *catalog, const char *comment, bool ret)
+static void catalog_cmd(struct catalog *catalog, const char *comment, gboolean ret)
 {
    if(ret)
       return;
@@ -48,13 +48,13 @@ static void catalog_cmd(struct catalog *catalog, const char *comment, bool ret)
                    comment,
                    catalog_error(catalog));
    fail(msg->str);
-   g_string_free(msg, true/*free content*/);
+   g_string_free(msg, TRUE/*free content*/);
 }
-static bool exists(const char *path)
+static gboolean exists(const char *path)
 {
    struct stat buf;
    if(stat(path, &buf)!=0)
-      return false;
+      return FALSE;
    return buf.st_size>0;
 }
 
@@ -258,14 +258,14 @@ END_TEST
  * @param list the list itself (passed by catalog_executequery as userdata)
  * @see #results
  */
-static bool collect_results_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
+static gboolean collect_results_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
 {
    GList **results = (GList **)userdata;
-   g_return_val_if_fail(results, false);
+   g_return_val_if_fail(results, FALSE);
    *results=g_list_append(*results,
                           result);
    printf("result %d: %s\n", g_list_length(*results), result->name);
-   return true;/*continue*/
+   return TRUE;/*continue*/
 }
 
 /**
@@ -280,7 +280,7 @@ static void free_result(gpointer data, gpointer userdata)
    g_return_if_fail(result!=NULL);
    result->release(result);
 }
-static void execute_query_and_expect(const char *query, int goal_length, char *goal[], bool ordered)
+static void execute_query_and_expect(const char *query, int goal_length, char *goal[], gboolean ordered)
 {
    GList *list = NULL;
    catalog_cmd(catalog,
@@ -331,13 +331,13 @@ static void execute_query_and_expect(const char *query, int goal_length, char *g
       {
          for(int i=0; i<goal_length; i++)
             {
-               bool ok=false;
+               gboolean ok=FALSE;
                for(int j=0; j<found_length; j++)
                   {
                      if(found[j]!=NULL && strcmp(goal[i], found[j])==0)
                         {
                            found[j]=NULL;
-                           ok=true;
+                           ok=TRUE;
                            break;
                         }
                   }
@@ -358,19 +358,19 @@ START_TEST(test_execute_query)
    execute_query_and_expect("toto.c",
                             1,
                             (char *[]){ "toto.c" },
-                            false/*not ordered*/);
+                            FALSE/*not ordered*/);
 }
 END_TEST
 
-static bool execute_result(GList *list, const char *name)
+static gboolean execute_result(GList *list, const char *name)
 {
-   bool executed=false;
+   gboolean executed=FALSE;
    for(GList *current = list; current; current=g_list_next(current))
       {
          struct result *result=current->data;
          if(strcmp(name, result->name)==0)
             {
-               executed=true;
+               executed=TRUE;
                result->execute(result, NULL/*errors*/);
             }
       }
@@ -390,7 +390,7 @@ START_TEST(test_lastexecuted_first)
    execute_query_and_expect("tot",
                             3,
                             (char *[]){ "toto.h", "total.h", "toto.c" },
-                            true/*ordered*/);
+                            TRUE/*ordered*/);
 }
 END_TEST
 
@@ -400,22 +400,22 @@ START_TEST(test_execute_query_with_space)
    execute_query_and_expect("to .c",
                             1,
                             (char *[]){ "toto.c" },
-                            false/*not ordered*/);
+                            FALSE/*not ordered*/);
 }
 END_TEST
 
 /**
- * Let the query return only that many result and return false.
+ * Let the query return only that many result and return FALSE.
  *
  * @param catalog ignored
  * @param pertinence ignored
  * @param result released
  * @param userdata a pointer to an integer (the counter), which will be decremented to 0
  */
-static bool countdown_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
+static gboolean countdown_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
 {
    int *counter = (int *)userdata;
-   g_return_val_if_fail(counter!=NULL, false);
+   g_return_val_if_fail(counter!=NULL, FALSE);
    fail_unless( (*counter)>0, "callback called once too many");
 
    (*counter)--;
@@ -441,10 +441,10 @@ END_TEST
  * @param result released
  * @param userdata a pointer to an integer (the counter), which will be decremented to 0
  */
-static bool countdown_interrupt_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
+static gboolean countdown_interrupt_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
 {
    int *counter = (int *)userdata;
-   g_return_val_if_fail(counter!=NULL, false);
+   g_return_val_if_fail(counter!=NULL, FALSE);
    fail_unless( (*counter)>0, "countdown_interrupt_callback called once too many");
 
    (*counter)--;
@@ -452,7 +452,7 @@ static bool countdown_interrupt_callback(struct catalog *catalog, float pertinen
    result->release(result);
    if( (*counter) == 0 )
       catalog_interrupt(catalog);
-   return true/*continue*/;
+   return TRUE/*continue*/;
 }
 START_TEST(test_interrupt_stops_query)
 {
@@ -499,7 +499,7 @@ GCond  *execute_query_cond;
 
 static gpointer execute_query_thread(void *userdata)
 {
-   bool *stop = (bool *)userdata;
+   gboolean *stop = (gboolean *)userdata;
    char *errmsg=NULL;
    sqlite *db=sqlite_open(PATH, 0600, &errmsg);
    if(!db)
@@ -561,7 +561,7 @@ START_TEST(test_busy)
    g_mutex_lock(execute_query_mutex);
    GThread *thread = g_thread_create(execute_query_thread,
                                      NULL/*userdata*/,
-                                     false/*not joinable*/,
+                                     FALSE/*not joinable*/,
                                      NULL);
    fail_unless(thread!=NULL,
                "thread creation failed");
@@ -575,7 +575,7 @@ START_TEST(test_busy)
    printf("test_busy: execute query\n");
    execute_query_and_expect("toto.c",
                             0,
-                            (char *[]) { NULL }, false/*not ordered*/);
+                            (char *[]) { NULL }, FALSE/*not ordered*/);
    printf("test_busy: query done\n");
    catalog_restart(catalog);
 
@@ -587,7 +587,7 @@ START_TEST(test_busy)
 
    execute_query_and_expect("toto.c",
                             1,
-                            (char *[]) { "toto.c" }, false/*not ordered*/);
+                            (char *[]) { "toto.c" }, FALSE/*not ordered*/);
 
    g_mutex_lock(execute_query_mutex);
    g_cond_broadcast(execute_query_cond); /* tell the thread to finish*/
@@ -615,7 +615,7 @@ START_TEST(test_execute)
    char buffer[buffer_len+1];
    int sofar=0;
 
-   while(true)
+   while(TRUE)
       {
          ssize_t bytes = read(pipe_fd, &buffer[sofar], buffer_len-sofar);
          if(bytes>0)

@@ -52,7 +52,7 @@ static void stop(struct queryrunner *self);
 static void release(struct queryrunner *self);
 
 static struct result *result_new(Display *display, Window win, const char *title);
-static bool result_execute(struct result *self, GError **);
+static gboolean result_execute(struct result *self, GError **);
 static void result_release(struct result *self);
 
 /* ------------------------- public functions */
@@ -185,20 +185,20 @@ static struct result *result_new(Display *display, Window win, const char *title
    return TO_RESULT(retval);
 }
 
-static bool result_execute(struct result *_self, GError **err)
+static gboolean result_execute(struct result *_self, GError **err)
 {
    struct window_result *self = TO_WINDOW_RESULT(_self);
-   g_return_val_if_fail(self, false);
-   g_return_val_if_fail(err==NULL || *err==NULL, false);
+   g_return_val_if_fail(self, FALSE);
+   g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
    printf("activate window %s '%s'\n",
           self->base.path,
           self->base.name);
-   bool retval;
+   gboolean retval;
    gdk_error_trap_push();
    retval=netwm_activate_window(self->display,
                                 self->win,
-                                true/*switch desktop*/);
+                                TRUE/*switch desktop*/);
    gdk_flush();
    gint xerror = gdk_error_trap_pop();
    if(xerror)
@@ -208,7 +208,7 @@ static bool result_execute(struct result *_self, GError **err)
                      xerror==BadWindow ? RESULT_ERROR_INVALID_RESULT:RESULT_ERROR_MISSING_RESOURCE,
                      "window activation failed (X error %d)\n",
                      xerror);
-         return false;
+         return FALSE;
       }
    return retval;
 }

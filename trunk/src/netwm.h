@@ -26,8 +26,8 @@ Window *netwm_get_client_list (Display *disp, unsigned long *size);
  *
  * @param disp X display
  * @param win the window to activate
- * @param switch_desktop if true, move to the window's desktop first
- * @return true if activating the window worked
+ * @param switch_desktop if TRUE, move to the window's desktop first
+ * @return TRUE if activating the window worked
  */
 gboolean netwm_activate_window (Display *disp, Window win, gboolean switch_desktop);
 

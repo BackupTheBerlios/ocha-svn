@@ -17,7 +17,7 @@
 struct catalog
 {
    sqlite *db;
-   bool stop;
+   gboolean stop;
    GString* sql;
    GString* error;
 
@@ -51,23 +51,23 @@ struct catalog_result
 
 
 /* ------------------------- prototypes */
-static bool exists(const char *path);
-static bool handle_sqlite_retval(struct catalog *catalog, int retval, char *errmsg);
+static gboolean exists(const char *path);
+static gboolean handle_sqlite_retval(struct catalog *catalog, int retval, char *errmsg);
 static int execute_update_nocatalog(sqlite *db, const char *sql, char **errmsg);
-static bool execute_update(struct catalog *catalog);
+static gboolean execute_update(struct catalog *catalog);
 static int progress_callback(void *userdata);
-static bool execute_query(struct catalog *catalog, sqlite_callback callback, void *userdata);
-static bool create_tables(sqlite *db, char **errmsg);
+static gboolean execute_query(struct catalog *catalog, sqlite_callback callback, void *userdata);
+static gboolean create_tables(sqlite *db, char **errmsg);
 static int count(const char *str, char c);
 static const char *escape(struct catalog *catalog, const char *orig);
 static void escape_free(struct catalog *catalog);
 static void execute_parse(GString *gstr, const char *pattern, const char *path);
-static bool update_entry_timestamp(struct catalog *catalog, int entry_id);
-static bool execute_result(struct result *_self, GError **);
+static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id);
+static gboolean execute_result(struct result *_self, GError **);
 static void free_result(struct result *self);
 static struct result *create_result(struct catalog *catalog, const char *path, const char *display_name, const char *execute, int entry_id);
 static int result_sqlite_callback(void *userdata, int col_count, char **col_data, char **col_names);
-static bool insert_and_get_id(struct catalog  *catalog, int *id_out);
+static gboolean insert_and_get_id(struct catalog  *catalog, int *id_out);
 static int findid_callback(void *userdata, int column_count, char **result, char **names);
 
 
@@ -76,11 +76,11 @@ static int findid_callback(void *userdata, int column_count, char **result, char
 GQuark catalog_error_quark()
 {
    static GQuark catalog_quark;
-   static bool initialized;
+   static gboolean initialized;
    if(!initialized)
       {
          catalog_quark=g_quark_from_static_string("CATALOG_ERROR");
-         initialized=true;
+         initialized=TRUE;
       }
    return catalog_quark;
 }
@@ -90,7 +90,7 @@ struct catalog *catalog_connect(const char *path, GError **err)
    g_return_val_if_fail(path, NULL);
    g_return_val_if_fail(err==NULL || *err==NULL, NULL);
 
-   bool newdb = !exists(path);
+   gboolean newdb = !exists(path);
    char *errmsg = NULL;
 
 
@@ -127,7 +127,7 @@ struct catalog *catalog_connect(const char *path, GError **err)
       }
 
    struct catalog *catalog = (struct catalog *)g_malloc(sizeof(struct catalog)+strlen(path)+1);
-   catalog->stop=false;
+   catalog->stop=FALSE;
    catalog->db=db;
    catalog->sql=g_string_new("");
    catalog->error=g_string_new("");
@@ -151,8 +151,8 @@ void catalog_disconnect(struct catalog *catalog)
    sqlite_close(catalog->db);
    g_cond_free(catalog->busy_wait_cond);
    g_mutex_free(catalog->busy_wait_mutex);
-   g_string_free(catalog->sql, true/*free_segment*/);
-   g_string_free(catalog->error, true/*free_segment*/);
+   g_string_free(catalog->sql, TRUE/*free_segment*/);
+   g_string_free(catalog->error, TRUE/*free_segment*/);
    escape_free(catalog);
    g_free(catalog);
 }
@@ -161,7 +161,7 @@ void catalog_interrupt(struct catalog *catalog)
 {
    g_return_if_fail(catalog!=NULL);
    g_mutex_lock(catalog->busy_wait_mutex);
-   catalog->stop=true;
+   catalog->stop=TRUE;
    g_cond_broadcast(catalog->busy_wait_cond);
    g_mutex_unlock(catalog->busy_wait_mutex);
 }
@@ -170,35 +170,35 @@ void catalog_restart(struct catalog *catalog)
 {
    g_return_if_fail(catalog!=NULL);
    g_mutex_lock(catalog->busy_wait_mutex);
-   catalog->stop=false;
+   catalog->stop=FALSE;
    g_mutex_unlock(catalog->busy_wait_mutex);
 }
 
-bool catalog_executequery(struct catalog *catalog,
+gboolean catalog_executequery(struct catalog *catalog,
                           const char *query,
                           catalog_callback_f callback,
                           void *userdata)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(query!=NULL, false);
-   g_return_val_if_fail(callback!=NULL, false);
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(query!=NULL, FALSE);
+   g_return_val_if_fail(callback!=NULL, FALSE);
 
    if(catalog->stop)
-      return true;
+      return TRUE;
 
 
    g_string_assign(catalog->sql,
                    "SELECT e.id, e.path, e.display_name, c.execute, e.lastuse "
                    "FROM entries e, command c "
                    "WHERE e.display_name LIKE '%");
-   bool has_space=false;
+   gboolean has_space=FALSE;
    for(const char *cptr=query; *cptr!='\0'; cptr++)
       {
          char c = *cptr;
          switch(c)
             {
             case ' ':
-               has_space=true;
+               has_space=TRUE;
                break;
 
             case '\'':
@@ -210,7 +210,7 @@ bool catalog_executequery(struct catalog *catalog,
                   {
                      g_string_append(catalog->sql,
                                      "%' AND e.display_name LIKE '%");
-                     has_space=false;
+                     has_space=FALSE;
                   }
                g_string_append_c(catalog->sql,
                                c);
@@ -221,14 +221,14 @@ bool catalog_executequery(struct catalog *catalog,
                    "ORDER BY e.lastuse DESC;");
    catalog->callback=callback;
    catalog->callback_userdata=userdata;
-   bool ret = execute_query(catalog,
+   gboolean ret = execute_query(catalog,
                             result_sqlite_callback,
                             catalog/*userdata*/);
    /* the catalog was probably called from two threads
     * at the same time: this is forbidden
     */
    g_return_val_if_fail(catalog->callback==callback,
-                        false);
+                        FALSE);
 
    catalog->callback=NULL;
    catalog->callback_userdata=NULL;
@@ -238,11 +238,11 @@ bool catalog_executequery(struct catalog *catalog,
 
 
 
-bool catalog_addcommand(struct catalog *catalog, const char *name, const char *execute, int *id_out)
+gboolean catalog_addcommand(struct catalog *catalog, const char *name, const char *execute, int *id_out)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(name!=NULL, false);
-   g_return_val_if_fail(execute!=NULL, false);
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(name!=NULL, FALSE);
+   g_return_val_if_fail(execute!=NULL, FALSE);
 
    int old_id = -1;
    if(catalog_findcommand(catalog, name, &old_id))
@@ -268,10 +268,10 @@ bool catalog_addcommand(struct catalog *catalog, const char *name, const char *e
 }
 
 
-bool catalog_findcommand(struct catalog *catalog, const char *name, int *id_out)
+gboolean catalog_findcommand(struct catalog *catalog, const char *name, int *id_out)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(name!=NULL, false);
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(name!=NULL, FALSE);
 
    g_string_printf(catalog->sql,
                    "SELECT id FROM command where display_name='%s';",
@@ -283,15 +283,15 @@ bool catalog_findcommand(struct catalog *catalog, const char *name, int *id_out)
       {
          if(id_out)
             *id_out=id;
-         return true;
+         return TRUE;
       }
-   return false;
+   return FALSE;
 }
 
-bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out)
+gboolean catalog_findentry(struct catalog *catalog, const char *path, int *id_out)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(path!=NULL, false);
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(path!=NULL, FALSE);
 
    g_string_printf(catalog->sql,
                    "SELECT id FROM entries WHERE path='%s';",
@@ -303,16 +303,16 @@ bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out)
       {
          if(id_out)
             *id_out=id;
-         return true;
+         return TRUE;
       }
-   return false;
+   return FALSE;
 }
 
-bool catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
+gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(path!=NULL, false);
-   g_return_val_if_fail(display_name!=NULL, false);
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(path!=NULL, FALSE);
+   g_return_val_if_fail(display_name!=NULL, FALSE);
 
    int old_id=-1;
    if(catalog_findentry(catalog, path, &old_id))
@@ -338,17 +338,17 @@ bool catalog_addentry(struct catalog *catalog, const char *path, const char *dis
 }
 
 /* ------------------------- static functions */
-static bool exists(const char *path)
+static gboolean exists(const char *path)
 {
    struct stat buf;
    return stat(path, &buf)==0 && buf.st_size>0;
 }
-static bool handle_sqlite_retval(struct catalog *catalog, int retval, char *errmsg)
+static gboolean handle_sqlite_retval(struct catalog *catalog, int retval, char *errmsg)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
+   g_return_val_if_fail(catalog!=NULL, FALSE);
 
    if(retval==SQLITE_OK || retval==SQLITE_ABORT || retval==SQLITE_INTERRUPT)
-      return true;
+      return TRUE;
 
    g_string_truncate(catalog->error, 0);
    if(errmsg==NULL)
@@ -367,7 +367,7 @@ static bool handle_sqlite_retval(struct catalog *catalog, int retval, char *errm
    g_string_append_printf(catalog->error,
                           " (SQL statement: %s)",
                           catalog->sql->str);
-   return false;
+   return FALSE;
 }
 
 static int execute_update_nocatalog(sqlite *db, const char *sql, char **errmsg)
@@ -386,7 +386,7 @@ static int execute_update_nocatalog(sqlite *db, const char *sql, char **errmsg)
 
    return ret;
 }
-static bool execute_update(struct catalog *catalog)
+static gboolean execute_update(struct catalog *catalog)
 {
    char *errmsg=NULL;
    g_string_prepend(catalog->sql, "BEGIN;");
@@ -405,7 +405,7 @@ static int progress_callback(void *userdata)
    return catalog->stop ? 1:0;
 }
 
-static bool execute_query(struct catalog *catalog, sqlite_callback callback, void *userdata)
+static gboolean execute_query(struct catalog *catalog, sqlite_callback callback, void *userdata)
 {
    char *errmsg=NULL;
 
@@ -442,7 +442,7 @@ static bool execute_query(struct catalog *catalog, sqlite_callback callback, voi
    return handle_sqlite_retval(catalog, ret, errmsg);
 }
 
-static bool create_tables(sqlite *db, char **errmsg)
+static gboolean create_tables(sqlite *db, char **errmsg)
 {
    int ret = execute_update_nocatalog(db,
                                       "BEGIN; "
@@ -534,9 +534,9 @@ static void execute_parse(GString *gstr, const char *pattern, const char *path)
    g_string_append(gstr, current);
 }
 
-static bool update_entry_timestamp(struct catalog *catalog, int entry_id)
+static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id)
 {
-   g_return_val_if_fail(catalog, false);
+   g_return_val_if_fail(catalog, FALSE);
    GTimeVal timeval;
    g_get_current_time(&timeval);
 
@@ -548,11 +548,11 @@ static bool update_entry_timestamp(struct catalog *catalog, int entry_id)
    return execute_update(catalog);
 }
 
-static bool execute_result(struct result *_self, GError **err)
+static gboolean execute_result(struct result *_self, GError **err)
 {
    struct catalog_result *self = (struct catalog_result *)_self;
-   g_return_val_if_fail(self, false);
-   g_return_val_if_fail(err==NULL || *err==NULL, false);
+   g_return_val_if_fail(self, FALSE);
+   g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
    pid_t pid = fork();
    if(pid<0)
@@ -562,7 +562,7 @@ static bool execute_result(struct result *_self, GError **err)
                      RESULT_ERROR_MISSING_RESOURCE,
                      "failed at fork(): %s\n",
                      strerror(errno));
-         return false;
+         return FALSE;
       }
 
    if(pid==0)
@@ -591,7 +591,7 @@ static bool execute_result(struct result *_self, GError **err)
          catalog_disconnect(catalog);
       }
 
-   return true;
+   return TRUE;
 }
 
 static void free_result(struct result *self)
@@ -656,22 +656,22 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
                                          display_name,
                                          execute,
                                          entry_id);
-   bool go_on = catalog->callback(catalog,
+   gboolean go_on = catalog->callback(catalog,
                                   0.5/*pertinence*/,
                                   result,
                                   catalog->callback_userdata);
    return go_on && !catalog->stop ? 0:1;
 }
 
-static bool insert_and_get_id(struct catalog  *catalog, int *id_out)
+static gboolean insert_and_get_id(struct catalog  *catalog, int *id_out)
 {
    if(execute_update(catalog))
       {
          if(id_out!=NULL)
             *id_out=sqlite_last_insert_rowid(catalog->db);
-         return true;
+         return TRUE;
       }
-   return false;
+   return FALSE;
 }
 
 /**

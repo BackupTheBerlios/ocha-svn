@@ -59,7 +59,7 @@ START_TEST(test_index_directory)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", gnome_open_id, 4);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, false/*not slow*/, NULL/*err*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -76,7 +76,7 @@ START_TEST(test_index_directory_maxdepth_1)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, 1, NULL/*ignore*/, false/*not slow*/, NULL/*err*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, 1, NULL/*ignore*/, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -93,7 +93,7 @@ START_TEST(test_index_directory_maxdepth_2)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, 2, NULL/*ignore*/, false/*not slow*/, NULL/*err*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, 2, NULL/*ignore*/, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -120,7 +120,7 @@ START_TEST(test_index_directory_default_ignore)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", gnome_open_id, 4);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, false/*not slow*/, NULL/*err*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -138,7 +138,7 @@ START_TEST(test_index_directory_ignore_others)
    mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, ignore, false/*not slow*/, NULL/*err*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, ignore, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -188,7 +188,7 @@ static void setup_three_applications()
               "Comment=Xman: manual page browser for X\n"
               "Icon=\n"
               "Exec=xman\n"
-              "Terminal=false\n"
+              "Terminal=FALSE\n"
               "Categories=X-Debian-Help\n");
    createfile(TEMPDIR "/d1/d2/xpdf.desktop",
               "[Desktop Entry]\n"
@@ -198,7 +198,7 @@ static void setup_three_applications()
               "Comment=Xpdf: Portable Document Format (PDF) file viewer for X\n"
               "Icon=\n"
               "Exec=/usr/bin/xpdf\n"
-              "Terminal=false\n"
+              "Terminal=FALSE\n"
               "Categories=X-Debian-Apps-Viewers\n");
 }
 
@@ -237,7 +237,7 @@ START_TEST(test_index_applications)
    fail_unless(catalog_index_applications(catalog,
                                           TEMPDIR,
                                           -1,
-                                          false/*not slow*/,
+                                          FALSE/*not slow*/,
                                           NULL/*ignore errors*/),
                "indexing failed");
 
@@ -266,7 +266,7 @@ START_TEST(test_index_applications_depth)
    fail_unless(catalog_index_applications(catalog,
                                           TEMPDIR,
                                           1,
-                                          false/*not slow*/,
+                                          FALSE/*not slow*/,
                                           NULL/*ignore errors*/),
                "indexing failed");
 
@@ -287,7 +287,7 @@ START_TEST(test_index_applications_skip_terminal)
               "Comment=\n"
               "Icon=\n"
               "Exec=/usr/bin/zile\n"
-              "Terminal=true\n"
+              "Terminal=TRUE\n"
               "Categories=X-Debian-Apps-Editors\n");
 
    int run_id=2;
@@ -299,7 +299,7 @@ START_TEST(test_index_applications_skip_terminal)
    fail_unless(catalog_index_applications(catalog,
                                           TEMPDIR,
                                           1,
-                                          false/*not slow*/,
+                                          FALSE/*not slow*/,
                                           NULL/*ignore errors*/),
                "indexing failed");
 
@@ -349,7 +349,7 @@ START_TEST(test_index_applications_skip_withargs)
    fail_unless(catalog_index_applications(catalog,
                                           TEMPDIR,
                                           1,
-                                          false/*not slow*/,
+                                          FALSE/*not slow*/,
                                           NULL/*ignore errors*/),
                "indexing failed");
 
@@ -385,7 +385,7 @@ START_TEST(test_index_bookmarks)
               "<H1>Bookmarks</H1>\n"
               "\n"
               "<DL><p>\n"
-              "    <DT><H3 LAST_MODIFIED=\"1092503470\" PERSONAL_TOOLBAR_FOLDER=\"true\" ID=\"rdf:#$0GJ1m2\">Bookmarks Toolbar Folder</H3>\n"
+              "    <DT><H3 LAST_MODIFIED=\"1092503470\" PERSONAL_TOOLBAR_FOLDER=\"TRUE\" ID=\"rdf:#$0GJ1m2\">Bookmarks Toolbar Folder</H3>\n"
               "<DD>Add bookmarks to this folder to see them displayed on the Bookmarks Toolbar\n"
               "    <DL><p>\n"
               "        <DT><A HREF=\"http://slashdot.org/\" ADD_DATE=\"1084121070\" LAST_VISIT=\"1105484124\" LAST_MODIFIED=\"1084121093\" SHORTCUTURL=\"/.\" ICON=\"data:image/x-icon;base64,AAABAAEAEBAQAAAAAAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIAAAP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAREAAAERAAABEQAAEREQAAAREAARERAAABEQABEREAAAAREAAREAAAABEQAAAAAAAAAREAAAAAAAABEQAAAAAAAAAREAAAAAAAABEQAAAAAAAAAREAAAAAAAABEQAAAAAAAAAAAAAAAAAAAAAAAAD//wAA5+cAAMPDAADDgQAA4YEAAOGDAADwxwAA8P8AAPh/AAD4fwAA/D8AAPw/AAD+HwAA/j8AAP//AAD//wAA\" LAST_CHARSET=\"ISO-8859-1\" ID=\"rdf:#$iwElo2\">slashdot</A>\n"

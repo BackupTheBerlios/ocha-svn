@@ -9,23 +9,23 @@ static char *prepare(const char *str)
    g_free((void *)str_norm);
    return retval;
 }
-bool query_ismatch(const char *query, const char *name)
+gboolean query_ismatch(const char *query, const char *name)
 {
-   g_return_val_if_fail(query!=NULL, false);
-   g_return_val_if_fail(name!=NULL, false);
+   g_return_val_if_fail(query!=NULL, FALSE);
+   g_return_val_if_fail(name!=NULL, FALSE);
 
    if(query[0]=='\0' || name[0]=='\0')
-      return false;
+      return FALSE;
 
    char *query_prepared = prepare(query);
    const char *name_prepared = prepare(name);
 
-   bool retval;
+   gboolean retval;
    if(strcmp(name_prepared, query_prepared)==0)
-      retval=true;
+      retval=TRUE;
    else
       {
-         retval=true;
+         retval=TRUE;
          char *current=query_prepared;
          do
             {
@@ -36,7 +36,7 @@ bool query_ismatch(const char *query, const char *name)
                const char *found = strstr(name_prepared, current);
                if(found==NULL)
                   {
-                     retval=false;
+                     retval=FALSE;
                      break;
                   }
                if(space)
@@ -44,7 +44,7 @@ bool query_ismatch(const char *query, const char *name)
                else
                   break;
             }
-         while(true);
+         while(TRUE);
       }
 
    g_free((void *)query_prepared);
@@ -52,10 +52,10 @@ bool query_ismatch(const char *query, const char *name)
    return retval;
 }
 
-bool query_result_ismatch(const char *query, const struct result *result)
+gboolean query_result_ismatch(const char *query, const struct result *result)
 {
-   g_return_val_if_fail(query!=NULL, false);
-   g_return_val_if_fail(result!=NULL, false);
+   g_return_val_if_fail(query!=NULL, FALSE);
+   g_return_val_if_fail(result!=NULL, FALSE);
 
    return query_ismatch(query, result->name);
 }
@@ -76,29 +76,29 @@ bool query_result_ismatch(const char *query, const struct result *result)
  * @param query (normalized UTF8 with G_NORMALIZE_ALL_COMPOSE)
  * @param name name or path (normalized UTF8 with G_NORMALIZE_ALL_COMPOSE)
  * @param highlight a string of at least the same length as name
- * @return true if there was any match
+ * @return TRUE if there was any match
  */
-bool query_highlight(const char *query, const char *name, char *highlight)
+gboolean query_highlight(const char *query, const char *name, char *highlight)
 {
-   g_return_val_if_fail(query!=NULL, false);
-   g_return_val_if_fail(name!=NULL, false);
-   g_return_val_if_fail(highlight!=NULL, false);
+   g_return_val_if_fail(query!=NULL, FALSE);
+   g_return_val_if_fail(name!=NULL, FALSE);
+   g_return_val_if_fail(highlight!=NULL, FALSE);
 
-   g_return_val_if_fail(query!=NULL, false);
-   g_return_val_if_fail(name!=NULL, false);
+   g_return_val_if_fail(query!=NULL, FALSE);
+   g_return_val_if_fail(name!=NULL, FALSE);
    char *query_prepared = g_utf8_casefold(query, -1);
    const char *name_prepared = g_utf8_casefold(name, -1);
 
    memset(highlight, '\0', strlen(name)+1);
-   bool retval;
+   gboolean retval;
    if(strcmp(name_prepared, query_prepared)==0)
       {
          strcpy(highlight, name);
-         retval=true;
+         retval=TRUE;
       }
    else
       {
-         retval=true;
+         retval=TRUE;
          char *current=query_prepared;
 
 
@@ -111,7 +111,7 @@ bool query_highlight(const char *query, const char *name, char *highlight)
                const char *found = strstr(name_prepared, current);
                if(found==NULL)
                   {
-                     retval=false;
+                     retval=FALSE;
                      break;
                   }
                else
@@ -130,14 +130,14 @@ bool query_highlight(const char *query, const char *name, char *highlight)
                else
                   break;
             }
-         while(true);
+         while(TRUE);
       }
 
    g_free((void *)query_prepared);
    g_free((void *)name_prepared);
    return retval;
 
-   return false;
+   return FALSE;
 }
 
 
@@ -151,12 +151,12 @@ const char *query_pango_highlight(const char *query, const char *str, const char
    if(query_highlight(query, str, highlight))
       {
          GString *retval = g_string_new("");
-         bool last_highlighted=false;
+         gboolean last_highlighted=FALSE;
          char buffer[norm_str_len+1];
          int bufpos=0;
          for(int i=0; i<norm_str_len; i++)
             {
-               bool current_highlighted = highlight[i]!='\0';
+               gboolean current_highlighted = highlight[i]!='\0';
                if(current_highlighted!=last_highlighted)
                   {
                      if(bufpos>0)
@@ -184,7 +184,7 @@ const char *query_pango_highlight(const char *query, const char *str, const char
          g_free((void *)norm_query);
          g_free((void *)norm_str);
          char *retval_content = retval->str;
-         g_string_free(retval, false/*don't free content*/);
+         g_string_free(retval, FALSE/*don't free content*/);
          return retval_content;
       }
    else

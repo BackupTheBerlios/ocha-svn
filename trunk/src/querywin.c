@@ -17,7 +17,7 @@ static GString* running_query;
 static guint32 last_keypress;
 #define query_label_text_len 256
 static char query_label_text[256];
-bool shown;
+gboolean shown;
 static struct result_queue *result_queue;
 static struct queryrunner *queryrunner;
 
@@ -53,7 +53,7 @@ void querywin_init()
 
    gtk_window_stick(GTK_WINDOW(querywin));
    gtk_window_set_keep_above(GTK_WINDOW(querywin),
-                             true);
+                             TRUE);
 
 
    g_signal_connect(querywin,
@@ -94,7 +94,7 @@ void querywin_start()
    last_keypress=0;
    queryrunner->start(queryrunner);
    gtk_window_reshow_with_initial_size(GTK_WINDOW(querywin));
-   shown=true;
+   shown=TRUE;
 }
 void querywin_stop()
 {
@@ -103,7 +103,7 @@ void querywin_stop()
 
    queryrunner->stop(queryrunner);
    gtk_widget_hide(querywin);
-   shown=false;
+   shown=FALSE;
 }
 
 /* ------------------------- private functions */

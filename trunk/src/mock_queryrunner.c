@@ -19,7 +19,7 @@ static void stop(struct queryrunner *self);
 static void release(struct queryrunner *self);
 
 static struct result *result_new(const char *query, int index);
-static bool result_execute(struct result *, GError **);
+static gboolean result_execute(struct result *, GError **);
 static void result_release(struct result *);
 
 /** keep up to 256 characters of a query */
@@ -37,7 +37,7 @@ struct mock_queryrunner
    struct queryrunner base;
    /** the queue to add results to */
    struct result_queue *queue;
-   /** true when the query is started */
+   /** TRUE when the query is started */
    gboolean started;
    /** keep a copy of the query, for consolidate - up to a point. */
    char query[MAX_QUERY_LEN];
@@ -81,7 +81,7 @@ static struct result *result_new(const char *query, int index)
    g_string_printf(name, "%s%d", query, index);
    retval->name=name->str;
    retval->path=name->str;
-   g_string_free(name, false/*not free_segment*/);
+   g_string_free(name, FALSE/*not free_segment*/);
    retval->execute=result_execute;
    retval->release=result_release;
    return retval;
@@ -92,11 +92,11 @@ static struct result *result_new(const char *query, int index)
  *
  * This function prints a message to stdout.
  * @praam result
- * @return true, always
+ * @return TRUE, always
  */
-static bool result_execute(struct result *result, GError **errors)
+static gboolean result_execute(struct result *result, GError **errors)
 {
-   g_return_val_if_fail(result!=NULL, false);
+   g_return_val_if_fail(result!=NULL, FALSE);
    printf("execute result: %s\n", result->name);
    return TRUE;
 }

@@ -41,11 +41,11 @@ void catalog_index_init(void);
  * one of the patterns, it'll be ignored (together with its content, if
  * it's a directory). Only * and ? are supported (no [..] character ranges)
  * @param slow slow down operation not to waste CPU cycles
- * @param err if this function returns false and if this is non-null,
+ * @param err if this function returns FALSE and if this is non-null,
  * this will contain an error code and message (to be freed with g_error_free())
- * @return true if all went well
+ * @return TRUE if all went well
  */
-bool catalog_index_directory(struct catalog *catalog, const char *directory, int maxdepth, const char **ignore, bool slow, GError **err);
+gboolean catalog_index_directory(struct catalog *catalog, const char *directory, int maxdepth, const char **ignore, gboolean slow, GError **err);
 
 /**
  * Index or re-index the applications in the directory.
@@ -58,11 +58,11 @@ bool catalog_index_directory(struct catalog *catalog, const char *directory, int
  * 1 means that only the files in the given directory
  * will be taken into account.
  * @param slow slow down operation not to waste CPU cycles
- * @param err if this function returns false and if this is non-null,
+ * @param err if this function returns FALSE and if this is non-null,
  * this will contain an error code and message (to be freed with g_error_free())
- * @return true if all went well
+ * @return TRUE if all went well
  */
-bool catalog_index_applications(struct catalog *catalog, const char *directory, int maxdepth, bool slow, GError **err);
+gboolean catalog_index_applications(struct catalog *catalog, const char *directory, int maxdepth, gboolean slow, GError **err);
 
 /**
  * Index or re-index the entries in a bookmark file.
@@ -70,11 +70,11 @@ bool catalog_index_applications(struct catalog *catalog, const char *directory, 
  * For now, only mozilla bookmarks are supported.
  * @param catalog
  * @param bookmark_file mozila bookmark file
- * @param err if this function returns false and if this is non-null,
+ * @param err if this function returns FALSE and if this is non-null,
  * this will contain an error code and message (to be freed with g_error_free())
- * @return true if all went well
+ * @return TRUE if all went well
  */
-bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file, GError **err);
+gboolean catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file, GError **err);
 
 /** Get the error quark for this domain, usually used through CATALOG_INDEX_ERROR */
 GQuark catalog_index_error_quark(void);

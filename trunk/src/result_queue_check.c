@@ -14,11 +14,11 @@ extern int result_queue_counter;
 struct mock_result
 {
    struct result result;
-   bool executed;
-   bool released;
+   gboolean executed;
+   gboolean released;
 };
 
-static bool execute_cb(struct result *, GError **);
+static gboolean execute_cb(struct result *, GError **);
 static void release_cb(struct result *);
 static struct mock_result results[] =
    {
@@ -46,19 +46,19 @@ static struct mock_result results[] =
 #endif
 
 
-static bool execute_cb(struct result *_result, GError **err)
+static gboolean execute_cb(struct result *_result, GError **err)
 {
    struct mock_result *result = (struct mock_result *)_result;
    fail_unless(!result->released, "released");
    fail_unless(!result->executed, "already executed");
-   result->executed=true;
+   result->executed=TRUE;
 }
 
 static void release_cb(struct result *_result)
 {
    struct mock_result *result = (struct mock_result *)_result;
    fail_unless(!result->released, "already released");
-   result->released=true;
+   result->released=TRUE;
 }
 
 static void setup()
@@ -112,7 +112,7 @@ static void add_result(struct result_queue  *queue, int i) {
 static void loop_as_long_as_necessary() {
    while(g_main_context_pending(NULL/*default context*/))
       g_main_context_iteration(NULL/*default context*/,
-                               true/*may block*/);
+                               TRUE/*may block*/);
 }
 
 
@@ -126,7 +126,7 @@ static struct result_queue* process_queue() {
 
    while(g_main_context_pending(NULL/*default context*/))
       g_main_context_iteration(NULL/*default context*/,
-                               true/*may block*/);
+                               TRUE/*may block*/);
    loop_as_long_as_necessary();
    return queue;
 }
@@ -222,8 +222,8 @@ static gpointer producer_thread(gpointer mocks)
          mock[i].result.path="resultx/path";
          mock[i].result.release=release_cb;
          mock[i].result.execute=execute_cb;
-         mock[i].executed=false;
-         mock[i].released=false;
+         mock[i].executed=FALSE;
+         mock[i].released=FALSE;
          result_queue_add(queue,
                           NULL/*runner*/,
                           "myquery",
@@ -274,7 +274,7 @@ START_TEST(test_add_result_from_several_threads)
          mocks[i]=g_new(struct mock_result, PRODUCER_THREAD_RESULT_COUNT);
          g_thread_create(producer_thread,
                          mocks[i]/*data*/,
-                         false/*joinable*/,
+                         FALSE/*joinable*/,
                          NULL/*error*/);
       }
 

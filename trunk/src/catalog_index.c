@@ -22,51 +22,51 @@ static catalog_index_trace_callback_f trace_callback;
 /** callback userdata passed to catalog_index_set_callback() */
 static gpointer trace_callback_userdata;
 
-static bool getmode(const char *path, mode_t *mode);
-static bool is_accessible_directory(mode_t mode);
-static bool is_accessible_file(mode_t mode);
-static bool is_readable(mode_t mode);
-static bool is_executable(mode_t mode);
+static gboolean getmode(const char *path, mode_t *mode);
+static gboolean is_accessible_directory(mode_t mode);
+static gboolean is_accessible_file(mode_t mode);
+static gboolean is_readable(mode_t mode);
+static gboolean is_executable(mode_t mode);
 
-static bool to_ignore(const char *filename, GPatternSpec **patterns);
+static gboolean to_ignore(const char *filename, GPatternSpec **patterns);
 
-static bool catalog_index_applications_recursive(struct catalog *catalog, const char *directory, int maxdepth, bool slow, int cmd);
+static gboolean catalog_index_applications_recursive(struct catalog *catalog, const char *directory, int maxdepth, gboolean slow, int cmd);
 static GPatternSpec **create_patterns(const char **patterns);
 static void free_patterns(GPatternSpec **);
 
-static bool has_gnome_mime_command(const char *path);
-static bool bookmarks_read_line(FILE *, GString *, GError **err);
+static gboolean has_gnome_mime_command(const char *path);
+static gboolean bookmarks_read_line(FILE *, GString *, GError **err);
 
 static char *html_expand_common_entities(const char *orig);
 
-static void doze_off(bool really);
+static void doze_off(gboolean really);
 
-static bool catalog_addcommand_witherrors(struct catalog *catalog, const char *name, const char *execute, int *cmd, GError **err);
-static bool catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, int cmd_id, GError **err);
+static gboolean catalog_addcommand_witherrors(struct catalog *catalog, const char *name, const char *execute, int *cmd, GError **err);
+static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, int cmd_id, GError **err);
 static DIR *opendir_witherrors(const char *path, GError **err);
 
-typedef bool (*handle_file_f)(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
-static bool recurse(struct catalog *catalog,
+typedef gboolean (*handle_file_f)(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
+static gboolean recurse(struct catalog *catalog,
                     const char *directory,
                     GPatternSpec **ignore_patterns,
                     int maxdepth,
-                    bool slow,
+                    gboolean slow,
                     int cmd,
                     handle_file_f callback,
                     gpointer userdata,
                     GError **err);
-static bool index_directory_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
-static bool index_application_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
+static gboolean index_directory_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
+static gboolean index_application_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
 
 /* ------------------------- public functions */
 GQuark catalog_index_error_quark()
 {
    static GQuark quark;
-   static bool initialized;
+   static gboolean initialized;
    if(!initialized)
       {
          quark=g_quark_from_static_string("CATALOG_INDEX");
-         initialized=true;
+         initialized=TRUE;
       }
    return quark;
 }
@@ -82,20 +82,20 @@ void catalog_index_set_trace_callback(catalog_index_trace_callback_f callback, g
    trace_callback_userdata=userdata;
 }
 
-bool catalog_index_directory(struct catalog *catalog, const char *directory, int maxdepth, const char **ignore, bool slow, GError **err)
+gboolean catalog_index_directory(struct catalog *catalog, const char *directory, int maxdepth, const char **ignore, gboolean slow, GError **err)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(directory!=NULL, false);
-   g_return_val_if_fail(maxdepth==-1 || maxdepth>0, false);
-   g_return_val_if_fail(err==NULL || *err==NULL, false);
-   g_return_val_if_fail(DEFAULT_IGNORE!=NULL, false); /* call catalog_index_init!() */
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(directory!=NULL, FALSE);
+   g_return_val_if_fail(maxdepth==-1 || maxdepth>0, FALSE);
+   g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
+   g_return_val_if_fail(DEFAULT_IGNORE!=NULL, FALSE); /* call catalog_index_init!() */
 
    int cmd = -1;
    if(!catalog_addcommand_witherrors(catalog, "gnome-open", "gnome-open \"%f\"", &cmd, err))
-      return false;
+      return FALSE;
 
    GPatternSpec **ignore_patterns = create_patterns(ignore);
-   bool retval = recurse(catalog,
+   gboolean retval = recurse(catalog,
                          directory,
                          ignore_patterns,
                          maxdepth,
@@ -108,16 +108,16 @@ bool catalog_index_directory(struct catalog *catalog, const char *directory, int
    return retval;
 }
 
-bool catalog_index_applications(struct catalog *catalog, const char *directory, int maxdepth, bool slow, GError **err)
+gboolean catalog_index_applications(struct catalog *catalog, const char *directory, int maxdepth, gboolean slow, GError **err)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(directory!=NULL, false);
-   g_return_val_if_fail(maxdepth==-1 || maxdepth>0, false);
-   g_return_val_if_fail(err==NULL || *err==NULL, false);
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(directory!=NULL, FALSE);
+   g_return_val_if_fail(maxdepth==-1 || maxdepth>0, FALSE);
+   g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
    int cmd = -1;
    if(!catalog_addcommand_witherrors(catalog, "run-desktop-entry", "run-desktop-entry \"%f\"", &cmd, err))
-      return false;
+      return FALSE;
 
    return recurse(catalog,
                   directory,
@@ -130,15 +130,15 @@ bool catalog_index_applications(struct catalog *catalog, const char *directory, 
                   err);
 }
 
-bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file, GError **err)
+gboolean catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file, GError **err)
 {
-   g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(bookmark_file!=NULL, false);
-   g_return_val_if_fail(err==NULL || *err==NULL, false);
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(bookmark_file!=NULL, FALSE);
+   g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
    int cmd = -1;
    if(!catalog_addcommand(catalog, "gnome-moz-remote", "gnome-moz-remote \"%f\"", &cmd))
-      return false;
+      return FALSE;
 
 
    FILE *fh = fopen(bookmark_file, "r");
@@ -150,10 +150,10 @@ bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file,
                      "error opening %s for reading: %s",
                      bookmark_file,
                      strerror(errno));
-         return false;
+         return FALSE;
       }
 
-   bool error=false;
+   gboolean error=FALSE;
    GString *line = g_string_new("");
    while( !error && bookmarks_read_line(fh, line, err) )
       {
@@ -182,7 +182,7 @@ bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file,
                                                                        cmd,
                                                                        err))
                                           {
-                                             error=true;
+                                             error=TRUE;
                                           }
                                        g_free(unescaped_label);
                                     }
@@ -198,7 +198,7 @@ bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file,
 /* ------------------------- private functions */
 
 
-static bool catalog_addcommand_witherrors(struct catalog *catalog, const char *name, const char *execute, int *cmd, GError **err)
+static gboolean catalog_addcommand_witherrors(struct catalog *catalog, const char *name, const char *execute, int *cmd, GError **err)
 {
    if(!catalog_addcommand(catalog, name, execute, cmd))
       {
@@ -208,11 +208,11 @@ static bool catalog_addcommand_witherrors(struct catalog *catalog, const char *n
                      "could not add/refresh %s command in catalog: %s",
                      name,
                      catalog_error(catalog));
-         return false;
+         return FALSE;
       }
-   return true;
+   return TRUE;
 }
-static bool catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, int cmd_id, GError **err)
+static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, int cmd_id, GError **err)
 {
    if(!catalog_addentry(catalog, path, name, cmd_id, NULL/*id_out*/))
       {
@@ -222,11 +222,11 @@ static bool catalog_addentry_witherrors(struct catalog *catalog, const char *pat
                      "could not add/refresh entry %s in catalog: %s",
                      path,
                      catalog_error(catalog));
-         return false;
+         return FALSE;
       }
    if(trace_callback)
       trace_callback(path, name, trace_callback_userdata);
-   return true;
+   return TRUE;
 }
 
 static DIR *opendir_witherrors(const char *path, GError **err)
@@ -244,23 +244,23 @@ static DIR *opendir_witherrors(const char *path, GError **err)
 }
 
 
-static bool _recurse(struct catalog *catalog,
+static gboolean _recurse(struct catalog *catalog,
                      const char *directory,
                      DIR *dirhandle,
                      GPatternSpec **ignore_patterns,
                      int maxdepth,
-                     bool slow,
+                     gboolean slow,
                      int cmd,
                      handle_file_f callback,
                      gpointer userdata,
                      GError **err)
 {
    if(maxdepth==0)
-      return true;
+      return TRUE;
    if(maxdepth>0)
       maxdepth--;
 
-   bool error=false;
+   gboolean error=FALSE;
    struct dirent *dirent;
    while( !error && (dirent=readdir(dirhandle)) != NULL )
       {
@@ -295,7 +295,7 @@ static bool _recurse(struct catalog *catalog,
                                               userdata,
                                               err))
                                     {
-                                       error=true;
+                                       error=TRUE;
                                     }
                                  else
                                     {
@@ -308,17 +308,17 @@ static bool _recurse(struct catalog *catalog,
                else if(is_accessible_file(mode))
                   {
                      if(!callback(catalog, cmd, current_path, filename, userdata, err))
-                        error=true;
+                        error=TRUE;
                   }
             }
       }
    return !error;
 }
-static bool recurse(struct catalog *catalog,
+static gboolean recurse(struct catalog *catalog,
                     const char *directory,
                     GPatternSpec **ignore_patterns,
                     int maxdepth,
-                    bool slow,
+                    gboolean slow,
                     int cmd,
                     handle_file_f callback,
                     gpointer userdata,
@@ -327,7 +327,7 @@ static bool recurse(struct catalog *catalog,
    DIR *dir=opendir_witherrors(directory, err);
    if(dir)
       {
-         bool retval = _recurse(catalog,
+         gboolean retval = _recurse(catalog,
                                 directory,
                                 dir,
                                 ignore_patterns,
@@ -342,14 +342,14 @@ static bool recurse(struct catalog *catalog,
       }
    else
       {
-         return false;
+         return FALSE;
       }
 }
 
-static bool index_directory_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata)
+static gboolean index_directory_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata)
 {
    if(!has_gnome_mime_command(path))
-      return true;
+      return TRUE;
 
    return catalog_addentry_witherrors(catalog,
                                       path,
@@ -358,22 +358,22 @@ static bool index_directory_entry(struct catalog *catalog, int cmd, const char *
                                       err);
 }
 
-static bool index_application_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata)
+static gboolean index_application_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata)
 {
    if(!g_str_has_suffix(filename, ".desktop"))
-      return true;
+      return TRUE;
 
    GnomeDesktopFile *desktopfile = gnome_desktop_file_load(path,
                                                            NULL/*ignore errors*/);
    if(desktopfile==NULL)
-      return true;
+      return TRUE;
 
    char *name = NULL;
    gnome_desktop_file_get_string(desktopfile,
                                  "Desktop Entry",
                                  "Name",
                                  &name);
-   gboolean terminal = false;
+   gboolean terminal = FALSE;
    gnome_desktop_file_get_boolean(desktopfile,
                                   "Desktop Entry",
                                   "Terminal",
@@ -384,7 +384,7 @@ static bool index_application_entry(struct catalog *catalog, int cmd, const char
                                  "Desktop Entry",
                                  "Exec",
                                  &exec);
-   bool retval = true;
+   gboolean retval = TRUE;
    if(!terminal && exec!=NULL && strstr(exec, "%")==NULL)
       {
          retval=catalog_addentry_witherrors(catalog,
@@ -402,51 +402,51 @@ static bool index_application_entry(struct catalog *catalog, int cmd, const char
    return retval;
 }
 
-static bool getmode(const char *path, mode_t* mode)
+static gboolean getmode(const char *path, mode_t* mode)
 {
    struct stat buf;
    if(stat(path, &buf)==0)
       {
          *mode=buf.st_mode;
-         return true;
+         return TRUE;
       }
-   return false;
+   return FALSE;
 }
 
-static bool is_accessible_directory(mode_t mode)
+static gboolean is_accessible_directory(mode_t mode)
 {
    if(!S_ISDIR(mode))
-      return false;
+      return FALSE;
    return is_readable(mode) && is_executable(mode);
 }
 
-static bool is_accessible_file(mode_t mode)
+static gboolean is_accessible_file(mode_t mode)
 {
    if(!S_ISREG(mode))
-      return false;
+      return FALSE;
    return is_readable(mode);
 }
 
-static bool is_readable(mode_t mode)
+static gboolean is_readable(mode_t mode)
 {
-   return true;
+   return TRUE;
 }
 
-static bool is_executable(mode_t mode)
+static gboolean is_executable(mode_t mode)
 {
-   return true;
+   return TRUE;
 }
 
-static bool to_ignore(const char *filename, GPatternSpec **patterns)
+static gboolean to_ignore(const char *filename, GPatternSpec **patterns)
 {
    if(patterns==NULL)
-      return false;
+      return FALSE;
    for(int i=0; patterns[i]!=NULL; i++)
       {
          if(g_pattern_match_string(patterns[i], filename))
-            return true;
+            return TRUE;
       }
-   return false;
+   return FALSE;
 }
 
 static int null_terminated_array_length(const char **patterns)
@@ -476,7 +476,7 @@ static void free_patterns(GPatternSpec **patterns)
    g_free(patterns);
 }
 
-static bool has_gnome_mime_command(const char *path)
+static gboolean has_gnome_mime_command(const char *path)
 {
    GString *uri = g_string_new("file://");
    if(*path!='/')
@@ -489,7 +489,7 @@ static bool has_gnome_mime_command(const char *path)
       }
    g_string_append(uri, path);
 
-   bool retval=false;
+   gboolean retval=FALSE;
    char *mimetype = gnome_vfs_get_mime_type(uri->str);
    if(mimetype)
       {
@@ -497,7 +497,7 @@ static bool has_gnome_mime_command(const char *path)
          if(app)
             {
                g_free(app);
-               retval=true;
+               retval=TRUE;
             }
          g_free(mimetype);
       }
@@ -505,7 +505,7 @@ static bool has_gnome_mime_command(const char *path)
    return retval;
 }
 
-static bool bookmarks_read_line(FILE *fh, GString *line, GError **err)
+static gboolean bookmarks_read_line(FILE *fh, GString *line, GError **err)
 {
    int buffer_len=256;
    char buffer[buffer_len];
@@ -518,7 +518,7 @@ static bool bookmarks_read_line(FILE *fh, GString *line, GError **err)
             *nl='\0';
          g_string_append(line, buffer);
          if(nl)
-            return true;
+            return TRUE;
       }
    if(errno!=0)
       {
@@ -527,7 +527,7 @@ static bool bookmarks_read_line(FILE *fh, GString *line, GError **err)
                      CATALOG_INDEX_EXTERNAL_ERROR,
                      "read error: %s",
                      strerror(errno));
-         return false;
+         return FALSE;
       }
    return line->len>0;
 }
@@ -539,7 +539,7 @@ static char *html_expand_common_entities(const char *str)
       {
          if(*c=='&')
             {
-               bool writec=false;
+               gboolean writec=FALSE;
                const char *start=c+1;
                const char *end=strchr(start, ';');
                if(end)
@@ -555,7 +555,7 @@ static char *html_expand_common_entities(const char *str)
                                  g_string_append_len(retval, buffer, len);
                               }
                            else
-                              writec=true;
+                              writec=TRUE;
                         }
                      else if(strncmp("amp", start, end-start)==0)
                         {
@@ -574,12 +574,12 @@ static char *html_expand_common_entities(const char *str)
                            g_string_append_c(retval, ' ');
                         }
                      else
-                        writec=true;
+                        writec=TRUE;
                      if(!writec)
                         c=end;
                   }
                else
-                  writec=true;
+                  writec=TRUE;
                if(writec)
                   g_string_append_c(retval, *c);
             }
@@ -587,11 +587,11 @@ static char *html_expand_common_entities(const char *str)
             g_string_append_c(retval, *c);
       }
    char *retval_str = retval->str;
-   g_string_free(retval, false/*don't free retval_str*/);
+   g_string_free(retval, FALSE/*don't free retval_str*/);
    return retval_str;
 }
 
-static void doze_off(bool really)
+static void doze_off(gboolean really)
 {
    if(really)
       sleep(3);

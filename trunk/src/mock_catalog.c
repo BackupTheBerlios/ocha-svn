@@ -43,7 +43,7 @@ struct addentry_args
 };
 
 static void expectation_init(struct expectation *, const char *);
-static bool expectation_check(struct expectation *);
+static gboolean expectation_check(struct expectation *);
 static void expectation_call(struct expectation *);
 /* ------------------------- mock_catalog */
 struct catalog *mock_catalog_new(void)
@@ -90,14 +90,14 @@ void mock_catalog_expect_addentry(struct catalog *catalog, const char *path, con
 
 static void expectations_met_cb(gpointer key, gpointer value, gpointer userdata)
 {
-   bool *retval = (bool *)userdata;
+   gboolean *retval = (gboolean *)userdata;
    struct expectation *expect = (struct expectation *)value;
    if(!expectation_check(expect))
-      *retval=false;
+      *retval=FALSE;
 }
 void mock_catalog_assert_expectations_met(struct catalog *catalog)
 {
-   bool retval = true;
+   gboolean retval = TRUE;
    g_hash_table_foreach(catalog->expected_addcommand,
                         expectations_met_cb,
                         &retval);
@@ -113,7 +113,7 @@ const char *catalog_error(struct catalog *catalog)
 {
    return "mock error";
 }
-bool catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
+gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
 {
    struct addentry_args *args =
       (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,
@@ -124,7 +124,7 @@ bool catalog_addentry(struct catalog *catalog, const char *path, const char *dis
                               path,
                               display_name));
          expectation_call(NULL);
-         return false;
+         return FALSE;
       }
 
    fail_unless(strcmp(args->display_name, display_name)==0,
@@ -140,10 +140,10 @@ bool catalog_addentry(struct catalog *catalog, const char *path, const char *dis
    expectation_call(&args->expect);
    if(id_out)
       *id_out=args->id;
-   return true;
+   return TRUE;
 }
 
-bool catalog_addcommand(struct catalog *catalog, const char *name, const char *execute, int *id_out)
+gboolean catalog_addcommand(struct catalog *catalog, const char *name, const char *execute, int *id_out)
 {
    struct addcommand_args *args =
       (struct addcommand_args *)g_hash_table_lookup(catalog->expected_addcommand,
@@ -154,7 +154,7 @@ bool catalog_addcommand(struct catalog *catalog, const char *name, const char *e
                               name,
                               execute));
          expectation_call(NULL);
-         return false;
+         return FALSE;
       }
 
    fail_unless(strcmp(args->execute, execute)==0,
@@ -166,7 +166,7 @@ bool catalog_addcommand(struct catalog *catalog, const char *name, const char *e
    expectation_call(&args->expect);
    if(id_out)
       *id_out=args->id;
-   return true;
+   return TRUE;
 }
 
 
@@ -178,24 +178,24 @@ static void expectation_init(struct expectation *ex, const char *description)
    ex->description=description;
 }
 
-static bool expectation_check(struct expectation *expect)
+static gboolean expectation_check(struct expectation *expect)
 {
    if(expect->expected!=expect->found)
       {
-         static bool firsterror=true;
+         static gboolean firsterror=TRUE;
          if(firsterror)
             {
                fprintf(stderr, "\n---\n");
-               firsterror=false;
+               firsterror=FALSE;
             }
          fprintf(stderr,
                  "%s: expected %d call(s), got %d\n",
                  expect->description,
                  expect->expected,
                  expect->found);
-         return false;
+         return FALSE;
       }
-   return true;
+   return TRUE;
 }
 static void expectation_call(struct expectation *expect)
 {

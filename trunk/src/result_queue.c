@@ -173,7 +173,7 @@ static gboolean source_callback(gpointer data)
  *
  * @param source
  * @param timeout maximum timeout to pass to the poll() call (out)
- * @return true if there's something on the queue
+ * @return TRUE if there's something on the queue
  */
 static gboolean source_prepare(GSource *source, gint *timeout)
 {
@@ -185,7 +185,7 @@ static gboolean source_prepare(GSource *source, gint *timeout)
 
 /**
  * Check the source, after polling.
- * @return true if there's something on the queue
+ * @return TRUE if there's something on the queue
  */
 static gboolean source_check(GSource *source)
 {
@@ -200,7 +200,7 @@ static gboolean source_check(GSource *source)
  * @param source
  * @param callback callback function, which may be NULL
  * @param user_data ignored
- * @return result true or false
+ * @return result TRUE or FALSE
  */
 static gboolean source_dispatch(GSource *source, GSourceFunc callback, gpointer user_data)
 {

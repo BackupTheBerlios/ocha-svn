@@ -2,7 +2,6 @@
 #define RESULT_H
 
 #include <glib.h>
-#include <stdbool.h>
 
 /** \file
  * A result is an executable object that
@@ -28,7 +27,7 @@ struct result
     *
     * This function should execute the result, whatever
     * that means for the current result, and return
-    * true if it succeeded. Any error message
+    * TRUE if it succeeded. Any error message
     * should have been presented to the user before
     * this function returns, depending on the
     * type of the result.
@@ -39,13 +38,13 @@ struct result
     *
     * @param self the result
     * @param errors a GError to set when the function
-    * returns false, may be NULL if you don't care.
+    * returns FALSE, may be NULL if you don't care.
     * The domain will be RESULT_ERROR and the error
     * code one of the codes defined by ResultErrorCode.
     * (to be freed with g_error_free())
-    * @return true if execution succeeded
+    * @return TRUE if execution succeeded
     */
-   bool (*execute)(struct result *self, GError **errors);
+   gboolean (*execute)(struct result *self, GError **errors);
 
    /**
     * Free all memory and resources held by this result

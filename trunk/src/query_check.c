@@ -26,7 +26,7 @@ static const char *utf8_CET_ETE_noaccents = "CET ETE";
 /**
  * prototype of query_highlight, which should not be used anywhere else
  */
-extern bool query_highlight(const char *query, const char *name, char *highlight);
+extern gboolean query_highlight(const char *query, const char *name, char *highlight);
 
 static void setup()
 {
@@ -170,12 +170,12 @@ static void assertHighlightIs(const char *query, const char *name, const char *p
    const int namelen=strlen(name);
    char goal[namelen+1];
    strcmp(name, goal);
-   bool expected_retval=false;
+   gboolean expected_retval=FALSE;
    for(int i=0; i<namelen; i++)
       {
          if(pattern[i]=='1')
             {
-               expected_retval=true;
+               expected_retval=TRUE;
                goal[i]=name[i];
             }
          else
@@ -185,13 +185,13 @@ static void assertHighlightIs(const char *query, const char *name, const char *p
    char dest[namelen+2];
    memset(dest, 'w', namelen+1);
    dest[namelen+1]='\0';
-   bool retval = query_highlight(query, name, dest);
+   gboolean retval = query_highlight(query, name, dest);
    fail_unless(expected_retval==retval,
                g_strdup_printf("assertHighlightIs(%s, %s, ...): returned %s when it should have returned %s\n",
                                query,
                                name,
-                               retval ? "true":"false",
-                               expected_retval ? "true":"false"));
+                               retval ? "TRUE":"FALSE",
+                               expected_retval ? "TRUE":"FALSE"));
    if(retval)
       {
          if(memcmp(dest, goal, namelen+1)==0)

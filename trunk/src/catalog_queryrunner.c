@@ -79,10 +79,10 @@ struct catalog_queryrunner
    /** tell the thread that query or stopping has changed */
    GCond *cond;
 
-   /** set to true to tell the thread to end, protected by the mutex */
-   bool stopping;
-   /** true between start() and stop() */
-   bool started;
+   /** set to TRUE to tell the thread to end, protected by the mutex */
+   gboolean stopping;
+   /** TRUE between start() and stop() */
+   gboolean started;
 };
 
 /** catalog_queryrunner to queryrunner */
@@ -96,17 +96,17 @@ static void consolidate(struct queryrunner *self);
 static void stop(struct queryrunner *self);
 static void release(struct queryrunner *self);
 static gpointer runquery_thread(gpointer);
-static bool result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata);
-static bool query_has_changed(struct catalog_queryrunner *self);
+static gboolean result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata);
+static gboolean query_has_changed(struct catalog_queryrunner *self);
 static void wait_on_condition(struct catalog_queryrunner *self, int wait_ms);
 
-static bool try_connect(const char *path)
+static gboolean try_connect(const char *path)
 {
    struct catalog *catalog=catalog_connect(path, NULL/*errormsg*/);
    if(catalog==NULL)
-      return false;
+      return FALSE;
    catalog_disconnect(catalog);
-   return true;
+   return TRUE;
 }
 
 struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queue *queue)
@@ -130,10 +130,10 @@ struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queu
    queryrunner->catalog=NULL;
    queryrunner->mutex=g_mutex_new();
    queryrunner->cond=g_cond_new();
-   queryrunner->stopping=false;
+   queryrunner->stopping=FALSE;
    queryrunner->thread=g_thread_create(runquery_thread,
                                        queryrunner/*userdata*/,
-                                       true/*joinable*/,
+                                       TRUE/*joinable*/,
                                        NULL/*error*/);
 
 
@@ -148,17 +148,17 @@ static void release(struct queryrunner *_self)
    stop(QUERYRUNNER(self));
 
    lock(self->mutex);
-   self->stopping=true;
+   self->stopping=TRUE;
    g_cond_broadcast(self->cond);
    unlock(self->mutex);
 
    g_thread_join(self->thread);
-   g_string_free(self->query, true/*free content*/);
-   g_string_free(self->running_query, true/*free content*/);
+   g_string_free(self->query, TRUE/*free content*/);
+   g_string_free(self->running_query, TRUE/*free content*/);
    g_free((gpointer)self->path);
    g_free(self);
 }
-static bool query_has_changed(struct catalog_queryrunner *queryrunner)
+static gboolean query_has_changed(struct catalog_queryrunner *queryrunner)
 {
    return strcmp(queryrunner->query->str, queryrunner->running_query->str)!=0;
 }
@@ -239,7 +239,7 @@ static void start(struct queryrunner *_self)
    g_return_if_fail(_self!=NULL);
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
    lock(self->mutex);
-   self->started=true;
+   self->started=TRUE;
    g_cond_broadcast(self->cond);
    unlock(self->mutex);
 }
@@ -256,10 +256,10 @@ static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
    unlock(self->mutex);
 
 }
-static bool result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
+static gboolean result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
 {
-   g_return_val_if_fail(userdata!=NULL, false);
-   g_return_val_if_fail(result!=NULL, false);
+   g_return_val_if_fail(userdata!=NULL, FALSE);
+   g_return_val_if_fail(result!=NULL, FALSE);
 
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(userdata);
 
@@ -272,13 +272,13 @@ static bool result_callback(struct catalog *catalog, float pertinence, struct re
    count++;
    self->count=count;
    if(count>=MAXIMUM)
-      return false;
+      return FALSE;
 
    if(count==FIRST_BUNCH_SIZE)
       wait_on_condition(self, AFTER_FIRST_BUNCH_TIMEOUT);
    else if(count%LATER_BUNCH_SIZE==0)
       wait_on_condition(self, LATER_BUNCH_TIMEOUT);
-   return true;
+   return TRUE;
 }
 
 static void run_query(struct queryrunner *_self, const char *query)
@@ -322,7 +322,7 @@ static void stop(struct queryrunner *_self)
    printf("stop (in)\n");
    lock(self->mutex);
    printf("locked\n");
-   self->started=false;
+   self->started=FALSE;
    g_string_truncate(self->query, 0);
    if(self->catalog)
       catalog_interrupt(self->catalog);

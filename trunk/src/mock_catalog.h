@@ -31,7 +31,7 @@ void mock_catalog_expect_addentry(struct catalog *catalog, const char *path, con
  * Fail unless all calls have been made as expected.
  *
  * If there's an error, it'll be printed to stderr and
- * the function will return false
+ * the function will return FALSE
  * @param catalog
  */
 void mock_catalog_assert_expectations_met(struct catalog *catalog);

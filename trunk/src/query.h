@@ -16,25 +16,25 @@
  */
 
 /**
- * Return true if the query matches the given name.
+ * Return TRUE if the query matches the given name.
  *
  * If you've got a result already, use query_result_ismatch()
  * instead.
  *
  * @param query
  * @param name
- * @return true if the name matches the query
+ * @return TRUE if the name matches the query
  */
-bool query_ismatch(const char *query, const char *name);
+gboolean query_ismatch(const char *query, const char *name);
 
 /**
- * Return true if the query matches the given result.
+ * Return TRUE if the query matches the given result.
  *
  * @param query
  * @param result
- * @return true if the name matches the query
+ * @return TRUE if the name matches the query
  */
-bool query_result_ismatch(const char *query, const struct result *result);
+gboolean query_result_ismatch(const char *query, const struct result *result);
 
 /**
  * Highlight a string that's queried on using pango markup.

@@ -98,7 +98,7 @@ void resultlist_set_current_query(const char *query)
    if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
                                     &iter))
       {
-         bool go_on;
+         gboolean go_on;
          do
             {
                struct resultholder *holder;
@@ -147,7 +147,7 @@ struct result *resultlist_get_selected()
 void resultlist_add_result(float pertinence, struct result *result)
 {
    GtkTreeIter iter;
-   bool was_empty = !gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
+   gboolean was_empty = !gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
                                                    &iter);
 
    const char *path = result->path;
@@ -209,7 +209,7 @@ static const char *create_highlighted_label_markup(struct result  *result)
    g_string_append(full, "</small>");
 
    const char *markup = full->str;
-   g_string_free(full, false/* do not free content*/);
+   g_string_free(full, FALSE/* do not free content*/);
    return markup;
 }
 

@@ -48,9 +48,9 @@ void catalog_disconnect(struct catalog *catalog);
  * @param result the result itself. the callback is responsible for
  * releasing it eventually
  * @param userdata pointer passed to catalog_executequery()
- * @return true to continue adding results, false to stop looking for results
+ * @return TRUE to continue adding results, FALSE to stop looking for results
  */
-typedef bool (*catalog_callback_f)(struct catalog *catalog, float pertinence, struct result *result, void *userdata);
+typedef gboolean (*catalog_callback_f)(struct catalog *catalog, float pertinence, struct result *result, void *userdata);
 
 /**
  * Execute a query and add the results into
@@ -65,15 +65,15 @@ typedef bool (*catalog_callback_f)(struct catalog *catalog, float pertinence, st
  * @param callback function to call for every results
  * @param userdata userdata to pass to the callback
  * @param if non-null and if this function returns
- * false, you'll find there an error message (in english)
+ * FALSE, you'll find there an error message (in english)
  * explaining why the query failed. This is a static
  * pointer; it is always valid and does not need to be freed.
  * @param userdata pointer to pass to the callback
- * @return return false if there was a fatal error, in
+ * @return return FALSE if there was a fatal error, in
  * which case the catalog must be immediately
  * disconnected.
  */
-bool catalog_executequery(struct catalog *catalog,
+gboolean catalog_executequery(struct catalog *catalog,
                           const char *query,
                           catalog_callback_f callback,
                           void *userdata);
@@ -121,27 +121,27 @@ void catalog_restart(struct catalog *catalog);
  * @param name command name (used to find it afterwards)
  * @param execute command to execute, with %s to replace with the file name
  * @param id_out if non-null, this variable will be set to the generated ID of the command
- * @return true if the command was added, false otherwise
+ * @return TRUE if the command was added, FALSE otherwise
  */
-bool catalog_addcommand(struct catalog *catalog, const char *name, const char *execute, int *id_out);
+gboolean catalog_addcommand(struct catalog *catalog, const char *name, const char *execute, int *id_out);
 
 /**
  * Find a command by name.
  * @param catalog
  * @param name command name (used to find it afterwards)
  * @param id_out if non-null, this variable will be set to the generated ID of the command
- * @return true if the command was found, false otherwise
+ * @return TRUE if the command was found, FALSE otherwise
  */
-bool catalog_findcommand(struct catalog *catalog, const char *name, int *id_out);
+gboolean catalog_findcommand(struct catalog *catalog, const char *name, int *id_out);
 
 /**
  * Find an entry by path.
  * @param catalog
  * @param path entry path
  * @param id_out if non-null, this variable will be set to the generated ID of the command
- * @return true if the command was found, false otherwise
+ * @return TRUE if the command was found, FALSE otherwise
  */
-bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out);
+gboolean catalog_findentry(struct catalog *catalog, const char *path, int *id_out);
 
 /**
  * Add an entry into the catalog.
@@ -150,9 +150,9 @@ bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out);
  * @param display_name
  * @param command_id id of a command to use to execute the file
  * @param id_out if non-null, this variable will be set to the generated ID of the entry
- * @return true if the entry was added, false otherwise
+ * @return TRUE if the entry was added, FALSE otherwise
  */
-bool catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out);
+gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out);
 
 /**
  * Get a pointer on the last error that happened with
