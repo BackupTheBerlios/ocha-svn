@@ -37,7 +37,7 @@ ocha_SOURCES=ocha_main.c result_queue.c result_queue.h querywin.h querywin.c \
 querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h catalog_result.c catalog_result.h \
 query.c query.h resultlist.h resultlist.c netwm.h netwm.c netwm_queryrunner.c \
 netwm_queryrunner.h compound_queryrunner.h compound_queryrunner.c \
-indexer_files.c indexer_utils.c  indexer_applications.c indexer_applications.h desktop_file.c desktop_file.h \
+indexer_files.c indexer_files_view.c indexer_utils.c  indexer_applications.c indexer_applications.h desktop_file.c desktop_file.h \
 indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c ocha_gconf.h ocha_gconf.c \
 string_utils.h string_utils.c 
 ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS)
