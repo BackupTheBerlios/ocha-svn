@@ -39,6 +39,8 @@ struct result
     * @return true if execution succeeded
     */
    bool (*execute)(struct result *self);
+
+   void (*release)(struct result *self);
 };
 
 #endif /* RESULT_H */

@@ -3,6 +3,7 @@
 
 #include <glib.h>
 #include "result.h"
+#include "queryrunner.h"
 
 /** \file
  * A result queue is an ansynchronous queue
@@ -37,17 +38,19 @@
  * @param result the result itself. The function is responsible for freeing
  * the result. A correct empty implementation would call result_delete() on all results
  * it gets and then return.
+ * @param userdata userdata passed to the constructor of the result queue
  */
-typedef void (*result_queue_handler_f)(struct queryrunner *caller, const char *query, float pertinence, struct result *result);
+typedef void (*result_queue_handler_f)(struct queryrunner *caller, const char *query, float pertinence, struct result *result, gpointer userdata);
 
 /**
  * Create a new result queue.
  *
  * @param context context to attach this queue to, or NULL for the default context
  * @param handler the handler function
+ * @param userdata user data to pass to the handler when it's called
  * @return a new result queue, to be freed using result_queue_delete()
  */
-struct result_queue* result_queue_new(GMainContext* context, result_queue_handler_f handler);
+struct result_queue* result_queue_new(GMainContext* context, result_queue_handler_f handler, gpointer userdata);
 
 /**
  * Release a queue and all the resources it used.
