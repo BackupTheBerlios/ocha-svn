@@ -221,6 +221,21 @@ void catalog_restart(struct catalog *catalog);
 gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_out);
 
 /**
+ * Make sure a source with this ID exists, and that it's of the correct type.
+ *
+ * If the source exists with this type, it'll be left alone.
+ * If the source exists but is of the wrong type, its content will be removed
+ * and the source re-created. If the source does not exist, it'll be created.
+ *
+ * @param catalog
+ * @param type source type
+ * @param source_id source id
+ * @return TRUE if the source now exists and is of this type, FALSE if some
+ * error was detected (check catalog_error())
+ */
+gboolean catalog_check_source(struct catalog *catalog, const char *type, int source_id);
+
+/**
  * Get rid of a source and of all of its entries
  * @param catalog
  * @param id source id

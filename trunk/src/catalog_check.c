@@ -38,6 +38,7 @@ struct catalog_entry entries[] = {
 int entries_id[entries_length];
 
 #define catalog_cmd(catalog, comment, ret) _catalog_cmd(catalog, comment, ret, __FILE__, __LINE__)
+#define assert_source_exists(catalog, type, sourceid) _assert_source_exists(catalog, type, sourceid, __FILE__, __LINE__)
 
 /* ------------------------- prototypes */
 static Suite *catalog_check_suite(void);
@@ -53,6 +54,7 @@ static gboolean countdown_callback(struct catalog *catalog, const struct catalog
 static gboolean countdown_interrupt_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
 static gpointer execute_query_thread(void *userdata);
 static void addentries(struct catalog *catalog, int sourceid, int count, const char *name_pattern);
+static void _assert_source_exists(struct catalog *catalog, const char *type, int sourceid, const char *file, int line);
 
 /* ------------------------- test suite: catalog */
 
@@ -387,6 +389,97 @@ START_TEST(test_source_update)
 }
 END_TEST
 
+START_TEST(test_check_source_create_new)
+{
+        struct catalog *catalog;
+
+        printf("--- test_check_source_create_new\n");
+
+        catalog = catalog_connect(PATH, NULL);
+
+        catalog_cmd(catalog,
+                    "catalog_check_source(catalog, 'test', 9)",
+                    catalog_check_source(catalog, "test", 9));
+        assert_source_exists(catalog, "test", 9);
+
+        printf("--- test_check_source_create_new OK\n");
+}
+END_TEST
+
+START_TEST(test_check_source_transform)
+{
+        struct catalog *catalog;
+        int source_id=-1;
+        unsigned int count;
+        struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
+
+        printf("--- test_check_source_transform\n");
+
+        catalog = catalog_connect(PATH, NULL);
+
+        catalog_cmd(catalog,
+                    "create source",
+                    catalog_add_source(catalog,
+                                       "test",
+                                       &source_id));
+        entry.source_id=source_id;
+        catalog_cmd(catalog,
+                    "addentry(/tmp/toto.txt)",
+                    catalog_add_entry(catalog,
+                                      &entry,
+                                      NULL/*id_out*/));
+
+        catalog_cmd(catalog,
+                    "catalog_check_source(catalog, 'blah', source_id)",
+                    catalog_check_source(catalog, "blah", source_id));
+        count=1;
+        catalog_cmd(catalog,
+                    "get count('blah', source_id)",
+                    catalog_get_source_content_count(catalog, source_id, &count));
+        fail_unless(count==0,
+                    "old entries should have been removed");
+
+        assert_source_exists(catalog, "blah", source_id);
+
+        printf("--- test_check_source_transform OK\n");
+}
+END_TEST
+
+START_TEST(test_check_source_keep)
+{
+        struct catalog *catalog;
+        int source_id=-1;
+        unsigned int count;
+        struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
+
+        printf("--- test_check_source_keep\n");
+
+        catalog = catalog_connect(PATH, NULL);
+
+        catalog_cmd(catalog,
+                    "create source",
+                    catalog_add_source(catalog,
+                                       "test",
+                                       &source_id));
+        entry.source_id=source_id;
+        catalog_cmd(catalog,
+                    "addentry(/tmp/toto.txt)",
+                    catalog_add_entry(catalog,
+                                      &entry,
+                                      NULL/*id_out*/));
+
+        catalog_cmd(catalog,
+                    "catalog_check_source(catalog, 'test', source_id)",
+                    catalog_check_source(catalog, "test", source_id));
+        catalog_cmd(catalog,
+                    "get count('blah', source_id)",
+                    catalog_get_source_content_count(catalog, source_id, &count));
+        fail_unless(count==1,
+                    "old entries should have been kept");
+
+        printf("--- test_check_source_keep OK\n");
+}
+END_TEST
 
 
 START_TEST(test_execute_query)
@@ -655,7 +748,9 @@ static Suite *catalog_check_suite(void)
         tcase_add_test(tc_core, test_remove_entry);
         tcase_add_test(tc_core, test_remove_source);
         tcase_add_test(tc_core, test_source_update);
-
+        tcase_add_test(tc_core, test_check_source_keep);
+        tcase_add_test(tc_core, test_check_source_create_new);
+        tcase_add_test(tc_core, test_check_source_transform);
 
         tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
         suite_add_tcase(s, tc_query);
@@ -970,3 +1065,31 @@ static void addentries(struct catalog *catalog,
         }
 }
 
+static void _assert_source_exists(struct catalog *catalog, const char *type, int source_id, const char *file, int line)
+{
+        struct catalog_entry entry = CATALOG_ENTRY("Toto", "/tmp/toto.txt");
+        int entry_id;
+        int count=1;
+
+        entry.source_id=source_id;
+        _catalog_cmd(catalog,
+                     "addentry(/tmp/toto.txt)",
+                     catalog_add_entry(catalog,
+                                       &entry,
+                                       &entry_id),
+                     file,
+                     line);
+
+        _catalog_cmd(catalog,
+                     "executequery()",
+                     catalog_executequery(catalog,
+                                          "t",
+                                          countdown_callback,
+                                          &count),
+                     file,
+                     line);
+        _fail_unless(count==0,
+                     file,
+                     line,
+                     "source does not exist: no entries found");
+}

@@ -130,6 +130,35 @@ gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_o
         return FALSE;
 }
 
+gboolean catalog_check_source(struct catalog *catalog, const char *type, int source_id)
+{
+        int count;
+        g_return_val_if_fail(catalog!=NULL, FALSE);
+        g_return_val_if_fail(type!=NULL, FALSE);
+
+        if(!execute_query_printf(catalog,
+                                 getinteger_callback,
+                                 &count,
+                                 "SELECT COUNT(*) FROM sources WHERE id=%d and type='%q'",
+                                 source_id,
+                                 type)) {
+                return FALSE;
+        }
+
+        if(count==1) {
+                return TRUE;
+        }
+
+        return execute_update_printf(catalog,
+                                     TRUE/*autocommit*/,
+                                     "DELETE FROM sources WHERE id=%d; "
+                                     "DELETE FROM entries WHERE source_id=%d; "
+                                     "INSERT INTO sources (id, type, version, enabled) VALUES (%d, '%q', 0, 1);",
+                                     source_id,
+                                     source_id,
+                                     source_id,
+                                     type);
+}
 
 struct catalog *catalog_connect(const char *path, GError **err)
 {
