@@ -172,7 +172,7 @@ static gboolean _recurse(struct catalog *catalog,
                   }
                 if(acc_dir || acc_file)
                   {
-                     if(!callback(catalog, cmd, current_path, filename, userdata, err))
+                      if(!callback(catalog, cmd, current_path, filename, err, userdata))
                         error=TRUE;
                   }
             }

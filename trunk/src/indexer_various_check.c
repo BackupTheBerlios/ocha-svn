@@ -177,7 +177,9 @@ START_TEST(test_index)
 {
    expect_file_entry("x1.txt");
    expect_file_entry("x2.gif");
+   expect_file_entry("d1");
    expect_file_entry("d1/x3.txt");
+   expect_file_entry("d1/d2");
    expect_file_entry("d1/d2/x4.txt");
 
    index_files();
@@ -192,6 +194,7 @@ START_TEST(test_limit_depth_1)
 
    expect_file_entry("x1.txt");
    expect_file_entry("x2.gif");
+   expect_file_entry("d1");
 
    index_files();
 
@@ -205,7 +208,9 @@ START_TEST(test_limit_depth_2)
 
    expect_file_entry("x1.txt");
    expect_file_entry("x2.gif");
+   expect_file_entry("d1");
    expect_file_entry("d1/x3.txt");
+   expect_file_entry("d1/d2");
 
    index_files();
 
@@ -220,6 +225,7 @@ START_TEST(test_ignore)
    touch(TEMPDIR "/x1.txt~"); /* hardcoded ignore pattern */
    touch(TEMPDIR "/CVS/x5.gif"); /* hardcoded ignore pattern */
 
+   expect_file_entry("d1");
    expect_file_entry("x2.gif");
 
    index_files();

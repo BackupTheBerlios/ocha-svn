@@ -117,11 +117,9 @@ void resultlist_clear()
                         * least until a query is run that it does not match.
                         */
                        go_on=gtk_tree_model_iter_next(GTK_TREE_MODEL(model), &iter);
-                       printf("keep %s\n", holder->result->path);
                    }
                else
                    {
-                       printf("get rid of %s\n", holder->result->path);
                        if(holder)
                            g_hash_table_remove(hash, holder->result->path);
                        go_on=gtk_list_store_remove(GTK_LIST_STORE(model), &iter);

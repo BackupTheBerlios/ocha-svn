@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <glib.h>
 
 /**
  * \file index mozilla/firefox bookmarks
@@ -31,6 +32,21 @@ struct indexer indexer_mozilla =
    .execute=execute,
    .validate=validate,
    .discover=discover,
+};
+
+/**
+ * A bookmark file that's just been
+ * discovered, possibly with a label
+ * if it came from a profile.ini or
+ * if it has been found in a profile.ini
+ * later.
+ */
+struct discovered
+{
+    /** path this was found it, to free with g_free() */
+    char *path;
+    /** name of the profile, to free with g_free(). may be null */
+    char *profile_name;
 };
 
 static struct indexer_source *load(struct indexer *self, struct catalog *catalog, int id)
@@ -255,6 +271,76 @@ static char *html_expand_common_entities(const char *str)
    return retval_str;
 }
 
+static struct discovered *discover_add_boorkmark_file(GArray *discovereds, const char *path)
+{
+   struct discovered *start = (struct discovered *)discovereds->data;
+   struct discovered *end = start+discovereds->len;
+   for(struct discovered *current=start; current<end; current++)
+      {
+         if(strcmp(path, current->path)==0)
+             return current;
+      }
+   g_array_set_size(discovereds, discovereds->len+1);
+   struct discovered *last = ((struct discovered *)discovereds->data)+(discovereds->len-1);
+   last->path=g_strdup(path);
+   last->profile_name=NULL;
+   return last;
+}
+
+static void discover_add_profiles_file(GArray *discovereds, const char *path)
+{
+    GKeyFile *keyfile = g_key_file_new();
+    if(g_key_file_load_from_file(keyfile, path, G_KEY_FILE_NONE, NULL/*err*/))
+        {
+            int groups_len = 0;
+            gchar **groups = g_key_file_get_groups(keyfile, &groups_len);
+            if(groups)
+                {
+                    for(int i=0; i<groups_len; i++)
+                        {
+                            gchar *group = groups[i];
+                            gchar *profile_name = g_key_file_get_string(keyfile,
+                                                                        group,
+                                                                        "Name",
+                                                                        NULL/*err*/);
+                            if(profile_name)
+                                {
+                                    gchar *profile_path = g_key_file_get_string(keyfile,
+                                                                                group,
+                                                                                "Path",
+                                                                                NULL/*err*/);
+                                    if(profile_path)
+                                        {
+                                            struct discovered *discovered;
+                                            char full_profile_path[strlen(path)+1+strlen(profile_path)+1+strlen("bookmarks.html")+1];
+                                            if(*profile_path=='/')
+                                                strcpy(full_profile_path, profile_path);
+                                            else
+                                                {
+                                                    strcpy(full_profile_path, path);
+                                                    char *lastslash = strrchr(full_profile_path, '/');
+                                                    if(lastslash)
+                                                        *lastslash='\0';
+                                                    strcat(full_profile_path, "/");
+                                                    strcat(full_profile_path, profile_path);
+                                                }
+                                            strcat(full_profile_path, "/");
+                                            strcat(full_profile_path, "bookmarks.html");
+
+                                            discovered = discover_add_boorkmark_file(discovereds,
+                                                                                     full_profile_path);
+                                            discovered->profile_name=g_strdup(profile_name);
+                                            g_free(profile_path);
+                                        }
+                                    g_free(profile_name);
+                                }
+                        }
+                    g_strfreev(groups);
+                }
+        }
+    g_key_file_free(keyfile);
+}
+
 gboolean discover_callback(struct catalog *catalog,
                            int ignored,
                            const char *path,
@@ -262,18 +348,21 @@ gboolean discover_callback(struct catalog *catalog,
                            GError **err,
                            gpointer userdata)
 {
-   if(strcmp("bookmarks.html", filename)!=0)
-      return TRUE;
-   int id=0;
-   if(!catalog_add_source(catalog, INDEXER_NAME, &id))
-      return FALSE;
-   if(!catalog_set_source_attribute(catalog, id, "path", path))
-      return FALSE;
+   GArray *discovereds = (GArray *)userdata;
+   g_return_val_if_fail(filename!=NULL, FALSE);
+   g_return_val_if_fail(discovereds!=NULL, FALSE);
+   g_return_val_if_fail(path!=NULL, FALSE);
+
+   if(strcmp("bookmarks.html", filename)==0)
+       discover_add_boorkmark_file(discovereds, path);
+   else if(strcmp("profiles.ini", filename)==0)
+       discover_add_profiles_file(discovereds, path);
    return TRUE;
 }
 
 static gboolean discover(struct indexer *indexer, struct catalog *catalog)
 {
+   GArray *discovereds = g_array_new(FALSE/*not zero terminated*/, TRUE/*clear*/, sizeof(struct discovered));
    gboolean retval = TRUE;
    char *directories[] = { ".mozilla", ".firefox", ".phoenix", NULL };
    for(int i=0; retval && directories[i]; i++)
@@ -289,22 +378,59 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
                               FALSE/*not slow*/,
                               0/*source_id, ignored*/,
                               discover_callback,
-                              NULL/*userdata*/,
+                              discovereds/*userdata*/,
                               NULL/*err*/);
             }
          g_free(path);
       }
+   if(discovereds->len>0)
+      {
+         struct discovered *start = (struct discovered *)discovereds->data;
+         struct discovered *end = start+discovereds->len;
+         for(struct discovered *current=start; current<end; current++)
+            {
+               int id;
+               if(catalog_add_source(catalog, INDEXER_NAME, &id))
+                  {
+                     printf("add %s %s: %d\n", current->path, current->profile_name, id);
+                     if(catalog_set_source_attribute(catalog,
+                                                     id,
+                                                      "path",
+                                                     current->path))
+                        {
+                           if(current->profile_name)
+                              catalog_set_source_attribute(catalog,
+                                                           id,
+                                                           "profile",
+                                                           current->profile_name);
+                        }
+                     else
+                        retval=FALSE;
+                  }
+               else
+                  retval=FALSE;
+
+               g_free(current->path);
+               if(current->profile_name)
+                  g_free(current->profile_name);
+            }
+      }
+   g_array_free(discovereds, TRUE/*free content*/);
    return retval;
 }
 
 static char *display_name(struct catalog *catalog, int id)
 {
+
     char *uri=NULL;
     char *retval=NULL;
     if(!catalog_get_source_attribute(catalog, id, "path", &uri) || uri==NULL)
         retval=g_strdup("Invalid");
     else
     {
+        char *profile_name=NULL;
+        catalog_get_source_attribute(catalog, id, "profile", &profile_name);
+
         char *path=NULL;
         if(g_str_has_prefix(uri, "file://"))
             path=&uri[strlen("file://")];
@@ -324,13 +450,23 @@ static char *display_name(struct catalog *catalog, int id)
                 {
                     g_string_append(gstr, "Firefox ");
                 }
-                if(!strstr(path, "default"))
-                {
-                    /* not the default, print the path instead of the
-                     * profile name...
-                     */
-                    g_string_append(gstr, &path[strlen(home)+1]);
-                }
+                if(profile_name)
+                    {
+                        g_string_append(gstr, "Profile: ");
+                        g_string_append(gstr, profile_name);
+                    }
+                else
+                    {
+                        if(!strstr(path, "default"))
+                            {
+                                /* not the default, print the path instead of the
+                                 * profile name...
+                                 */
+                                g_string_append(gstr, &path[strlen(home)+1]);
+                            }
+                        else
+                            g_string_append(gstr, "Default Profile");
+                    }
                 retval=g_strdup(gstr->str);
                 g_string_free(gstr, TRUE);
             }
@@ -345,6 +481,8 @@ static char *display_name(struct catalog *catalog, int id)
             retval=uri;
             uri=NULL;
         }
+        if(profile_name)
+            g_free(profile_name);
     }
     if(uri)
         g_free(uri);
