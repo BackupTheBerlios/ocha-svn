@@ -1,6 +1,10 @@
 #include "mempool.h"
 #include <glib.h>
 
+/** \file 
+ * Implementation of API defined in mempool.h
+ */
+
 struct mempool
 {
    size_t size;

@@ -1,5 +1,18 @@
 #ifndef TARGET_H
 #define TARGET_H
+/** \file 
+ *
+ * A target is the basic object type
+ * on which ocha works. It represents some typed
+ * data on which some actions can be executed. What
+ * action can be executed depend on the type of
+ * the target or even the catalog the target comes
+ * from. 
+ *
+ * A memory pool is associated with a target, so that
+ * any resource will be freed at the same time the
+ * target is freed.
+ */
 
 #include <stdbool.h>
 #include <glib.h>
@@ -8,21 +21,14 @@
 /**
  * An object on which actions can be performed.
  * 
- * A target is the basic object type
- * on which ocha works. It represents some typed
- * data on which some actions can be executed. What
- * action can be executed depend on the type of
- * the target or even the catalog the target comes
- * from. 
+ * This structure represents target. It contains 
+ * READ-ONLY fields that are guaranteed to exists 
+ * in the targets returned by target_new(). Other
+ * fields might exists, but they're not publicly 
+ * available.
  * 
  * Targets are reference-counted.
  * 
- * A target can be marked as invalid, in which case
- * it should not be used because it looks like it's
- * actually not what the user wanted. Invalid target
- * still work normally, though; it's just a flag. 
- * Invalid targets should be discarded ASAP. 
- *
  * All string pointers should be allocated from
  * the target's memory pool so that they'll be
  * discarded at the same time as the target.

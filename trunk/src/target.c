@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "target.h"
+/** \file
+ * Implementation of API defined target.h
+ */
 
 #define FILE_URL_HEADER "file://"
 

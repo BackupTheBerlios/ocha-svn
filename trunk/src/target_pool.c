@@ -2,6 +2,10 @@
 #include <glib.h>
 #include "target_pool.h"
 
+/** \file 
+ * Implementation of API defined in target_pool.h
+ */
+
 struct target_pool
 {
    /** string x target */
