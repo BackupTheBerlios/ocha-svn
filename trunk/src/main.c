@@ -21,167 +21,11 @@
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
 
-#define QUERY_TIMEOUT 3000
-
-static struct querywin win_data;
 static struct result_queue *result_queue;
-static struct queryrunner *queryrunner;
-static GString* query_str;
-static GString* running_query;
-static guint32 last_keypress;
-#define query_label_text_len 256
-static char query_label_text[256];
-bool shown;
-static void querywin_start()
-{
-   if(shown)
-      return;
-   printf("show\n");
-   last_keypress=0;
-   queryrunner->start(queryrunner);
-   gtk_window_reshow_with_initial_size(GTK_WINDOW(win_data.querywin));
-   shown=true;
-}
-static void querywin_stop()
-{
-   printf("hide\n");
-   queryrunner->stop(queryrunner);
-   gtk_widget_hide(win_data.querywin);
-   shown=false;
-}
-
-static gboolean focus_out_cb(GtkWidget* widget, GdkEventFocus* ev, gpointer userdata)
-{
-   querywin_stop();
-   return FALSE; /*propagate*/
-}
-
-static gboolean map_event_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata)
-{
-   gtk_window_present(GTK_WINDOW(win_data.querywin));
-}
-
-void result_handler_cb(struct queryrunner *caller,
-                       const char *query,
-                       float pertinence,
-                       struct result *result,
-                       gpointer userdata)
-{
-   g_return_if_fail(result);
-
-   resultlist_add_result(pertinence, result);
-}
-
-static gboolean run_query(gpointer userdata)
-{
-   if(strcmp(running_query->str, query_str->str)!=0)
-      {
-         g_string_assign(running_query, query_str->str);
-         resultlist_set_current_query(query_str->str);
-         resultlist_clear();
-         queryrunner->run_query(queryrunner, running_query->str);
-      }
-   return FALSE;
-}
-
-static void set_query_string()
-{
-   strncpy(query_label_text, query_str->str, query_label_text_len-1);
-   gtk_label_set_text(GTK_LABEL(win_data.query_label), query_label_text);
-   g_timeout_add(300, run_query, NULL/*userdata*/);
-}
-static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata)
-{
-   switch(ev->keyval)
-      {
-      case GDK_Escape:
-         querywin_stop();
-         return TRUE; /*handled*/
-
-      case GDK_Delete:
-      case GDK_BackSpace:
-         if(query_str && query_str->len>0)
-            {
-               g_string_truncate(query_str, query_str->len-1);
-               set_query_string();
-            }
-         last_keypress=ev->time;
-         return TRUE; /*handled*/
-
-      case GDK_Return:
-         {
-            struct result *selected = resultlist_get_selected();
-            if(selected!=NULL)
-               {
-                  querywin_stop();
-                  selected->execute(selected);
-               }
-            return TRUE; /*handled*/
-         }
-
-      default:
-         if(ev->string && ev->string[0]!='\0')
-            {
-               if((ev->time-last_keypress)>QUERY_TIMEOUT)
-                  g_string_assign(query_str, ev->string);
-               else
-                  g_string_append(query_str, ev->string);
-               set_query_string();
-               last_keypress=ev->time;
-               return TRUE;/*handled*/
-            }
-         break;
-      }
-   return FALSE; /*propagate*/
-}
-
-
-static void init_ui(void)
-{
-   resultlist_init();
-   querywin_create(&win_data, resultlist_get_widget());
-   GtkWidget* querywin = win_data.querywin;
-
-   gtk_window_stick(GTK_WINDOW(querywin));
-   gtk_window_set_keep_above(GTK_WINDOW(querywin),
-                 true);
-
-
-   g_signal_connect(querywin,
-                    "key_release_event",
-                    G_CALLBACK(key_release_event_cb),
-                    NULL/*data*/);
-
-   g_signal_connect(querywin,
-                    "focus_out_event",
-                    G_CALLBACK(focus_out_cb),
-                    NULL/*data*/);
-
-   g_signal_connect(querywin,
-                    "map_event",
-                    G_CALLBACK(map_event_cb),
-                    NULL/*data*/);
-
-
-}
-
-void sighandler(int signum)
-{
-   querywin_start();
-}
-static void install_sighandler()
-{
-   struct sigaction act;
-   act.sa_handler=sighandler;
-   sigemptyset(&act.sa_mask);
-   act.sa_flags=0;
-   act.sa_restorer=NULL;
-   sigaction(SIGUSR1, &act, NULL/*oldact*/);
-}
 
 
 static GdkFilterReturn filter_keygrab (GdkXEvent *xevent,
-                                       GdkEvent *event,
+                                       GdkEvent *gdk_event_unused,
                                        gpointer data)
 {
    int keycode = GPOINTER_TO_INT(data);
@@ -252,25 +96,19 @@ int main(int argc, char *argv[])
       }
 
 
-   query_str=g_string_new("");
-   running_query=g_string_new("");
-   result_queue=result_queue_new(NULL/*default context*/,
-                                 result_handler_cb,
-                                 NULL/*userdata*/);
-
+   querywin_init();
 
    GString *catalog_path = g_string_new(getenv("HOME"));
    g_string_append(catalog_path, "/.ocha");
    mkdir(catalog_path->str, 0600);
    g_string_append(catalog_path, "/catalog");
-   queryrunner = catalog_queryrunner_new(catalog_path->str,
-                                         result_queue);
-   init_ui();
+   struct queryrunner *queryrunner = catalog_queryrunner_new(catalog_path->str,
+                                                             querywin_get_result_queue());
+   querywin_set_queryrunner(queryrunner);
    querywin_start();
 
    install_keygrab();
 
-   install_sighandler();
    gtk_main();
 
    return 0;

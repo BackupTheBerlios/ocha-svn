@@ -1,23 +1,13 @@
 #ifndef QUERYWIN_H
 #define QUERYWIN_H
 
-#include <gtk/gtk.h>
+#include "result_queue.h"
+#include "queryrunner.h"
 
-/**
- * Handle to interesting widgets
- */
-struct querywin
-{
-   GtkWidget *querywin;
-   GtkWidget *query_label;
-   GtkWidget *treeview;
-};
-
-/**
- * Create the GtkWigets for the query window
- * and fill a structure querywin.
- * @param querywin a structure querywin to fill
- */
-void querywin_create(struct querywin *, GtkWidget *treeview);
+void querywin_init();
+struct result_queue *querywin_get_result_queue(void);
+void querywin_set_queryrunner(struct queryrunner *);
+void querywin_start(void);
+void querywin_stop(void);
 
 #endif /*QUERYWIN_H*/

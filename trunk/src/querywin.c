@@ -1,13 +1,199 @@
 #include "querywin.h"
+#include "resultlist.h"
+#include <string.h>
+#include <gtk/gtk.h>
+#include <gdk/gdkkeysyms.h>
 
 /** \file
  * Create a query window and initialize the querwin structure.
  */
 
+static GtkWidget *querywin;
+static GtkWidget *query_label;
+static GtkWidget *treeview;
+static GString* query_str;
+static GString* running_query;
+static guint32 last_keypress;
+#define query_label_text_len 256
+static char query_label_text[256];
+bool shown;
+static struct result_queue *result_queue;
+static struct queryrunner *queryrunner;
 
-void querywin_create(struct querywin *retval, GtkWidget *list)
+#define QUERY_TIMEOUT 3000
+
+static void querywin_create(GtkWidget *list);
+static gboolean focus_out_cb(GtkWidget* widget, GdkEventFocus* ev, gpointer userdata);
+static gboolean map_event_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata);
+static void result_handler_cb(struct queryrunner *caller,
+                              const char *query,
+                              float pertinence,
+                              struct result *result,
+                              gpointer userdata);
+static gboolean run_query(gpointer userdata);
+static void set_query_string(void);
+static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata);
+
+#define assert_initialized() g_return_if_fail(result_queue)
+#define assert_queryrunner_set() g_return_if_fail(queryrunner);
+/* ------------------------- public functions */
+
+void querywin_init()
 {
-  GtkWidget *querywin;
+   query_str=g_string_new("");
+   running_query=g_string_new("");
+   result_queue=result_queue_new(NULL/*default context*/,
+                                 result_handler_cb,
+                                 NULL/*userdata*/);
+
+   resultlist_init();
+   querywin_create(resultlist_get_widget());
+
+   gtk_window_stick(GTK_WINDOW(querywin));
+   gtk_window_set_keep_above(GTK_WINDOW(querywin),
+                 true);
+
+
+   g_signal_connect(querywin,
+                    "key_release_event",
+                    G_CALLBACK(key_release_event_cb),
+                    NULL/*data*/);
+
+   g_signal_connect(querywin,
+                    "focus_out_event",
+                    G_CALLBACK(focus_out_cb),
+                    NULL/*data*/);
+
+   g_signal_connect(querywin,
+                    "map_event",
+                    G_CALLBACK(map_event_cb),
+                    NULL/*data*/);
+
+
+}
+
+struct result_queue *querywin_get_result_queue()
+{
+   g_return_val_if_fail(result_queue, NULL);
+   return result_queue;
+}
+void querywin_set_queryrunner(struct queryrunner *runner)
+{
+   assert_initialized();
+   queryrunner=runner;
+}
+void querywin_start()
+{
+   assert_initialized();
+   assert_queryrunner_set();
+
+   if(shown)
+      return;
+   last_keypress=0;
+   queryrunner->start(queryrunner);
+   gtk_window_reshow_with_initial_size(GTK_WINDOW(querywin));
+   shown=true;
+}
+void querywin_stop()
+{
+   assert_initialized();
+   assert_queryrunner_set();
+
+   queryrunner->stop(queryrunner);
+   gtk_widget_hide(querywin);
+   shown=false;
+}
+
+/* ------------------------- private functions */
+
+static gboolean focus_out_cb(GtkWidget* widget, GdkEventFocus* ev, gpointer userdata)
+{
+   querywin_stop();
+   return FALSE; /*propagate*/
+}
+
+static gboolean map_event_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata)
+{
+   gtk_window_present(GTK_WINDOW(querywin));
+}
+
+static void result_handler_cb(struct queryrunner *caller,
+                              const char *query,
+                              float pertinence,
+                              struct result *result,
+                              gpointer userdata)
+{
+   g_return_if_fail(result);
+
+   resultlist_add_result(pertinence, result);
+}
+
+static gboolean run_query(gpointer userdata)
+{
+   if(strcmp(running_query->str, query_str->str)!=0)
+      {
+         g_string_assign(running_query, query_str->str);
+         resultlist_set_current_query(query_str->str);
+         resultlist_clear();
+         queryrunner->run_query(queryrunner, running_query->str);
+      }
+   return FALSE;
+}
+
+static void set_query_string()
+{
+   strncpy(query_label_text, query_str->str, query_label_text_len-1);
+   gtk_label_set_text(GTK_LABEL(query_label), query_label_text);
+   g_timeout_add(300, run_query, NULL/*userdata*/);
+}
+static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata)
+{
+   switch(ev->keyval)
+      {
+      case GDK_Escape:
+         querywin_stop();
+         return TRUE; /*handled*/
+
+      case GDK_Delete:
+      case GDK_BackSpace:
+         if(query_str && query_str->len>0)
+            {
+               g_string_truncate(query_str, query_str->len-1);
+               set_query_string();
+            }
+         last_keypress=ev->time;
+         return TRUE; /*handled*/
+
+      case GDK_Return:
+         {
+            struct result *selected = resultlist_get_selected();
+            if(selected!=NULL)
+               {
+                  querywin_stop();
+                  selected->execute(selected);
+               }
+            return TRUE; /*handled*/
+         }
+
+      default:
+         if(ev->string && ev->string[0]!='\0')
+            {
+               if((ev->time-last_keypress)>QUERY_TIMEOUT)
+                  g_string_assign(query_str, ev->string);
+               else
+                  g_string_append(query_str, ev->string);
+               set_query_string();
+               last_keypress=ev->time;
+               return TRUE;/*handled*/
+            }
+         break;
+      }
+   return FALSE; /*propagate*/
+}
+
+
+static void querywin_create(GtkWidget *list)
+{
   GtkWidget *vbox1;
   GtkWidget *query;
   GtkWidget *scrolledwindow1;
@@ -37,9 +223,8 @@ void querywin_create(struct querywin *retval, GtkWidget *list)
   gtk_container_add (GTK_CONTAINER (scrolledwindow1), list);
 
   /* fill in structure */
-  retval->querywin=querywin;
-  retval->query_label=query;
-  retval->treeview=list;
+  query_label=query;
+  treeview=list;
 }
 
 
