@@ -39,8 +39,7 @@ ocha_indexer_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 
 ocha_SOURCES=ocha_main.c ocha_init.c result_queue.c result_queue.h querywin.h querywin.c \
 querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h catalog_result.c catalog_result.h \
-query.c query.h resultlist.h resultlist.c netwm.h netwm.c netwm_queryrunner.c \
-netwm_queryrunner.h compound_queryrunner.h compound_queryrunner.c \
+query.c query.h resultlist.h resultlist.c \
 launchers.c launcher_open.c launcher_openurl.c launcher_application.c desktop_file.c \
 string_utils.h string_utils.c ocha_gconf.c ocha_gconf.h
 ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS)

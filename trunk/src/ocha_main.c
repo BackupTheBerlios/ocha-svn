@@ -6,8 +6,6 @@
 #include "queryrunner.h"
 #include "catalog.h"
 #include "catalog_queryrunner.h"
-#include "netwm_queryrunner.h"
-#include "compound_queryrunner.h"
 #include "query.h"
 #include "resultlist.h"
 #include "ocha_init.h"
@@ -51,8 +49,7 @@ int main(int argc, char *argv[])
         int i;
         const char *catalog_path;
         struct result_queue *queue;
-        struct queryrunner *runners[3];
-        struct queryrunner *compound;
+        struct queryrunner *runner;
         struct keygrab_data keygrab_data;
 
         ocha_init(argc, argv, TRUE/*has gui*/, &config);
@@ -78,12 +75,9 @@ int main(int argc, char *argv[])
         catalog_path = config.catalog_path;
 
         queue = querywin_get_result_queue();
-        runners[0]=netwm_queryrunner_create(GDK_DISPLAY(), queue);
-        runners[1]=catalog_queryrunner_new(catalog_path, queue);
-        runners[2]=NULL;
+        runner=catalog_queryrunner_new(catalog_path, queue);
 
-        compound = compound_queryrunner_new(runners, 2);
-        querywin_set_queryrunner(compound);
+        querywin_set_queryrunner(runner);
         querywin_start();
 
         if(!configure_keygrab(&keygrab_data)) {
