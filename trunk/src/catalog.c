@@ -361,12 +361,39 @@ bool catalog_executequery(struct catalog *catalog,
    if(catalog->stop)
       return true;
 
-   g_string_printf(catalog->sql,
+
+   g_string_assign(catalog->sql,
                    "SELECT e.path, e.display_name, c.execute "
                    "FROM entries e, command c "
-                   "WHERE e.display_name LIKE '%%%s%%' AND e.command_id=c.id "
-                   "ORDER BY e.path;",
-                   query);
+                   "WHERE e.display_name LIKE '%");
+   bool has_space=false;
+   for(const char *cptr=query; *cptr!='\0'; cptr++)
+      {
+         char c = *cptr;
+         switch(c)
+            {
+            case ' ':
+               has_space=true;
+               break;
+
+            case '\'':
+            case '"':
+               break;
+
+            default:
+               if(has_space)
+                  {
+                     g_string_append(catalog->sql,
+                                     "%' AND e.display_name LIKE '%");
+                     has_space=false;
+                  }
+               g_string_append_c(catalog->sql,
+                               c);
+            }
+      }
+   g_string_append(catalog->sql,
+                   "%' AND e.command_id=c.id "
+                   "ORDER BY e.path;");
    catalog->callback=callback;
    catalog->callback_userdata=userdata;
    bool ret = execute_query(catalog,

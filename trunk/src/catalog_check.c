@@ -281,6 +281,15 @@ START_TEST(test_execute_query)
 }
 END_TEST
 
+START_TEST(test_execute_query_with_space)
+{
+   printf("--- test_execute_query\n");
+   execute_query_and_expect("to .c",
+                            1,
+                            (char *[]){ "toto.c" });
+}
+END_TEST
+
 /**
  * Let the query return only that many result and return false.
  *
@@ -527,6 +536,7 @@ Suite *catalog_check_suite(void)
    tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
    suite_add_tcase(s, tc_query);
    tcase_add_test(tc_query, test_execute_query);
+   tcase_add_test(tc_query, test_execute_query_with_space);
    tcase_add_test(tc_query, test_callback_stops_query);
    tcase_add_test(tc_query, test_interrupt_stops_query);
    tcase_add_test(tc_query, test_recover_from_interruption);
