@@ -206,7 +206,17 @@ static GtkWidget *properties_widget_from_indexer(struct indexer *indexer)
 {
     g_return_val_if_fail(indexer!=NULL, NULL);
 
-    GtkWidget *retval = gtk_label_new(indexer->display_name);
+    char *text = g_strdup_printf("<b>%s</b>\n\n%s",
+                                 indexer->display_name,
+                                 indexer->description);
+
+    GtkWidget *retval = gtk_label_new(text);
+    gtk_label_set_use_markup(GTK_LABEL(retval), TRUE);
+    gtk_label_set_line_wrap(GTK_LABEL(retval), TRUE);
+    gtk_label_set_justify(GTK_LABEL(retval), GTK_JUSTIFY_FILL);
+    gtk_label_set_selectable(GTK_LABEL(retval), TRUE);
+
+    g_free(text);
     gtk_widget_show(retval);
     return retval;
 }

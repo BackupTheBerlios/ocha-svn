@@ -35,6 +35,16 @@ struct indexer
    const char *display_name;
 
    /**
+    * A long multiline description for the
+    * indexer, in UTF8 with pango markup.
+    * This description will be displayed on
+    * the preference screen when the user selects
+    * the indexer (as opposed to selecting a
+    * source inside the indexer)
+    */
+   const char *description;
+
+   /**
     * Examine the current environment and try to figure out
     * what to index.
     *

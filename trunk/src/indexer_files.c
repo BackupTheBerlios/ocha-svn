@@ -41,6 +41,14 @@ struct indexer indexer_files =
    .validate = validate,
    .load_source = load,
    .discover = discover,
+
+   .description =
+    "This indexer looks recursively into directories for files "
+    "that GNOME knows how to open.\n"
+    "By default, only the desktop and your home directory are "
+    "indexed. You'll probably want to add new sources inside "
+    "this indexer for the folders where you save the files you "
+    "most often work with."
 };
 
 /* ------------------------- private functions */

@@ -24,6 +24,7 @@ static gboolean index(struct indexer_source *, struct catalog *, GError **);
 static void release(struct indexer_source *);
 static gboolean discover(struct indexer *, struct catalog *catalog);
 static char *display_name(struct catalog *catalog, int id);
+static char *describe(struct indexer *indexer);
 static GtkWidget *editor_widget(struct indexer_source *source);
 
 #define INDEXER_NAME "applications"
@@ -35,6 +36,14 @@ struct indexer indexer_applications =
    .execute=execute,
    .validate=validate,
    .discover=discover,
+
+   .description =
+    "This indexer looks recursively into directories for files "
+    "that GNOME knows how to open.\n"
+    "By default, only the desktop and your home directory are "
+    "indexed. You'll probably want to add new sources inside "
+    "this indexer for the folders where you save the files you "
+    "most often work with."
 };
 
 static struct indexer_source *load(struct indexer *self, struct catalog *catalog, int id)
@@ -367,3 +376,4 @@ static GtkWidget *editor_widget(struct indexer_source *source)
 {
     return gtk_label_new(source->display_name);
 }
+

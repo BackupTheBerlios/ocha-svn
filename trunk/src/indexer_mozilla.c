@@ -23,6 +23,7 @@ static gboolean discover(struct indexer *, struct catalog *catalog);
 static char *display_name(struct catalog *catalog, int id);
 static GtkWidget *editor_widget(struct indexer_source *source);
 
+
 #define INDEXER_NAME "mozilla"
 struct indexer indexer_mozilla =
 {
@@ -32,6 +33,11 @@ struct indexer indexer_mozilla =
    .execute=execute,
    .validate=validate,
    .discover=discover,
+
+   .description=
+    "Each source in this indexer corresponds to a profile "
+    "of Mozilla or Mozilla/Firefox. This indexer keeps track of "
+    "the bookmarks in these profiles.\n"
 };
 
 /**
