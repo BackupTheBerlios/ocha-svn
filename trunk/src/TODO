@@ -1,7 +1,11 @@
 - get data from ~/.recently-used http://standards.freedesktop.org/recent-file-spec/recent-file-spec-0.2.html
+- use lastvisited from bookmark file
 - keep recent windows/recently-used in memory (lastuse flag on catalog does not apply to them)
-- get URLs from firefox history file
+- weight results, really
+- count accesses and use that to weight results
+- get URLs from firefox history file (see notes/mork.pl and http://www.livejournal.com/users/jwz/312657.html)
 - canonize file paths
 - replace paths with URI
 - check result validity 
 - display errors when using invalid result (how?)
+- check for memory leaks in indexer and (more importantly) in ocha
