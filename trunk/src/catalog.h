@@ -147,12 +147,13 @@ gboolean catalog_findentry(struct catalog *catalog, const char *path, int *id_ou
  * Add an entry into the catalog.
  * @param catalog
  * @param path local path or URI
- * @param display_name
+ * @param name short name for the entry (what will be searched)
+ * @param long_name long name for the entry/description. For a file it's often a path.
  * @param command_id id of a command to use to execute the file
  * @param id_out if non-null, this variable will be set to the generated ID of the entry
  * @return TRUE if the entry was added, FALSE otherwise
  */
-gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out);
+gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int command_id, int *id_out);
 
 /**
  * Get a pointer on the last error that happened with

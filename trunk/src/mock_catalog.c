@@ -113,11 +113,13 @@ const char *catalog_error(struct catalog *catalog)
 {
    return "mock error";
 }
-gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
+gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, const char *long_name, int command_id, int *id_out)
 {
    struct addentry_args *args =
       (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,
                                                   path);
+
+   fail_unless(long_name!=NULL, "no long_name");
    if(args==NULL)
       {
          fail(g_strdup_printf("unexpected call catalog_addentry(catalog, '%s', '%s')\n",

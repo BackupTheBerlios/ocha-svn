@@ -93,6 +93,7 @@ static void setup_query()
          fail_unless(catalog_addentry(catalog,
                                       entries[i].path,
                                       entries[i].filename,
+                                      entries[i].path/*long_name*/,
                                       command_id,
                                       &entries[i].id),
                      "entry could not be created");
@@ -126,6 +127,7 @@ static void setup_execute()
    fail_unless(catalog_addentry(catalog,
                                 "/tmp/hello.c",
                                 "hello.c",
+                                "/tmp/hello.c",
                                 command_id,
                                 NULL),
                "entry could not be created");
@@ -211,7 +213,7 @@ START_TEST(test_addentry)
    int entry_id=-1;
    catalog_cmd(catalog,
                "1st addentry(/tmp/toto.txt)",
-               catalog_addentry(catalog, "/tmp/toto.txt", "Toto", command_id, &entry_id));
+               catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", command_id, &entry_id));
 
    catalog_disconnect(catalog);
 }
@@ -224,7 +226,7 @@ START_TEST(test_addentry_escape)
 
    catalog_cmd(catalog,
                "1st addentry(/tmp/toto.txt)",
-               catalog_addentry(catalog, "/tmp/to'to.txt", "To'to", command_id, NULL));
+               catalog_addentry(catalog, "/tmp/to'to.txt", "To'to", "/tmp/toto.txt", command_id, NULL));
 
    catalog_disconnect(catalog);
 }
@@ -239,10 +241,10 @@ START_TEST(test_addentry_noduplicate)
    catalog_addcommand(catalog, "edit", "edit %s", &command_id);
 
    int entry_id_1=-1;
-   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", command_id, &entry_id_1),
+   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", command_id, &entry_id_1),
                "1st addentry failed");
    int entry_id_2=-1;
-   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", command_id, &entry_id_2),
+   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", command_id, &entry_id_2),
                "2nd addentry failed");
 
    catalog_disconnect(catalog);
@@ -515,7 +517,7 @@ static gpointer execute_query_thread(void *userdata)
    g_mutex_lock(execute_query_mutex);
    printf("execute_query_thread: lock\n");
    sqlite_exec(db,
-               "BEGIN; INSERT INTO entries VALUES (NULL, '', '', '', '');",
+               "BEGIN; INSERT INTO entries VALUES (NULL, '', '', '', '', '');",
                NULL/*no callback*/,
                NULL/*userdata*/,
                &errmsg);

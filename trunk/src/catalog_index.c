@@ -214,7 +214,7 @@ static gboolean catalog_addcommand_witherrors(struct catalog *catalog, const cha
 }
 static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, int cmd_id, GError **err)
 {
-   if(!catalog_addentry(catalog, path, name, cmd_id, NULL/*id_out*/))
+   if(!catalog_addentry(catalog, path, name, path, cmd_id, NULL/*id_out*/))
       {
          g_set_error(err,
                      CATALOG_INDEX_ERROR,

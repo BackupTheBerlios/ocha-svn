@@ -61,7 +61,7 @@ static void execute_parse(GString *gstr, const char *pattern, const char *path);
 static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id);
 static gboolean execute_result(struct result *_self, GError **);
 static void free_result(struct result *self);
-static struct result *create_result(struct catalog *catalog, const char *path, const char *display_name, const char *execute, int entry_id);
+static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *execute, int entry_id);
 static int result_sqlite_callback(void *userdata, int col_count, char **col_data, char **col_names);
 static void get_id(struct catalog  *catalog, int *id_out);
 static int findid_callback(void *userdata, int column_count, char **result, char **names);
@@ -178,9 +178,9 @@ gboolean catalog_executequery(struct catalog *catalog,
    if(catalog->stop)
       return TRUE;
 
-   GString *sql = g_string_new("SELECT e.id, e.path, e.display_name, c.execute, e.lastuse "
+   GString *sql = g_string_new("SELECT e.id, e.path, e.name, c.execute, e.lastuse "
                                "FROM entries e, command c "
-                               "WHERE e.display_name LIKE '%%");
+                               "WHERE e.name LIKE '%%");
    gboolean has_space=FALSE;
    for(const char *cptr=query; *cptr!='\0'; cptr++)
       {
@@ -199,7 +199,7 @@ gboolean catalog_executequery(struct catalog *catalog,
                if(has_space)
                   {
                      g_string_append(sql,
-                                     "%%' AND e.display_name LIKE '%%");
+                                     "%%' AND e.name LIKE '%%");
                      has_space=FALSE;
                   }
                g_string_append_c(sql, c);
@@ -249,7 +249,7 @@ gboolean catalog_addcommand(struct catalog *catalog, const char *name, const cha
    else
       {
          if(execute_update_printf(catalog,
-                                  "INSERT INTO command (id, display_name, execute) VALUES (NULL, '%q', '%q')",
+                                  "INSERT INTO command (id, name, execute) VALUES (NULL, '%q', '%q')",
                                   name,
                                   execute))
             {
@@ -270,7 +270,7 @@ gboolean catalog_findcommand(struct catalog *catalog, const char *name, int *id_
    if( execute_query_printf(catalog,
                             findid_callback,
                             &id,
-                            "SELECT id FROM command where display_name='%q'",
+                            "SELECT id FROM command where name='%q'",
                             name)
        && id!=-1)
       {
@@ -301,28 +301,31 @@ gboolean catalog_findentry(struct catalog *catalog, const char *path, int *id_ou
    return FALSE;
 }
 
-gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
+gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int command_id, int *id_out)
 {
    g_return_val_if_fail(catalog!=NULL, FALSE);
    g_return_val_if_fail(path!=NULL, FALSE);
-   g_return_val_if_fail(display_name!=NULL, FALSE);
+   g_return_val_if_fail(name!=NULL, FALSE);
+   g_return_val_if_fail(long_name!=NULL, FALSE);
 
    int old_id=-1;
    if(catalog_findentry(catalog, path, &old_id))
       {
          return execute_update_printf(catalog,
-                                      "UPDATE entries SET display_name='%q', command_id=%d WHERE id=%d",
-                                      display_name,
+                                      "UPDATE entries SET name='%q', command_id=%d WHERE id=%d",
+                                      name,
                                       command_id,
                                       old_id);
       }
    else
       {
          if(execute_update_printf(catalog,
-                                  "INSERT INTO entries (id, path, display_name, command_id) VALUES (NULL, '%q', '%q', %d)",
+                                  "INSERT INTO entries (id, path, name, long_name, command_id) VALUES (NULL, '%q', '%q', '%q', %d)",
                                   path,
-                                  display_name,
-                                  command_id))
+                                  name,
+                                  long_name,
+                                  command_id,
+                                  NULL))
             {
                get_id(catalog, id_out);
                return TRUE;
@@ -454,21 +457,17 @@ static gboolean create_tables(sqlite *db, char **errmsg)
                                              "BEGIN; "
                                              "CREATE TABLE entries (id INTEGER PRIMARY KEY, "
                                              "path VARCHAR UNIQUE NOT NULL, "
-                                             "display_name VARCHAR NOT NULL, "
+                                             "name VARCHAR NOT NULL, "
+                                             "long_name VARCHAR NOT NULL, "
                                              "command_id INTEGER, "
                                              "lastuse TIMESTAMP);"
                                              "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
                                              "CREATE INDEX path_idx ON entries (path);"
                                              "CREATE TABLE command (id INTEGER PRIMARY KEY , "
-                                             "display_name VARCHAR NOT NULL, "
+                                             "name VARCHAR NOT NULL, "
                                              "execute VARCHAR NOT NULL, "
                                              "lastuse TIMESTAMP);"
-                                             "CREATE INDEX command_idx ON command (display_name);"
-                                             "CREATE TABLE history (query VARCHAR NOT NULL, "
-                                             "entry_id INTEGER NOT NULL, "
-                                             "command_id INTEGER NOT NULL, "
-                                             "lastuse TIMESTAMP NOT NULL, "
-                                             "frequence FLOAT NOT NULL);"
+                                             "CREATE INDEX command_idx ON command (name);"
                                              "COMMIT;",
                                              errmsg);
    return ret==SQLITE_OK;
@@ -572,16 +571,16 @@ static void free_result(struct result *self)
    g_return_if_fail(self);
    g_free(self);
 }
-static struct result *create_result(struct catalog *catalog, const char *path, const char *display_name, const char *execute, int entry_id)
+static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *execute, int entry_id)
 {
    g_return_val_if_fail(catalog, NULL);
    g_return_val_if_fail(path, NULL);
-   g_return_val_if_fail(display_name, NULL);
+   g_return_val_if_fail(name, NULL);
    g_return_val_if_fail(execute, NULL);
 
    struct catalog_result *result = g_malloc(sizeof(struct catalog_result)
                                             +strlen(path)+1
-                                            +strlen(display_name)+1
+                                            +strlen(name)+1
                                             +strlen(execute)+1
                                             +strlen(catalog->path)+1);
    result->entry_id=entry_id;
@@ -593,8 +592,8 @@ static struct result *create_result(struct catalog *catalog, const char *path, c
    result->base.long_name=result->base.path;
 
    result->base.name=buf;
-   strcpy(buf, display_name);
-   buf+=strlen(display_name)+1;
+   strcpy(buf, name);
+   buf+=strlen(name)+1;
 
    result->execute=buf;
    strcpy(buf, execute);
@@ -619,7 +618,7 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
 
    const int entry_id = atoi(col_data[0]);
    const char *path = col_data[1];
-   const char *display_name = col_data[2];
+   const char *name = col_data[2];
    const char *execute = col_data[3];
 
    if(catalog->stop)
@@ -627,7 +626,7 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
 
    struct result *result = create_result(catalog,
                                          path,
-                                         display_name,
+                                         name,
                                          execute,
                                          entry_id);
    gboolean go_on = catalog->callback(catalog,
