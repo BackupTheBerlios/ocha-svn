@@ -1,6 +1,8 @@
 import conf
 import sys, os, os.path
 from catalog import Catalog
+import time
+WAIT_UNIT=1
 
 def findOrCreateXEmacs(catalog):
     commands=catalog.commands()
@@ -27,7 +29,13 @@ catalog=Catalog(conf.catalog_path())
 
 xemacs=findOrCreateXEmacs(catalog)
 
-for dir in sys.argv[1:]:
+args=sys.argv[1:]
+wait=False
+if "--wait"==args[0]:
+    wait=True
+    args=args[1:]
+
+for dir in args:
     for root, dirs, files in os.walk(dir):
         if isforbidden(root):
             continue
@@ -41,6 +49,9 @@ for dir in sys.argv[1:]:
         for old in existing:
             if not old.exists():
                 existing.delete()
+        if wait:
+            catalog.commit()
+            time.sleep(WAIT_UNIT)
 
 catalog.commit()
 

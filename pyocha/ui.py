@@ -6,6 +6,10 @@ from catalog import Catalog
 import os
 import os.path
 import conf
+import time
+
+def now():
+    return time.time()
 
 class QueryObserver:
     def queryChanged(self, query):
@@ -16,12 +20,13 @@ class QueryObserver:
 
 class QueryResult:
     last_id=0
-    def __init__(self, display_name, result, path=None):
+    def __init__(self, query, display_name, result, path=None):
         self.display_name=display_name
         QueryResult.last_id=QueryResult.last_id+1
         self.id=QueryResult.last_id
         self.result=result
         self.path=path
+        self.query=query
 
     def getDisplayName(self):
         return self.display_name
@@ -31,7 +36,7 @@ class QueryResult:
 
     def execute(self):
         command_id=self.result.command_id
-        catalog=self.result.catalog
+        catalog=self.query.openCatalog()
         command=catalog.loadCommand(command_id)
         command.executeWithEntry(self.result)
 
@@ -47,7 +52,6 @@ class Query:
         if self.__catalog:
             self.__catalog.close()
             self.__catalog=None
-            print "disconnect"
 
     def getQueryString(self):
         return self.__query
@@ -56,7 +60,12 @@ class Query:
         return [] + self.__results
 
     def addResult(self, display_name, path, result):
-        self.__results.append(QueryResult(display_name=display_name, path=path, result=result))
+        self.__results.append(QueryResult(self, display_name=display_name, path=path, result=result))
+
+    def set(self, str):
+        self.__query=str
+        self.__sendQueryChanged()
+        self.__run_query()
 
     def append(self, str):
         self.__query=self.__query+str
@@ -66,30 +75,37 @@ class Query:
     def backspace(self):
         if len(self.__query)>0:
             self.__query=self.__query[0:-1]
-        self.__sendQueryChanged()
-        self.__run_query()
+            self.__sendQueryChanged()
+            self.__run_query()
+
 
     def reset(self):
         self.__query=""
-        self.sendQueryChanged()
+        self.__sendQueryChanged()
         self.__stop_query()
 
+
+    def openCatalog(self):
+        if not self.__catalog:
+            self.__catalog=Catalog(self.__catalog_path)
+        return self.__catalog
+
     def __stop_query(self):
-        pass
+        self.__results=[]
+        self.__sendListChanged()
 
     def __run_query(self):
+        self.__stop_query()
         if not self.__query:
             return
-        if not self.__catalog:
-            print "connect"
-            self.__catalog=Catalog(self.__catalog_path)
-        self.__results=[]
-        self.__sendQueryChanged()
+        catalog=self.openCatalog()
         catalog=self.__catalog
         catalog.query(self.__query, self.__query_cb)
+        self.__sendListChanged()
 
     def __query_cb(self, catalog, entry):
-        print "result:"+str(entry)
+        if len(self.__results)>10:
+            return False
         self.addResult(entry.display_name, entry.path, entry)
         self.__sendListChanged()
         return True
@@ -107,7 +123,8 @@ class Query:
 
 
 class QueryWin(QueryObserver):
-    def __init__(self, query):
+    def __init__(self, query, timeout):
+        self.timeout=timeout
         self.query=query
         self.__results={}
         xml = gtk.glade.XML('pyocha.glade')
@@ -121,6 +138,12 @@ class QueryWin(QueryObserver):
         self.win.connect("key_release_event", self.cb_key_release_event)
 
         query.addObserver(self)
+
+    def show(self):
+        self.win.show()
+
+    def ping(self):
+        self.__ping=now()
 
     def __initlist(self):
         self.list_model=gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
@@ -140,8 +163,10 @@ class QueryWin(QueryObserver):
 
     def queryChanged(self, query):
         self.query_widget.set_text(query.getQueryString())
+        self.ping()
 
     def listChanged(self, query):
+        self.ping()
         model=self.list_model
         iter=model.get_iter_first()
         results=query.getQueryResults()
@@ -153,7 +178,7 @@ class QueryWin(QueryObserver):
             model.set_value(iter, 2, result.id)
             self.__results[str(result.id)]=result
             iter=model.iter_next(iter)
-        if iter:
+        while iter:
             next=model.iter_next(iter)
             model.remove(iter)
             iter=next
@@ -166,7 +191,6 @@ class QueryWin(QueryObserver):
             self.selectedResult=results[0]
 
     def execute(self):
-        print "execute:"+str(self.selectedResult)
         if self.selectedResult:
             self.selectedResult.execute()
 
@@ -175,10 +199,12 @@ class QueryWin(QueryObserver):
 
     def cb_select(self, treeselection):
         model, iter = treeselection.get_selected()
-        result_id=self.list_model.get_value(iter, 2)
-        result=self.findResult(result_id)
-        print "result:"+str(result)
-        self.selectedResult=result
+        if iter:
+            result_id=self.list_model.get_value(iter, 2)
+            result=self.findResult(result_id)
+            self.selectedResult=result
+        else:
+            self.selectedResult=None
 
     def stop(self):
         self.win.hide()
@@ -194,8 +220,18 @@ class QueryWin(QueryObserver):
             self.execute()
             self.stop()
         elif event.string:
-            self.query.append(event.string)
+            if (now()-self.__ping)>self.timeout:
+                self.query.set(event.string)
+            else:
+                self.query.append(event.string)
+
 
 query=Query(conf.catalog_path())
-win=QueryWin(query)
+win=QueryWin(query, conf.timeout())
+
+import signal
+def sighndl(sig, stack):
+    win.show()
+signal.signal(signal.SIGUSR1, sighndl)
+
 gtk.main()

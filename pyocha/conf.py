@@ -10,4 +10,5 @@ def basedir():
 def catalog_path():
     return os.path.join(basedir(), "catalog")
 
-
+def timeout():
+    return 0.8
