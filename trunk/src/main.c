@@ -156,39 +156,50 @@ static void str_lower(char *dest, const char *from)
       dest[i]=tolower(from[i]);
    dest[len]='\0';
 }
+
 static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, GtkTreeModel* model, GtkTreeIter* iter, gpointer userdata)
 {
    struct result *result = NULL;
    gtk_tree_model_get(model, iter, 0, &result, -1);
    g_return_if_fail(result);
-   int buffer_len = 3+5+3+strlen(result->name)+4+6+4+1+7+strlen(result->path)+8+1;
-   char buffer[buffer_len];
-   strcpy(buffer, "<b><big>");
+
    char *query = query_str->str;
    char query_lower[query_str->len+1];
    str_lower(query_lower, query);
    char name_lower[strlen(result->name)+1];
    str_lower(name_lower, result->name);
    char *found=strstr(name_lower, query_lower);
+   char *markup;
    if(found==NULL)
-      strcat(buffer, result->name);
+      {
+         markup=g_markup_printf_escaped("<big>%s</big>\n<small>%s</small>",
+                                        result->name,
+                                        result->path);
+      }
    else
       {
+         const char *name=result->name;
          int index=found-name_lower;
-         int buflen=strlen(buffer);
-         strncat(buffer, result->name, index);
-         buffer[buflen+index]='\0';
-         strcat(buffer, "<u>");
-         strncat(buffer, &result->name[index], strlen(query));
-         buffer[buflen+index+3+strlen(query)]='\0';
-         strcat(buffer, "</u>");
-         strcat(buffer, &result->name[index+strlen(query)]);
+         int buflen=strlen(name);
+         int querylen=strlen(query);
+         char before[index+1];
+         char middle[querylen+1];
+         strncpy(before, name, index);
+         before[index]='\0';
+         strncpy(middle, &name[index], querylen);
+         middle[querylen]='\0';
+
+         markup=g_markup_printf_escaped("<big>%s<u>%s</u>%s</big>\n<small>%s</small>",
+                                        before,
+                                        middle,
+                                        &name[index+querylen],
+                                        result->path);
       }
-   strcat(buffer, "</big></b>\n<small>");
-   strcat(buffer, result->path);
-   strcat(buffer, "</small>");
-   g_assert(strlen(buffer)<=(buffer_len-1));
-   g_object_set(renderer, "markup", buffer, NULL);
+   g_object_set(renderer,
+                "markup",
+                markup,
+                NULL);
+   g_free(markup);
 }
 
 
@@ -310,6 +321,7 @@ int main(int argc, char *argv[])
    result_queue=result_queue_new(NULL/*default context*/,
                                  result_handler_cb,
                                  NULL/*userdata*/);
+
 
    GString *catalog_path = g_string_new(getenv("HOME"));
    g_string_append(catalog_path, "/.ocha");
