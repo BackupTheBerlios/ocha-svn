@@ -6,9 +6,9 @@
 /** query runner structure with private fields */
 struct compound_queryrunner
 {
-   struct queryrunner base;
-   int queryrunners_len;
-   struct queryrunner *queryrunners[];
+        struct queryrunner base;
+        int queryrunners_len;
+        struct queryrunner *queryrunners[];
 };
 
 /** compound_queryrunner -> queryrunner */
@@ -16,89 +16,93 @@ struct compound_queryrunner
 /** queryrunner -> compound_queryrunner */
 #define TO_COMPOUND_QUERYRUNNER(q) ((struct compound_queryrunner *)(q))
 
-static void start(struct queryrunner *self);
-static void run_query(struct queryrunner *self, const char *query);
-static void consolidate(struct queryrunner *self);
-static void stop(struct queryrunner *self);
-static void release(struct queryrunner *self);
+/* ------------------------- prototypes */
+static void compound_queryrunner_start(struct queryrunner *self);
+static void compound_queryrunner_stop(struct queryrunner *self);
+static void compound_queryrunner_run_query(struct queryrunner *self, const char *query);
+static void compound_queryrunner_consolidate(struct queryrunner *self);
+static void compound_queryrunner_release(struct queryrunner *self);
 
 
 /* ------------------------- public functions */
 struct queryrunner *compound_queryrunner_new(struct queryrunner **queryrunners, int queryrunners_len)
 {
-   struct compound_queryrunner *retval = g_malloc(sizeof(struct compound_queryrunner)+queryrunners_len*sizeof(struct queryrunner *));
-   retval->base.start=start;
-   retval->base.stop=stop;
-   retval->base.run_query=run_query;
-   retval->base.consolidate=consolidate;
-   retval->base.release=release;
-   retval->queryrunners_len=queryrunners_len;
-   for(int i=0; i<queryrunners_len; i++)
-      retval->queryrunners[i]=queryrunners[i];
+        struct compound_queryrunner *retval = g_malloc(sizeof(struct compound_queryrunner)+queryrunners_len*sizeof(struct queryrunner *));
+        retval->base.start=compound_queryrunner_start;
+        retval->base.stop=compound_queryrunner_stop;
+        retval->base.run_query=compound_queryrunner_run_query;
+        retval->base.consolidate=compound_queryrunner_consolidate;
+        retval->base.release=compound_queryrunner_release;
+        retval->queryrunners_len=queryrunners_len;
+        for(int i=0; i<queryrunners_len; i++)
+                retval->queryrunners[i]=queryrunners[i];
 
-   return TO_QUERYRUNNER(retval);
+        return TO_QUERYRUNNER(retval);
 }
 
-/* ------------------------- queryrunner */
-static void start(struct queryrunner *_self)
+/* ------------------------- member functions */
+static void compound_queryrunner_start(struct queryrunner *_self)
 {
-   struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
-   g_return_if_fail(self);
+        struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
+        g_return_if_fail(self);
 
-   int len = self->queryrunners_len;
-   for(int i=0; i<len; i++)
-      {
-         struct queryrunner *runner = self->queryrunners[i];
-         runner->start(runner);
-      }
+        int len = self->queryrunners_len;
+        for(int i=0; i<len; i++)
+        {
+                struct queryrunner *runner = self->queryrunners[i];
+                runner->start(runner);
+        }
 }
-static void stop(struct queryrunner *_self)
+static void compound_queryrunner_stop(struct queryrunner *_self)
 {
-   struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
-   g_return_if_fail(self);
+        struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
+        g_return_if_fail(self);
 
-   int len = self->queryrunners_len;
-   for(int i=0; i<len; i++)
-      {
-         struct queryrunner *runner = self->queryrunners[i];
-         runner->stop(runner);
-      }
+        int len = self->queryrunners_len;
+        for(int i=0; i<len; i++)
+        {
+                struct queryrunner *runner = self->queryrunners[i];
+                runner->stop(runner);
+        }
 }
-static void run_query(struct queryrunner *_self, const char *query)
+static void compound_queryrunner_run_query(struct queryrunner *_self, const char *query)
 {
-   struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
-   g_return_if_fail(self);
+        struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
+        g_return_if_fail(self);
 
-   int len = self->queryrunners_len;
-   for(int i=0; i<len; i++)
-      {
-         struct queryrunner *runner = self->queryrunners[i];
-         runner->run_query(runner, query);
-      }
+        int len = self->queryrunners_len;
+        for(int i=0; i<len; i++)
+        {
+                struct queryrunner *runner = self->queryrunners[i];
+                runner->run_query(runner, query);
+        }
 
 }
-static void consolidate(struct queryrunner *_self)
+static void compound_queryrunner_consolidate(struct queryrunner *_self)
 {
-   struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
-   g_return_if_fail(self);
+        struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
+        g_return_if_fail(self);
 
-   int len = self->queryrunners_len;
-   for(int i=0; i<len; i++)
-      {
-         struct queryrunner *runner = self->queryrunners[i];
-         runner->consolidate(runner);
-      }
+        int len = self->queryrunners_len;
+        for(int i=0; i<len; i++)
+        {
+                struct queryrunner *runner = self->queryrunners[i];
+                runner->consolidate(runner);
+        }
 }
-static void release(struct queryrunner *_self)
+static void compound_queryrunner_release(struct queryrunner *_self)
 {
-   struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
-   g_return_if_fail(self);
+        struct compound_queryrunner *self = TO_COMPOUND_QUERYRUNNER(_self);
+        g_return_if_fail(self);
 
-   int len = self->queryrunners_len;
-   for(int i=0; i<len; i++)
-      {
-         struct queryrunner *runner = self->queryrunners[i];
-         runner->release(runner);
-      }
-   g_free(self);
+        int len = self->queryrunners_len;
+        for(int i=0; i<len; i++)
+        {
+                struct queryrunner *runner = self->queryrunners[i];
+                runner->release(runner);
+        }
+        g_free(self);
 }
+
+/* ------------------------- static functions */
+

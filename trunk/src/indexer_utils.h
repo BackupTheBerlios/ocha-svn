@@ -96,11 +96,11 @@ gboolean uri_exists(const char *uri);
  * @return an ID to pass to _source_attribute_change_notify_remove()
  */
 guint source_attribute_change_notify_add(struct indexer *,
-                                         int source_id,
-                                         const char *attribute,
-                                         struct catalog *catalog,
-                                         indexer_source_notify_f callback,
-                                         gpointer userdata);
+                int source_id,
+                const char *attribute,
+                struct catalog *catalog,
+                indexer_source_notify_f callback,
+                gpointer userdata);
 /**
  * Remove a notification registered wyth _source_attribute_change_notify_add
  * @param id return value of _source_attribute_change_notify_add

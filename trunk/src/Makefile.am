@@ -1,4 +1,4 @@
-noinst_HEADERS=result.h result_queue.h queryrunner.h mock_queryrunner.h querywin.h resultlist.h catalog_queryrunner.h
+noinst_HEADERS=result.h result_queue.h queryrunner.h querywin.h resultlist.h catalog_queryrunner.h
 bin_PROGRAMS=ocha ocha_indexer ocha_preferences
 
 noinst_PROGRAMS=result_queue_check catalog_check query_check indexer_various_check catalog_queryrunner_check

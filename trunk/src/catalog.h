@@ -9,10 +9,10 @@
 
 /** error codes returned by catalog connect */
 typedef enum
-   {
-      CATALOG_CONNECTION_ERROR,
-      CATALOG_CANNOT_CREATE_TABLES
-   } CatalogErrorCodes;
+{
+        CATALOG_CONNECTION_ERROR,
+        CATALOG_CANNOT_CREATE_TABLES
+} CatalogErrorCodes;
 
 /** get the error quark for the errors returned by catalog */
 GQuark catalog_error_quark();
@@ -112,8 +112,8 @@ gboolean catalog_get_source_content(struct catalog *catalog,
  * @return FALSE if there was an error
  */
 gboolean catalog_get_source_content_count(struct catalog *catalog,
-                                          int source_id,
-                                          unsigned int *count_out);
+                int source_id,
+                unsigned int *count_out);
 
 /**
  * Update the timestamp of the given entry, because it

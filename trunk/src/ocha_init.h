@@ -10,8 +10,8 @@
  */
 struct configuration
 {
-    /** absolute path to the catalog file, which may not exist (call g_free() when you're done) */
-    const char *catalog_path;
+        /** absolute path to the catalog file, which may not exist (call g_free() when you're done) */
+        const char *catalog_path;
 };
 
 

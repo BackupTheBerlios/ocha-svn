@@ -36,109 +36,109 @@ typedef void (*indexer_new_source_cb)(struct indexer *, int source_id, gpointer 
  */
 struct indexer
 {
-   /**
-    * Unique name for this indexer.
-    * This name is used to find the indexer_sources that
-    * are linked to the indexer. It is never displayed.
-    */
-   const char *name;
+        /**
+         * Unique name for this indexer.
+         * This name is used to find the indexer_sources that
+         * are linked to the indexer. It is never displayed.
+         */
+        const char *name;
 
-   /**
-    * Name of this indexer to be displayed to the users
-    */
-   const char *display_name;
+        /**
+         * Name of this indexer to be displayed to the users
+         */
+        const char *display_name;
 
-   /**
-    * A long multiline description for the
-    * indexer, in UTF8 with pango markup.
-    * This description will be displayed on
-    * the preference screen when the user selects
-    * the indexer (as opposed to selecting a
-    * source inside the indexer)
-    */
-   const char *description;
+        /**
+         * A long multiline description for the
+         * indexer, in UTF8 with pango markup.
+         * This description will be displayed on
+         * the preference screen when the user selects
+         * the indexer (as opposed to selecting a
+         * source inside the indexer)
+         */
+        const char *description;
 
-   /**
-    * Examine the current environment and try to figure out
-    * what to index.
-    *
-    * This function is called on all indexers the first time
-    * ocha is started, with an empty catalog. The goal is to
-    * look at directories, user configuration files and
-    * the environment and create the sources that would be
-    * the most appropriate in this environment and add
-    * them into the catalog.
-    *
-    * The new sources should be ready to be indexed, but
-    * they should still be empty when this call ends.
-    *
-    * @param catalog catalog to add new sources into
-    * @return FALSE if something went wrong accessing
-    * the catalog. The error will be found in the catalog
-    * itself. Everything else should not be considered
-    * an error; the sources whose creation failed for
-    * some other reason should simply be skipped. They
-    * probably were not appropriate.
-    */
-   gboolean (*discover)(struct indexer *, struct catalog *catalog);
+        /**
+         * Examine the current environment and try to figure out
+         * what to index.
+         *
+         * This function is called on all indexers the first time
+         * ocha is started, with an empty catalog. The goal is to
+         * look at directories, user configuration files and
+         * the environment and create the sources that would be
+         * the most appropriate in this environment and add
+         * them into the catalog.
+         *
+         * The new sources should be ready to be indexed, but
+         * they should still be empty when this call ends.
+         *
+         * @param catalog catalog to add new sources into
+         * @return FALSE if something went wrong accessing
+         * the catalog. The error will be found in the catalog
+         * itself. Everything else should not be considered
+         * an error; the sources whose creation failed for
+         * some other reason should simply be skipped. They
+         * probably were not appropriate.
+         */
+        gboolean (*discover)(struct indexer *, struct catalog *catalog);
 
-   /**
-    * Load a indexer_source from the catalog.
-    * @param indexer
-    * @param catalog catalog to load the indexer_source from.
-    * don't keep references to this catalog, because it'll
-    * be closed just after this function returns
-    * @param id unique id of the indexer_source
-    * @return a indexer_source structure, even if the catalog
-    * did not contain everything that was needed for
-    * the indexer_source to be complete (it might be completed
-    * later.
-    */
-   struct indexer_source *(*load_source)(struct indexer *self, struct catalog *catalog, int id);
+        /**
+         * Load a indexer_source from the catalog.
+         * @param indexer
+         * @param catalog catalog to load the indexer_source from.
+         * don't keep references to this catalog, because it'll
+         * be closed just after this function returns
+         * @param id unique id of the indexer_source
+         * @return a indexer_source structure, even if the catalog
+         * did not contain everything that was needed for
+         * the indexer_source to be complete (it might be completed
+         * later.
+         */
+        struct indexer_source *(*load_source)(struct indexer *self, struct catalog *catalog, int id);
 
-   /**
-    * Execute an entry added by a indexer_source of this indexer.
-    *
-    * @param indexer
-    * @param name entry name
-    * @param long_name long entry name
-    * @param path entry path or uri
-    * @param err if non-NULL, any indexing errors
-    * will be added into this object iff this function
-    * returns FALSE. The errors types and domain are
-    * the same as those returned by the function
-    * execute in the struct result
-    * @return TRUE for success, FALSE for failure
-    * @see result
-    */
-   gboolean (*execute)(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err);
+        /**
+         * Execute an entry added by a indexer_source of this indexer.
+         *
+         * @param indexer
+         * @param name entry name
+         * @param long_name long entry name
+         * @param path entry path or uri
+         * @param err if non-NULL, any indexing errors
+         * will be added into this object iff this function
+         * returns FALSE. The errors types and domain are
+         * the same as those returned by the function
+         * execute in the struct result
+         * @return TRUE for success, FALSE for failure
+         * @see result
+         */
+        gboolean (*execute)(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err);
 
-   /**
-    * Execute an entry added by a indexer_source of this indexer.
-    *
-    * @param name entry name
-    * @param long_name long entry name
-    * @param path entry path or uri
-    * @return true if the entry is valid and execute
-    * has a chance of working, false otherwise
-    * @see result
-    */
-   gboolean (*validate)(struct indexer *, const char *name, const char *long_name, const char *path);
+        /**
+         * Execute an entry added by a indexer_source of this indexer.
+         *
+         * @param name entry name
+         * @param long_name long entry name
+         * @param path entry path or uri
+         * @return true if the entry is valid and execute
+         * has a chance of working, false otherwise
+         * @see result
+         */
+        gboolean (*validate)(struct indexer *, const char *name, const char *long_name, const char *path);
 
-   /**
-    * Create a new source.
-    *
-    * Some indexers will not allow the creation of
-    * new sources, in which case this function may
-    * be null.
-    *
-    * @param indexer
-    * @param catalog catalog to register the source in
-    * @param err error structure (may be null)
-    * @return a new, uninitialized source, to be freed the usual way or
-    * NULL if there was an error
-    */
-   struct indexer_source *(*new_source)(struct indexer *, struct catalog *catalog, GError **err);
+        /**
+         * Create a new source.
+         *
+         * Some indexers will not allow the creation of
+         * new sources, in which case this function may
+         * be null.
+         *
+         * @param indexer
+         * @param catalog catalog to register the source in
+         * @param err error structure (may be null)
+         * @return a new, uninitialized source, to be freed the usual way or
+         * NULL if there was an error
+         */
+        struct indexer_source *(*new_source)(struct indexer *, struct catalog *catalog, GError **err);
 };
 
 /**
@@ -167,8 +167,8 @@ struct indexer
  */
 static inline gboolean indexer_discover(struct indexer *indexer, struct catalog *catalog)
 {
-   g_return_val_if_fail(indexer, FALSE);
-   return indexer->discover(indexer, catalog);
+        g_return_val_if_fail(indexer, FALSE);
+        return indexer->discover(indexer, catalog);
 }
 
 /**
@@ -187,8 +187,8 @@ static inline gboolean indexer_discover(struct indexer *indexer, struct catalog 
  */
 static inline struct indexer_source *indexer_load_source(struct indexer *self, struct catalog *catalog, int id)
 {
-   g_return_val_if_fail(self, NULL);
-   return self->load_source(self, catalog, id);
+        g_return_val_if_fail(self, NULL);
+        return self->load_source(self, catalog, id);
 }
 
 /**
@@ -210,8 +210,8 @@ static inline struct indexer_source *indexer_load_source(struct indexer *self, s
  */
 static inline gboolean indexer_execute(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err)
 {
-   g_return_val_if_fail(self, FALSE);
-   return self->execute(self, name, long_name, path, err);
+        g_return_val_if_fail(self, FALSE);
+        return self->execute(self, name, long_name, path, err);
 }
 
 /**
@@ -227,8 +227,8 @@ static inline gboolean indexer_execute(struct indexer *self, const char *name, c
  */
 static inline gboolean indexer_validate(struct indexer *self , const char *name, const char *long_name, const char *path)
 {
-   g_return_val_if_fail(self, FALSE);
-   return self->validate(self, name, long_name, path);
+        g_return_val_if_fail(self, FALSE);
+        return self->validate(self, name, long_name, path);
 }
 
 /**
@@ -247,8 +247,8 @@ static inline gboolean indexer_validate(struct indexer *self , const char *name,
  */
 static inline struct indexer_source *indexer_new_source(struct indexer *self, struct catalog *catalog, GError **err)
 {
-   g_return_val_if_fail(self, NULL);
-   return self->new_source(self, catalog, err);
+        g_return_val_if_fail(self, NULL);
+        return self->new_source(self, catalog, err);
 }
 
 /**
@@ -264,69 +264,69 @@ typedef void (*indexer_source_notify_f)(struct indexer_source * source, gpointer
  */
 struct indexer_source
 {
-   /** unique indexer_source id */
-   int id;
+        /** unique indexer_source id */
+        int id;
 
-   /** Name to be displayed to the user */
-   const char *display_name;
+        /** Name to be displayed to the user */
+        const char *display_name;
 
-   /** the indexer that created the source */
-   struct indexer *indexer;
+        /** the indexer that created the source */
+        struct indexer *indexer;
 
-   /**
-    * (re)-index the entries in this indexer_source.
-    * @param dest catalog to add the entries into
-    * @param err if non-NULL, any indexing errors
-    * will be added into this object iff this function
-    * returns FALSE
-    * @return TRUE for success, FALSE for failure
-    */
-   gboolean (*index)(struct indexer_source *self, struct catalog *dest, GError **err);
+        /**
+         * (re)-index the entries in this indexer_source.
+         * @param dest catalog to add the entries into
+         * @param err if non-NULL, any indexing errors
+         * will be added into this object iff this function
+         * returns FALSE
+         * @return TRUE for success, FALSE for failure
+         */
+        gboolean (*index)(struct indexer_source *self, struct catalog *dest, GError **err);
 
-   /**
-    * Create a widget to edit source properties.
-    *
-    * The source must not be released until this widget
-    * is not in use anymore.
-    *
-    * @param source
-    * @param catalog a catalog that must be kept open for
-    * as long as the widget is in use
-    * @return a new widget that can be added into
-    * a window to edit the source
-    */
-   GtkWidget *(*editor_widget)(struct indexer_source *source);
+        /**
+         * Create a widget to edit source properties.
+         *
+         * The source must not be released until this widget
+         * is not in use anymore.
+         *
+         * @param source
+         * @param catalog a catalog that must be kept open for
+         * as long as the widget is in use
+         * @return a new widget that can be added into
+         * a window to edit the source
+         */
+        GtkWidget *(*editor_widget)(struct indexer_source *source);
 
-   /**
-    * Get told when the display name has changed.
-    *
-    * Notifications outlive the struct indexer_source *. They'll
-    * last as long as the object exists in the configuration.
-    *
-    * @param source
-    * @param catalog a catalog that will exist for as long
-    * as the notification or the source hasn't been removed
-    * @param notify_func function to call when the name has changed
-    * @param userdata userdata to pass to the function
-    * @return an id to use to remove the notification request
-    */
-   guint (*notify_display_name_change)(struct indexer_source *, struct catalog *, indexer_source_notify_f, gpointer);
+        /**
+         * Get told when the display name has changed.
+         *
+         * Notifications outlive the struct indexer_source *. They'll
+         * last as long as the object exists in the configuration.
+         *
+         * @param source
+         * @param catalog a catalog that will exist for as long
+         * as the notification or the source hasn't been removed
+         * @param notify_func function to call when the name has changed
+         * @param userdata userdata to pass to the function
+         * @return an id to use to remove the notification request
+         */
+        guint (*notify_display_name_change)(struct indexer_source *, struct catalog *, indexer_source_notify_f, gpointer);
 
-   /**
-    * Remove a notification request added with notify_display_name_change
-    * @param source
-    * @param id number returned by notify_display_name_change
-    */
-   void (*remove_notification)(struct indexer_source *source, guint id);
+        /**
+         * Remove a notification request added with notify_display_name_change
+         * @param source
+         * @param id number returned by notify_display_name_change
+         */
+        void (*remove_notification)(struct indexer_source *source, guint id);
 
-   /**
-    * Release the source structure.
-    *
-    * After this call, the source must not be used
-    * any more.
-    * @param source
-    */
-   void (*release)(struct indexer_source *source);
+        /**
+         * Release the source structure.
+         *
+         * After this call, the source must not be used
+         * any more.
+         * @param source
+         */
+        void (*release)(struct indexer_source *source);
 };
 #define INDEXER_ERROR_DOMAIN_NAME "INDEXER"
 
@@ -343,8 +343,8 @@ struct indexer_source
  */
 static inline gboolean indexer_source_index(struct indexer_source *self, struct catalog *dest, GError **err)
 {
-   g_return_val_if_fail(self, FALSE);
-   return self->index(self, dest, err);
+        g_return_val_if_fail(self, FALSE);
+        return self->index(self, dest, err);
 }
 
 /**
@@ -363,8 +363,8 @@ static inline gboolean indexer_source_index(struct indexer_source *self, struct 
  */
 static inline GtkWidget *indexer_source_editor_widget(struct indexer_source *self)
 {
-   g_return_val_if_fail(self, NULL);
-   return self->editor_widget(self);
+        g_return_val_if_fail(self, NULL);
+        return self->editor_widget(self);
 }
 
 /**
@@ -379,8 +379,8 @@ static inline GtkWidget *indexer_source_editor_widget(struct indexer_source *sel
  */
 static inline void indexer_source_release(struct indexer_source *source)
 {
-   g_return_if_fail(source);
-   source->release(source);
+        g_return_if_fail(source);
+        source->release(source);
 }
 
 /**
@@ -398,15 +398,15 @@ static inline void indexer_source_release(struct indexer_source *source)
  * @return an id to use to remove the notification request
  */
 static inline guint indexer_source_notify_display_name_change(struct indexer_source *source,
-                                                              struct catalog *catalog,
-                                                              indexer_source_notify_f notify,
-                                                              gpointer userdata)
+                struct catalog *catalog,
+                indexer_source_notify_f notify,
+                gpointer userdata)
 {
-   g_return_val_if_fail(source, 0);
-   return source->notify_display_name_change(source,
-                                             catalog,
-                                             notify,
-                                             userdata);
+        g_return_val_if_fail(source, 0);
+        return source->notify_display_name_change(source,
+                        catalog,
+                        notify,
+                        userdata);
 }
 
 /**
@@ -416,8 +416,8 @@ static inline guint indexer_source_notify_display_name_change(struct indexer_sou
  */
 static inline void indexer_source_remove_notification(struct indexer_source *source, guint id)
 {
-   g_return_if_fail(source);
-   source->remove_notification(source, id);
+        g_return_if_fail(source);
+        source->remove_notification(source, id);
 }
 
 /**
@@ -435,15 +435,15 @@ gboolean indexer_source_destroy(struct indexer_source *source, struct catalog *)
 
 /** Error codes */
 typedef enum
-   {
-      /** error that comes directly or indirectly from the catalog */
-      INDEXER_CATALOG_ERROR,
-      /** some source configuration is missing or makes no sense */
-      INDEXER_INVALID_CONFIGURATION,
-      /** file passed to the function cannot be cataloged */
-      INDEXER_INVALID_INPUT,
-      /** an error from some third-party module */
-      INDEXER_EXTERNAL_ERROR
-   } CatalogIndexErrorCode;
+{
+        /** error that comes directly or indirectly from the catalog */
+        INDEXER_CATALOG_ERROR,
+        /** some source configuration is missing or makes no sense */
+        INDEXER_INVALID_CONFIGURATION,
+        /** file passed to the function cannot be cataloged */
+        INDEXER_INVALID_INPUT,
+        /** an error from some third-party module */
+        INDEXER_EXTERNAL_ERROR
+} CatalogIndexErrorCode;
 
 #endif /*INDEXER_H*/

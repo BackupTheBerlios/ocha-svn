@@ -6,27 +6,31 @@
 #include "indexer_mozilla.h"
 #include <string.h>
 
-static struct indexer *indexers[] =
-   {
-      &indexer_files,
-      &indexer_mozilla,
-      &indexer_applications,
-      NULL
-   };
+static struct indexer *indexers[] = {
+        &indexer_files,
+        &indexer_mozilla,
+        &indexer_applications,
+        NULL
+};
+
+/* ------------------------- prototypes */
+
+/* ------------------------- public functions */
 
 struct indexer **indexers_list()
 {
-    return indexers;
+        return indexers;
 }
 
 struct indexer *indexers_get(const char *type)
 {
-    g_return_val_if_fail(type!=NULL, NULL);
-   for(struct indexer **ptr=indexers; *ptr; ptr++)
-      {
-         if(strcmp(type, (*ptr)->name)==0)
-            return *ptr;
-      }
-   return NULL;
+        g_return_val_if_fail(type!=NULL, NULL);
+
+        for(struct indexer **ptr=indexers; *ptr; ptr++) {
+                if(strcmp(type, (*ptr)->name)==0)
+                        return *ptr;
+        }
+        return NULL;
 }
 
+/* ------------------------- static functions */
