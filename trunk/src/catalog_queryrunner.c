@@ -10,6 +10,42 @@
 #include <string.h>
 
 /**
+ * Number of results to send without pausing
+ * in the "first bunch".
+ * The goal of the first bunch is to provide
+ * an estimate and let the user refine it. It
+ * must be fast.
+ */
+#define FIRST_BUNCH_SIZE 4
+/**
+ * Time to wait after the first bunch has been
+ * sent before sending more results (ms).
+ * If the user doesn't react after that time,
+ * it probably means that more results will
+ * help.
+ */
+#define AFTER_FIRST_BUNCH_TIMEOUT 1300
+
+/**
+ * Time to wait between several "later bunches" (ms).
+ * Too many results at once would drown the UI.
+ * The goal is to present the result as they come
+ * slow enough for the user and the UI not to
+ * be drowned in useless results
+ */
+#define LATER_BUNCH_TIMEOUT 400
+
+/**
+ * Number of results to put into a "later bunch"
+ */
+#define LATER_BUNCH_SIZE 8
+
+/**
+ * Maximum number of results to send, ever
+ */
+#define MAXIMUM 200
+
+/**
  * Extension of the structure queryrunner for this implementation
  */
 struct catalog_queryrunner
@@ -40,9 +76,6 @@ struct catalog_queryrunner
    bool started;
 };
 
-/** Maximum # of results to take into account */
-#define MAX_RESULT_COUNT 10
-
 /** catalog_queryrunner to queryrunner */
 #define QUERYRUNNER(catalog_qr) (&(catalog_qr)->base)
 /** queryrunner to catalog_queryrunner */
@@ -55,6 +88,8 @@ static void stop(struct queryrunner *self);
 static void release(struct queryrunner *self);
 static gpointer runquery_thread(gpointer);
 static bool result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata);
+static bool query_has_changed(struct catalog_queryrunner *self);
+static void wait_on_condition(struct catalog_queryrunner *self, int wait_ms);
 
 static bool try_connect(const char *path)
 {
@@ -114,7 +149,10 @@ static void release(struct queryrunner *_self)
    g_free((gpointer)self->path);
    g_free(self);
 }
-
+static bool query_has_changed(struct catalog_queryrunner *queryrunner)
+{
+   return strcmp(queryrunner->query->str, queryrunner->running_query->str)!=0;
+}
 
 static gpointer runquery_thread(gpointer userdata)
 {
@@ -143,7 +181,7 @@ static gpointer runquery_thread(gpointer userdata)
 
                if(queryrunner->query->len>0)
                   {
-                     while(strcmp(queryrunner->query->str, queryrunner->running_query->str)!=0)
+                     while(query_has_changed(queryrunner))
                         {
                            g_string_assign(queryrunner->running_query,
                                            queryrunner->query->str);
@@ -199,6 +237,18 @@ static void start(struct queryrunner *_self)
    g_mutex_unlock(self->mutex);
 }
 
+static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
+{
+   GTimeVal timeval;
+   g_get_current_time(&timeval);
+   g_time_val_add(&timeval, time_ms*1000);
+
+   g_mutex_lock(self->mutex);
+   if(!query_has_changed(self))
+      g_cond_timed_wait(self->cond, self->mutex, &timeval);
+   g_mutex_unlock(self->mutex);
+
+}
 static bool result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
 {
    g_return_val_if_fail(userdata!=NULL, false);
@@ -211,8 +261,17 @@ static bool result_callback(struct catalog *catalog, float pertinence, struct re
                     self->running_query->str,
                     pertinence,
                     result);
-   self->count++;
-   return self->count<MAX_RESULT_COUNT;
+   int count = self->count;
+   count++;
+   self->count=count;
+   if(count>=MAXIMUM)
+      return false;
+
+   if(count==FIRST_BUNCH_SIZE)
+      wait_on_condition(self, AFTER_FIRST_BUNCH_TIMEOUT);
+   else if(count%LATER_BUNCH_SIZE==0)
+      wait_on_condition(self, LATER_BUNCH_TIMEOUT);
+   return true;
 }
 
 static void run_query(struct queryrunner *_self, const char *query)
