@@ -12,7 +12,8 @@
 struct indexer_view
 {
     struct catalog *catalog;
-    GtkWidget *window;
+    /** Widget returned to the caller */
+    GtkWidget *root_widget;
     /** gtk_container to add/remove properties_widget from */
     GtkWidget *properties_widget_container;
     /** widget that represents the view of the current source or indexer */
@@ -23,11 +24,9 @@ struct indexer_view
     int current_source_id;
 };
 
-static void properties_window_destroy_cb(GtkWidget *widget, gpointer userdata);
-static void create_window(struct indexer_view *view);
+static void init_widgets(struct indexer_view *view);
 static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct indexer_source *source);
 static GtkWidget *properties_widget_from_indexer(struct indexer *indexer);
-
 
 /* ------------------------- public functions */
 struct indexer_view *indexer_view_new(struct catalog *catalog)
@@ -39,127 +38,92 @@ struct indexer_view *indexer_view_new(struct catalog *catalog)
     memset(view, 0, sizeof(struct indexer_view));
     view->catalog=catalog;
     view->current_source_id=-1;
+    init_widgets(view);
     return view;
 }
+
+GtkWidget *indexer_view_widget(struct indexer_view *view)
+{
+    g_return_val_if_fail(view, NULL);
+    return view->root_widget;
+}
+
 void indexer_view_destroy(struct indexer_view *view)
 {
     g_return_if_fail(view);
+    indexer_view_detach(view);
 
-    if(view->window)
-        gtk_widget_destroy(view->window);
-    g_assert(view->window==NULL);
-    g_assert(view->properties_widget==NULL);
-    g_assert(view->current_indexer==NULL);
+    if(view->root_widget)
+        gtk_widget_destroy(view->properties_widget_container);
     g_free(view);
 }
-gboolean indexer_view_is_visible(struct indexer_view *view)
-{
-    if(!view->window)
-        return FALSE;
-    gboolean visible = FALSE;
-    g_object_get(view->window, "visible", &visible, NULL);
-    return visible;
-}
 void indexer_view_attach_indexer(struct indexer_view *view,
-                                 struct indexer *indexer,
-                                 gboolean activate)
+                                 struct indexer *indexer)
 {
     g_return_if_fail(view);
     g_return_if_fail(indexer);
-    indexer_view_attach_source(view, indexer, -1, activate);
+    indexer_view_attach_source(view, indexer, NULL);
 }
 
 void indexer_view_attach_source(struct indexer_view *view,
                                 struct indexer *indexer,
-                                int source_id,
-                                gboolean activate)
+                                struct indexer_source *source)
 {
     g_return_if_fail(view);
     g_return_if_fail(indexer);
 
     gboolean issame = view->current_indexer==indexer
-        && source_id==view->current_source_id;
+        && ( ( source==NULL && view->current_source_id==-1)
+             || ( source!=NULL && source->id==view->current_source_id));
     if(!issame)
     {
         if(view->current_indexer!=NULL)
             indexer_view_detach(view);
-        if(!view->window)
-            create_window(view);
-
-        struct indexer_source *source=NULL;
-        if(source_id!=-1)
-        {
-            source=indexer->load_source(indexer, view->catalog, source_id);
-            if(!source)
-                return;
-        }
 
         GtkWidget *widget;
-        const char *title;
 
+        g_return_if_fail(view->properties_widget_container!=NULL);
         g_return_if_fail(view->current_indexer==NULL);
         g_return_if_fail(view->properties_widget==NULL);
-        g_return_if_fail(view->window!=NULL);
 
         view->current_indexer=indexer;
         if(source)
         {
-            view->current_source_id=source_id;
-            title=source->display_name;
+            view->current_source_id=source->id;
             widget=properties_widget_from_source(indexer, source);
         }
         else
         {
             view->current_source_id=-1;
             widget=properties_widget_from_indexer(indexer);
-            title=indexer->display_name;
         }
         view->properties_widget=widget;
 
-        GtkWidget *window = view->window;
         gtk_container_add(GTK_CONTAINER(view->properties_widget_container),
                           widget);
-        gtk_window_set_title(GTK_WINDOW(window),
-                             title);
-        if(source)
-            source->release(source);
     }
-    if(activate)
-        gtk_window_present(GTK_WINDOW(view->window));
 }
 void indexer_view_detach(struct indexer_view *view)
 {
     g_return_if_fail(view);
 
-    if(view->window)
-        {
-            if(view->properties_widget)
-                gtk_container_remove(GTK_CONTAINER(view->properties_widget_container),
-                                     view->properties_widget);
-            gtk_window_set_title(GTK_WINDOW(view->window),
-                                 "");
-        }
+    if(view->properties_widget)
+        gtk_container_remove(GTK_CONTAINER(view->properties_widget_container),
+                             view->properties_widget);
     view->properties_widget=NULL;
     view->current_indexer=NULL;
     view->current_source_id=-1;
 }
 
 /* ------------------------- private functions */
-static void create_window(struct indexer_view *view)
+static void init_widgets(struct indexer_view *view)
 {
     g_return_if_fail(view);
-    g_return_if_fail(view->window==NULL);
-
-    GtkWidget  *window=gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    view->window=window;
-    g_signal_connect(window,
-                     "destroy",
-                     G_CALLBACK(properties_window_destroy_cb),
-                     view);
+    g_return_if_fail(view->properties_widget_container==NULL);
 
     GtkWidget *notebook = gtk_notebook_new ();
+    view->root_widget = notebook;
     gtk_widget_show(notebook);
-    gtk_container_add(GTK_CONTAINER(window), notebook);
 
     /* location is a one-row vbox that's only there
      * so that I don't have to worry about packing order
@@ -189,18 +153,6 @@ static void create_window(struct indexer_view *view)
     }
 }
 
-static void properties_window_destroy_cb(GtkWidget *widget, gpointer userdata)
-{
-    struct indexer_view *view = (struct indexer_view *)userdata;
-    g_return_if_fail(view);
-
-    indexer_view_detach(view);
-    view->window=NULL;
-    g_assert(!view->properties_widget);
-    g_assert(!view->current_indexer);
-    g_assert(view->current_source_id==-1);
-}
-
 static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct indexer_source *source)
 {
     g_return_val_if_fail(indexer!=NULL, NULL);
@@ -215,17 +167,33 @@ static GtkWidget *properties_widget_from_indexer(struct indexer *indexer)
 {
     g_return_val_if_fail(indexer!=NULL, NULL);
 
-    char *text = g_strdup_printf("<b>%s</b>\n\n%s",
+
+    char *text = g_strdup_printf("<span size='x-large'><b>%s</b></span>\n\n<span size='large'>%s</span>",
                                  indexer->display_name,
                                  indexer->description);
 
-    GtkWidget *retval = gtk_label_new(text);
-    gtk_label_set_use_markup(GTK_LABEL(retval), TRUE);
-    gtk_label_set_line_wrap(GTK_LABEL(retval), TRUE);
-    gtk_label_set_justify(GTK_LABEL(retval), GTK_JUSTIFY_FILL);
-    gtk_label_set_selectable(GTK_LABEL(retval), TRUE);
-
+    GtkWidget *label = gtk_label_new(text);
+    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
+    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_FILL);
+    gtk_label_set_selectable(GTK_LABEL(label), TRUE);
+    gtk_misc_set_alignment(GTK_MISC(label),
+                           0.0,
+                           0.0);
     g_free(text);
-    gtk_widget_show(retval);
-    return retval;
+    gtk_widget_show(label);
+
+    GtkWidget *align = gtk_alignment_new(0.0/*xalign*/,
+                                         0.5/*yalign*/,
+                                         0.6/*xscale*/,
+                                         1.0/*yscale*/);
+    gtk_alignment_set_padding(GTK_ALIGNMENT(align),
+                              12/*top*/,
+                              0/*bottom*/,
+                              12/*right*/,
+                              6/*left*/);
+    gtk_widget_show(align);
+    gtk_container_add(GTK_CONTAINER(align),
+                      label);
+    return align;
 }

@@ -33,6 +33,9 @@ struct preferences_catalog
     GtkTreeStore *model;
     GtkTreeView *view;
     GtkTreeSelection *selection;
+    /** root widget, retured by get_widget */
+    GtkWidget *widget;
+    GtkLabel *properties_title;
 
     struct catalog *catalog;
     struct indexer_view *properties;
@@ -43,6 +46,7 @@ struct preferences_catalog
     struct prefs_and_indexer pai[];
 };
 
+static GtkWidget *init_widget(struct preferences_catalog *prefs);
 static GtkTreeStore *createModel(struct catalog *catalog);
 static void add_indexer(GtkTreeStore *model, struct indexer *indexer, struct catalog *catalog);
 static void add_source(GtkTreeStore *model, GtkTreeIter *parent, struct indexer *indexer, struct catalog *catalog, int source_id, GtkTreeIter *iter_out);
@@ -254,49 +258,56 @@ static void reload_cb(GtkButton *button, gpointer userdata)
     }
 }
 
-static void display_properties(struct preferences_catalog  *prefs, GtkTreeIter *iter, gboolean activate) {
-    char *type=NULL;
-    int source_id=0;
-    gtk_tree_model_get(GTK_TREE_MODEL(prefs->model), iter,
-                       COLUMN_INDEXER_TYPE, &type,
-                       COLUMN_SOURCE_ID, &source_id,
-                       -1);
-    if(type)
+static void update_properties(struct preferences_catalog  *prefs)
+{
+    GtkTreeIter iter;
+    if(gtk_tree_selection_get_selected(prefs->selection, NULL, &iter))
     {
-        struct indexer *indexer=indexers_get(type);
-        if(indexer)
+        char *type=NULL;
+        int source_id=0;
+        gtk_tree_model_get(GTK_TREE_MODEL(prefs->model),
+                           &iter,
+                           COLUMN_INDEXER_TYPE, &type,
+                           COLUMN_SOURCE_ID, &source_id,
+                           -1);
+        if(type)
         {
-            if(source_id>0)
-                indexer_view_attach_source(prefs->properties,
-                                           indexer,
-                                           source_id,
-                                           activate);
-            else
-                indexer_view_attach_indexer(prefs->properties,
-                                            indexer,
-                                            activate);
+            struct indexer *indexer=indexers_get(type);
+            if(indexer)
+            {
+                if(source_id>0)
+                {
+                    struct indexer_source *source;
+                    source=indexer->load_source(indexer,
+                                                prefs->catalog,
+                                                source_id);
+                    if(source)
+                    {
+                        indexer_view_attach_source(prefs->properties,
+                                                   indexer,
+                                                   source);
+                        source->release(source);
+                    }
+                }
+                else
+                {
+                    indexer_view_attach_indexer(prefs->properties,
+                                                indexer);
+                }
+                gtk_label_set_text(prefs->properties_title,
+                                   indexer->display_name);
+            }
+            g_free(type);
         }
-        g_free(type);
+    }
+    else
+    {
+        indexer_view_detach(prefs->properties);
+        gtk_label_set_text(prefs->properties_title, "");
     }
 }
 
 
-
-/** A row has been double-clicked: open properties */
-static void row_activated_cb(GtkTreeView *view,
-                             GtkTreePath *path,
-                             GtkTreeViewColumn *column,
-                             gpointer userdata)
-{
-    struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
-    g_return_if_fail(prefs);
-
-    GtkTreeIter iter;
-    if(gtk_tree_model_get_iter(GTK_TREE_MODEL(prefs->model), &iter, path))
-        {
-            display_properties(prefs, &iter, TRUE/*activate*/);
-        }
-}
 
 /** Selection has been modified */
 static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userdata)
@@ -304,14 +315,7 @@ static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userd
     struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
     g_return_if_fail(prefs);
 
-    if(indexer_view_is_visible(prefs->properties))
-    {
-        GtkTreeIter iter;
-        if(gtk_tree_selection_get_selected(selection, NULL, &iter))
-        {
-            display_properties(prefs, &iter, FALSE/*do not activate*/);
-        }
-    }
+    update_properties(prefs);
 }
 
 static gboolean find_indexer_iter(struct preferences_catalog *prefs, struct indexer *indexer, GtkTreeIter *iter_out)
@@ -344,6 +348,23 @@ static gboolean find_indexer_iter(struct preferences_catalog *prefs, struct inde
     return FALSE;
 }
 
+/**
+ * Make sure the row is visible and then select it
+ */
+static void select_row(struct preferences_catalog  *prefs, GtkTreeIter *source_iter)
+{
+    GtkTreePath *path;
+    path = gtk_tree_model_get_path(GTK_TREE_MODEL(prefs->model), source_iter);
+    if(path)
+    {
+        gtk_tree_view_expand_to_path(prefs->view, path);
+        gtk_tree_view_scroll_to_cell(prefs->view, path, NULL/*column*/, FALSE/*do not use_align*/, 0, 0);
+        gtk_tree_path_free(path);
+    }
+    gtk_tree_selection_select_iter(prefs->selection, source_iter);
+}
+
+
 static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer userdata)
 {
     struct prefs_and_indexer *pai = (struct prefs_and_indexer *)userdata;
@@ -358,6 +379,7 @@ static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer use
         if(find_indexer_iter(prefs, indexer, &indexer_iter))
         {
             GtkTreeIter source_iter;
+            GtkTreePath *path;
             add_source(GTK_TREE_STORE(prefs->model),
                        &indexer_iter,
                        indexer,
@@ -365,16 +387,7 @@ static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer use
                        source->id,
                        &source_iter);
 
-
-            GtkTreePath *path = gtk_tree_model_get_path(GTK_TREE_MODEL(prefs->model), &source_iter);
-            if(path)
-            {
-                gtk_tree_view_expand_to_path(prefs->view, path);
-                gtk_tree_view_scroll_to_cell(prefs->view, path, NULL/*column*/, FALSE/*do not use_align*/, 0, 0);
-                gtk_tree_path_free(path);
-            }
-            gtk_tree_selection_select_iter(prefs->selection, &source_iter);
-            display_properties(prefs, &source_iter, TRUE/*activate*/);
+            select_row(prefs, &source_iter);
         }
         source->release(source);
     }
@@ -411,22 +424,7 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
 
     struct preferences_catalog *prefs = g_malloc(sizeof(struct preferences_catalog)
                                                  +(indexer_count+1)*sizeof(struct prefs_and_indexer));
-
-    prefs->model = createModel(catalog);
-    prefs->view = createView(GTK_TREE_MODEL(prefs->model));
-    prefs->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(prefs->view));
     prefs->catalog=catalog;
-    prefs->properties=indexer_view_new(catalog);
-
-    g_signal_connect(prefs->view,
-                     "row-activated",
-                     G_CALLBACK(row_activated_cb),
-                     prefs);
-    g_signal_connect(prefs->selection,
-                     "changed",
-                     G_CALLBACK(row_selection_changed_cb),
-                     prefs);
-
     for(int i=0; i<indexer_count; i++)
     {
         prefs->pai[i].indexer=indexers[i];
@@ -435,10 +433,25 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
     prefs->pai[indexer_count].indexer=NULL;
     prefs->pai[indexer_count].prefs=NULL;
 
+    prefs->model = createModel(catalog);
+    prefs->view = createView(GTK_TREE_MODEL(prefs->model));
+    prefs->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(prefs->view));
+    prefs->properties=indexer_view_new(catalog);
+    prefs->widget = init_widget(prefs);
+
+    g_signal_connect(prefs->selection,
+                     "changed",
+                     G_CALLBACK(row_selection_changed_cb),
+                     prefs);
+
     return prefs;
 }
 
 GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
+{
+    return prefs->widget;
+}
+static GtkWidget *init_widget(struct preferences_catalog *prefs)
 {
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_widget_show(scroll);
@@ -520,5 +533,36 @@ GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
     gtk_box_pack_start(GTK_BOX(vbox), scroll, TRUE/*expand*/, TRUE/*fill*/, 0/*padding*/);
     gtk_box_pack_end(GTK_BOX(vbox), buttons, FALSE/*expand*/, FALSE/*fill*/, 0/*padding*/);
 
-    return vbox;
+    GtkWidget *properties_label = gtk_label_new("");
+    gtk_widget_show(properties_label);
+    prefs->properties_title=GTK_LABEL(properties_label);
+
+    PangoAttrList *attrs = pango_attr_list_new();
+    pango_attr_list_insert(attrs,
+                           pango_attr_weight_new(PANGO_WEIGHT_BOLD));
+    gtk_label_set_attributes(GTK_LABEL(properties_label),
+                             attrs);
+    pango_attr_list_unref(attrs);
+
+    GtkWidget *properties_frame = gtk_frame_new("");
+    gtk_widget_show(properties_frame);
+    gtk_frame_set_shadow_type(GTK_FRAME(properties_frame),
+                              GTK_SHADOW_NONE);
+    gtk_frame_set_label_widget(GTK_FRAME(properties_frame),
+                               properties_label);
+    gtk_container_add(GTK_CONTAINER(properties_frame),
+                      indexer_view_widget(prefs->properties));
+
+    GtkWidget *twopanes = gtk_hpaned_new();
+    gtk_widget_show(twopanes);
+    gtk_paned_pack1(GTK_PANED(twopanes),
+                    vbox,
+                    TRUE/*resize*/,
+                    FALSE/*shrink*/);
+    gtk_paned_pack2(GTK_PANED(twopanes),
+                    properties_frame,
+                    TRUE/*resize*/,
+                    TRUE/*shrink*/);
+
+    return twopanes;
 }

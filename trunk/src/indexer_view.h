@@ -1,6 +1,7 @@
 #ifndef INDEXER_VIEW_H
 #define INDEXER_VIEW_H
 
+#include <gtk/gtk.h>
 #include "indexer.h"
 
 
@@ -10,8 +11,7 @@
  */
 
 /**
- * Create a new indexer view
- * in detached mode (invisible)
+ * Create an empty indexer view
  *
  * @param catalog a catalog that must remain open
  * for the lifetime of this view
@@ -19,10 +19,17 @@
 struct indexer_view *indexer_view_new(struct catalog *catalog);
 
 /**
- * Destroy the indexer view,
+ * Get this view's widget
+ * @param view
+ * @return the widget, always the same for a given indexer_vier
+ */
+GtkWidget *indexer_view_widget(struct indexer_view *view);
+
+/**
+ * Destroy the indexer view.
  *
- * If the view was to something
- * it is detached.
+ * If the view was attached to something
+ * it is first detached.
  *
  * @param view
  */
@@ -35,11 +42,9 @@ void indexer_view_destroy(struct indexer_view *view);
  * else, it is detached before re-attaching it.
  * @param view
  * @param indexer
- * @param activate if TRUE, activate the window after
- * attaching
  */
 void indexer_view_attach_indexer(struct indexer_view *view,
-                                 struct indexer *indexer, gboolean activate);
+                                 struct indexer *indexer);
 
 /**
  * Make the indexer view display the
@@ -49,25 +54,16 @@ void indexer_view_attach_indexer(struct indexer_view *view,
  *
  * @param view
  * @param indexer
- * @param source_id
- * @param activate if TRUE, activate the window after
- * attaching
+ * @param source
  */
 void indexer_view_attach_source(struct indexer_view *view,
                                 struct indexer *indexer,
-                                int source_id,
-                                gboolean activate);
+                                struct indexer_source *source);
 
 /**
- * Put the indexer view in detached mode (invisible, no current indexer or source)
+ * Put the view back in 'detached' (empty) mode.
  * @param view
  */
 void indexer_view_detach(struct indexer_view *view);
 
-/**
- * Check whether the view window is currently open
- * @param view
- * @return true if the window is open
- */
-gboolean indexer_view_is_visible(struct indexer_view *view);
 #endif /* INDEXER_VIEW_H */
