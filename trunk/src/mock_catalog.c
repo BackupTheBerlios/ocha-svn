@@ -1,4 +1,5 @@
 #include "mock_catalog.h"
+#include "ocha_gconf.h"
 #include <glib.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,17 +45,18 @@ struct addentry_args
    int command_id;
    int id;
 };
+static GHashTable *source_attrs;
 
 static void expectation_init(struct expectation *, const char *);
 static gboolean expectation_check(struct expectation *);
 static void expectation_call(struct expectation *);
+static void init_source_attrs(void);
 /* ------------------------- mock_catalog */
 struct catalog *mock_catalog_new(void)
 {
    struct catalog *retval = g_new(struct catalog, 1);
    retval->expected_addcommand=g_hash_table_new(g_str_hash, g_str_equal);
    retval->expected_addentry=g_hash_table_new(g_str_hash, g_str_equal);
-   retval->source_attrs=g_hash_table_new(g_str_hash, g_str_equal);
    return retval;
 }
 
@@ -193,16 +195,21 @@ gboolean catalog_addcommand(struct catalog *catalog, const char *name, const cha
    return TRUE;
 }
 
-gboolean catalog_set_source_attribute(struct catalog *catalog, int source_id, const char *attribute, const char *value)
+static void init_source_attrs()
 {
-   g_hash_table_insert(catalog->source_attrs, g_strdup(attribute), g_strdup(value));
-   return TRUE;
+    if(!source_attrs)
+        source_attrs=g_hash_table_new(g_str_hash, g_str_equal);
 }
-
-gboolean catalog_get_source_attribute(struct catalog *catalog, int source_id, const char *attribute, char **value_out)
+char *ocha_gconf_get_source_attribute(const char *type, int source_id, const char *attribute)
 {
-   *value_out=g_hash_table_lookup(catalog->source_attrs, attribute);
-   return TRUE;
+    init_source_attrs();
+    return g_hash_table_lookup(source_attrs, attribute);
+}
+gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const char *attribute, const char *value)
+{
+    init_source_attrs();
+    g_hash_table_insert(source_attrs, g_strdup(attribute), g_strdup(value));
+    return TRUE;
 }
 
 gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id)

@@ -21,7 +21,7 @@ catalog_queryrunner_check_SOURCES=catalog_queryrunner_check.c catalog_queryrunne
 catalog_queryrunner_check_CFLAGS=$(TEST_CFLAGS) $(SQLITE_CFLAGS)  
 catalog_queryrunner_check_LDADD=$(TEST_LIBS) $(SQLITE_LIBS) 
 
-indexer_various_check_SOURCES=indexer_various_check.c indexer_applications.c indexer_applications.h indexer_files.c indexer.h indexer_files.h result.h indexer_utils.h indexer_utils.c mock_catalog.c mock_catalog.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h ocha_gconf.h ocha_gconf.c
+indexer_various_check_SOURCES=indexer_various_check.c indexer_applications.c indexer_applications.h indexer_files.c indexer.h indexer_files.h result.h indexer_utils.h indexer_utils.c mock_catalog.c mock_catalog.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h 
 indexer_various_check_CFLAGS=$(TEST_CFLAGS) $(GNOME_CFLAGS)
 indexer_various_check_LDADD=$(TEST_LIBS) 
 

@@ -30,7 +30,7 @@ static gboolean discover(struct indexer *, struct catalog *catalog);
 static gboolean has_gnome_mime_command(const char *path);
 static char *display_name(struct catalog *catalog, int id);
 static void release_source(struct indexer_source *source);
-static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *);
+static GtkWidget *editor_widget(struct indexer_source *source);
 #define INDEXER_NAME "files"
 
 /** Definition of the indexer */
@@ -52,12 +52,9 @@ struct indexer indexer_files =
     "most often work with."
 };
 
-struct source_with_catalog
-{
-   int source_id;
-   struct catalog *catalog;
-};
+/** For the UI, threat this number as infinity (-1) */
 #define DEPTH_INFINITY 10
+
 /* ------------------------- private functions */
 
 /**
@@ -315,25 +312,17 @@ static char *display_name(struct catalog *catalog, int id)
     return retval;
 }
 
-static void free_source_with_catalog_cb(GtkWidget *widget, gpointer userdata)
-{
-    g_return_if_fail(userdata);
-    struct source_with_catalog *source_with_catalog =
-        (struct source_with_catalog *)userdata;
-    g_free(userdata);
-}
 static void depth_changed_cb(GtkRange *range, gpointer userdata)
 {
     g_return_if_fail(range);
     g_return_if_fail(userdata);
-    struct source_with_catalog *source_with_catalog =
-        (struct source_with_catalog *)userdata;
+    int source_id = GPOINTER_TO_INT(userdata);
     int value = (int)gtk_range_get_value(range);
     if(value>=DEPTH_INFINITY)
        value=-1;
     char *value_as_string = g_strdup_printf("%d", (int)value);
     ocha_gconf_set_source_attribute(INDEXER_NAME,
-                                    source_with_catalog->source_id,
+                                    source_id,
                                     "depth",
                                     value_as_string);
     g_free(value_as_string);
@@ -358,11 +347,10 @@ static void exclude_changed_cb(GtkEditable *widget, gpointer userdata)
 {
     g_return_if_fail(widget);
     g_return_if_fail(userdata);
-    struct source_with_catalog *source_with_catalog =
-        (struct source_with_catalog *)userdata;
+    int source_id = GPOINTER_TO_INT(userdata);
     const char *text = gtk_entry_get_text(GTK_ENTRY(widget));
     ocha_gconf_set_source_attribute(INDEXER_NAME,
-                                    source_with_catalog->source_id,
+                                    source_id,
                                     "ignore",
                                     text);
 }
@@ -370,19 +358,18 @@ static void include_content_set_attribute_cb(GtkToggleButton *toggle, gpointer u
 {
     g_return_if_fail(toggle);
     g_return_if_fail(userdata);
-    struct source_with_catalog *source_with_catalog =
-        (struct source_with_catalog *)userdata;
+    int source_id = GPOINTER_TO_INT(userdata);
     if(gtk_toggle_button_get_active(toggle))
         {
             ocha_gconf_set_source_attribute(INDEXER_NAME,
-                                            source_with_catalog->source_id,
+                                            source_id,
                                             "depth",
                                             "1");
         }
     else
         {
             ocha_gconf_set_source_attribute(INDEXER_NAME,
-                                            source_with_catalog->source_id,
+                                            source_id,
                                             "depth",
                                             "0");
         }
@@ -419,11 +406,13 @@ static void include_content_reset_depth_cb(GtkToggleButton *toggle, gpointer use
         }
 }
 
-static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *catalog)
+static GtkWidget *editor_widget(struct indexer_source *source)
 {
+    g_return_val_if_fail(source, NULL);
+
     GtkWidget *retval = gtk_vbox_new(FALSE, 0);
     gtk_widget_show(retval);
-
+    int source_id = source->id;
     char *current_path = NULL;
     char *current_depth = NULL;
     char *current_ignore = NULL;
@@ -435,14 +424,6 @@ static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *c
     int current_depth_i = current_depth ? atoi(current_depth):1;
     if(current_depth_i==-1)
        current_depth_i=DEPTH_INFINITY;
-
-    struct source_with_catalog *source_with_catalog = g_new(struct source_with_catalog, 1);
-    source_with_catalog->catalog=catalog;
-    source_with_catalog->source_id=source->id;
-    g_signal_connect(retval,
-                     "destroy",
-                     G_CALLBACK(free_source_with_catalog_cb),
-                     source_with_catalog/*userdata*/);
 
     /* --- Top frame: folder */
 
@@ -526,7 +507,7 @@ static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *c
     g_signal_connect(include_contents,
                      "toggled",
                      G_CALLBACK(include_content_set_attribute_cb),
-                     source_with_catalog/*userdata*/);
+                     GINT_TO_POINTER(source_id)/*userdata*/);
     g_signal_connect(include_contents,
                      "toggled",
                      G_CALLBACK(include_content_disable_cb),
@@ -568,7 +549,7 @@ static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *c
     g_signal_connect(exclude,
                      "changed",
                      G_CALLBACK(exclude_changed_cb),
-                     source_with_catalog/*userdata*/);
+                     GINT_TO_POINTER(source_id)/*userdata*/);
 
     GtkWidget *depth = gtk_vscale_new_with_range(1.0/*min*/,
                                                  DEPTH_INFINITY/*max*/,
@@ -585,7 +566,7 @@ static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *c
     g_signal_connect(depth,
                      "value-changed",
                      G_CALLBACK(depth_changed_cb),
-                     source_with_catalog/*userdata*/);
+                     GINT_TO_POINTER(source_id)/*userdata*/);
     g_signal_connect(depth,
                      "value-changed",
                      G_CALLBACK(update_depth_label_cb),

@@ -12,12 +12,13 @@ static gboolean validate(struct indexer *, const char *name, const char *long_na
 
 static struct indexer mock_indexer =
 {
-    "test",
-    "Test Indexer",
-    discover,
-    load_source,
-    execute,
-    validate
+    .name="test",
+    .display_name="Test Indexer",
+    .description="Test Indexer Description",
+    .discover=discover,
+    .load_source=load_source,
+    .execute=execute,
+    .validate=validate
 };
 
 static struct indexer *indexers[] =
@@ -34,7 +35,7 @@ struct indexer **indexers_list()
 struct indexer *indexers_get(const char *type)
 {
     g_return_val_if_fail(type!=NULL, NULL);
-    if(strcmp(type, "name")==0)
+    if(strcmp(type, "test")==0)
         return &mock_indexer;
     return NULL;
 }

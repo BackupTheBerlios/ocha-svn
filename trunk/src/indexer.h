@@ -147,7 +147,7 @@ struct indexer_source
     * @return a new widget that can be added into
     * a window to edit the source
     */
-   GtkWidget *(*editor_widget)(struct indexer_source *source, struct catalog *);
+   GtkWidget *(*editor_widget)(struct indexer_source *source);
 
    /**
     * Release the source structure.

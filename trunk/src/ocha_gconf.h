@@ -18,6 +18,14 @@
 GConfClient *ocha_gconf_get_client(void);
 
 /**
+ * Check whether configuration exists.
+ * When this returns false, it means that
+ * the current user is running the program for the
+ * first time.
+ */
+gboolean ocha_gconf_exists(void);
+
+/**
  * List sources for the given indexer.
  *
  * @param indexer indexer name

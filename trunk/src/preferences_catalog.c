@@ -2,6 +2,7 @@
 #include "preferences_catalog.h"
 #include "indexers.h"
 #include "indexer_view.h"
+#include "ocha_gconf.h"
 #include <gtk/gtk.h>
 #include <string.h>
 

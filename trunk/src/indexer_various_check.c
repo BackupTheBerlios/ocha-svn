@@ -8,6 +8,7 @@
 #include "indexer_files.h"
 #include "indexer_applications.h"
 #include "indexer_mozilla.h"
+#include "ocha_gconf.h"
 #include "mock_catalog.h"
 #include <libgnome/gnome-url.h>
 #include <libgnomevfs/gnome-vfs.h>
@@ -43,12 +44,12 @@ static void setup()
    mkdir(TEMPDIR "/d1/d2", 0700);
 
    current_dir=g_get_current_dir();
-   catalog_set_source_attribute(catalog,
-                                SOURCE_ID,
-                                "path",
-                                g_strdup_printf("%s/%s",
-                                                current_dir,
-                                                TEMPDIR));
+   ocha_gconf_set_source_attribute("test",
+                                   SOURCE_ID,
+                                   "path",
+                                   g_strdup_printf("%s/%s",
+                                                   current_dir,
+                                                   TEMPDIR));
 }
 
 static void teardown()
@@ -59,18 +60,18 @@ static void teardown()
 /* ------------------------- private functions */
 static void set_depth(int depth)
 {
-   catalog_set_source_attribute(catalog,
-                                SOURCE_ID,
-                                "depth",
-                                g_strdup_printf("%d",
-                                                depth));
+   ocha_gconf_set_source_attribute("test",
+                                   SOURCE_ID,
+                                   "depth",
+                                   g_strdup_printf("%d",
+                                                   depth));
 }
 static void set_ignore(char *ignore)
 {
-   catalog_set_source_attribute(catalog,
-                                SOURCE_ID,
-                                "ignore",
-                                ignore);
+   ocha_gconf_set_source_attribute("test",
+                                   SOURCE_ID,
+                                   "ignore",
+                                   ignore);
 }
 
 static char *to_uri(const char *filename)
@@ -175,6 +176,7 @@ static void index_files()
 
 START_TEST(test_index)
 {
+   printf("test-index START");
    expect_file_entry("x1.txt");
    expect_file_entry("x2.gif");
    expect_file_entry("d1");
@@ -185,11 +187,13 @@ START_TEST(test_index)
    index_files();
 
    verify();
+   printf("test-index PASS");
 }
 END_TEST
 
 START_TEST(test_limit_depth_1)
 {
+   printf("test_limit_depth_1 START");
    set_depth(1);
 
    expect_file_entry("x1.txt");
@@ -199,11 +203,13 @@ START_TEST(test_limit_depth_1)
    index_files();
 
    verify();
+   printf("test_limit_depth_1 PASS");
 }
 END_TEST
 
 START_TEST(test_limit_depth_2)
 {
+   printf("test_limit_depth_2 START");
    set_depth(2);
 
    expect_file_entry("x1.txt");
@@ -215,12 +221,14 @@ START_TEST(test_limit_depth_2)
    index_files();
 
    verify();
+   printf("test_limit_depth_2 PASS");
 }
 END_TEST
 
 START_TEST(test_ignore)
 {
-   set_ignore("*.txt:x3.txt:d2");
+   printf("test_ignore START");
+   set_ignore("*.txt,x3.txt,d2");
 
    touch(TEMPDIR "/x1.txt~"); /* hardcoded ignore pattern */
    touch(TEMPDIR "/CVS/x5.gif"); /* hardcoded ignore pattern */
@@ -231,6 +239,7 @@ START_TEST(test_ignore)
    index_files();
 
    verify();
+   printf("test_ignore PASS");
 }
 END_TEST
 
@@ -360,13 +369,13 @@ static void setup_bookmarks()
 {
    base_setup();
    current_dir=g_get_current_dir();
-   catalog_set_source_attribute(catalog,
-                                SOURCE_ID,
-                                "path",
-                                g_strdup_printf("%s/%s/%s",
-                                                current_dir,
-                                                TEMPDIR,
-                                                "bookmarks.html"));
+   ocha_gconf_set_source_attribute("test",
+                                   SOURCE_ID,
+                                   "path",
+                                   g_strdup_printf("%s/%s/%s",
+                                                   current_dir,
+                                                   TEMPDIR,
+                                                   "bookmarks.html"));
 }
 
 static void teardown_bookmarks()

@@ -20,6 +20,12 @@ GConfClient *ocha_gconf_get_client()
     return client;
 }
 
+gboolean ocha_gconf_exists()
+{
+    ocha_gconf_get_client();
+    return gconf_client_dir_exists(client, OCHA_GCONF_PREFIX, NULL/*err*/);
+}
+
 void ocha_gconf_get_sources(const char *type, int **ids_out, int *ids_len_out)
 {
     g_return_if_fail(type);

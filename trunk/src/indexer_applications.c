@@ -26,7 +26,7 @@ static void release(struct indexer_source *);
 static gboolean discover(struct indexer *, struct catalog *catalog);
 static char *display_name(struct catalog *catalog, int id);
 static char *describe(struct indexer *indexer);
-static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *catalog);
+static GtkWidget *editor_widget(struct indexer_source *source);
 
 #define INDEXER_NAME "applications"
 struct indexer indexer_applications =
@@ -375,7 +375,7 @@ static char *display_name(struct catalog *catalog, int id)
     return retval;
 }
 
-static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *catalog)
+static GtkWidget *editor_widget(struct indexer_source *source)
 {
     return gtk_label_new(source->display_name);
 }

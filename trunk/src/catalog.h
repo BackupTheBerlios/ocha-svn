@@ -175,45 +175,6 @@ void catalog_restart(struct catalog *catalog);
 gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_out);
 
 /**
- * List sources in the catalog for a given type.
- *
- * @param catalog
- * @param type source type
- * @param ids_out if non-null this array will contain the ids
- * of the sources of the given type. The array will have
- * to be released using g_free() by the caller. If there
- * are no sources of this type, *ids_out  will be null and
- * *ids_len_out will be 0
- * @param ids_len_out this integer will be set to the
- * number of entries in ids_out. Must not be null.
- * @return TRUE if it worked, in which case ids_out and ids_len_out
- * have been set and ids_out. FALSE if it
- * failed. check catalog_error() in this case.
- */
-gboolean catalog_list_sources(struct catalog *catalog, const char *type, int **ids_out, int *ids_len_out);
-
-/**
- * Get a source attribute
- * @param catalog
- * @param attribute
- * @param value_out must not be NULL. This will contain the value of the attribute, in UTF-8.
- * The pointer will have to be freed by the caller using g_free()
- * @return TRUE if it worked. FALSE
- * if there was an error. Note that if there was no such attribute, the function
- * will return TRUE and *value_out will have been set to NULL, so you need to check both.
- */
-gboolean catalog_get_source_attribute(struct catalog *catalog, int source_id, const char *attribute, char **value_out);
-
-/**
- * Set a source atttribute
- * @param catalog
- * @param source_id
- * @param attribute attribute name
- * @param value attribute value, NULL to remove
- */
-gboolean catalog_set_source_attribute(struct catalog *catalog, int source_id, const char *attribute, const char *value);
-
-/**
  * Add an entry into the catalog.
  * @param catalog
  * @param path local path or URI

@@ -178,7 +178,7 @@ static void release(struct queryrunner *_self)
    unlock(self->mutex);
 
 #ifdef DEBUG
-   printf("%s:%s released\n", __FILE__, __LINE__);
+   printf("%s:%d released\n", __FILE__, __LINE__);
 #endif
    /* the real release will be done by the
     * thread when it notices self->stopping==TRUE

@@ -69,7 +69,6 @@ int main(int argc, char *argv[])
    const char *catalog_path = config.catalog_path;
 
    int retval=0;
-   gboolean catalog_existed = g_file_test(catalog_path, G_FILE_TEST_EXISTS);
    GError *err = NULL;
    struct catalog *catalog = catalog_connect(catalog_path, &err);
    if(catalog==NULL)
@@ -80,7 +79,7 @@ int main(int argc, char *argv[])
          exit(114);
       }
 
-   if(!catalog_existed)
+   if(!ocha_gconf_exists())
       {
          if(!first_time(verbose, catalog))
             {
