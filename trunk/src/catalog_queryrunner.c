@@ -140,6 +140,7 @@ static gpointer runquery_thread(gpointer userdata)
                catalog_restart(queryrunner->catalog);
                printf("execute query: %s\n",
                       queryrunner->running_query->str);
+	       g_mutex_unlock(queryrunner->mutex);   
                if(!catalog_executequery(queryrunner->catalog,
                                         queryrunner->running_query->str,
                                         result_callback,
@@ -150,6 +151,7 @@ static gpointer runquery_thread(gpointer userdata)
                             queryrunner->running_query->str,
                             catalog_error(queryrunner->catalog));
                   }
+	       g_mutex_lock(queryrunner->mutex);
             }
          else if(queryrunner->catalog)
             {
