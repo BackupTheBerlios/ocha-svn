@@ -172,6 +172,16 @@ START_TEST(test_addcommand)
 }
 END_TEST
 
+START_TEST(test_addcommand_escape)
+{
+   printf("--- test_addcommand_escape\n");
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+   fail_unless(catalog_addcommand(catalog, "ed'it", "edit '%s'", NULL),
+               "addcommand failed");
+   catalog_disconnect(catalog);
+}
+END_TEST
+
 START_TEST(test_addcommand_noduplicate)
 {
    printf("--- test_addcommand_noduplicate\n");
@@ -202,6 +212,19 @@ START_TEST(test_addentry)
    catalog_cmd(catalog,
                "1st addentry(/tmp/toto.txt)",
                catalog_addentry(catalog, "/tmp/toto.txt", "Toto", command_id, &entry_id));
+
+   catalog_disconnect(catalog);
+}
+END_TEST
+
+START_TEST(test_addentry_escape)
+{
+   printf("--- test_addentry_escape\n");
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+
+   catalog_cmd(catalog,
+               "1st addentry(/tmp/toto.txt)",
+               catalog_addentry(catalog, "/tmp/to'to.txt", "To'to", command_id, NULL));
 
    catalog_disconnect(catalog);
 }
@@ -623,8 +646,10 @@ Suite *catalog_check_suite(void)
    tcase_add_test(tc_core, test_create);
    tcase_add_test(tc_core, test_addcommand);
    tcase_add_test(tc_core, test_addcommand_noduplicate);
+   tcase_add_test(tc_core, test_addcommand_escape);
    tcase_add_test(tc_core, test_addentry);
    tcase_add_test(tc_core, test_addentry_noduplicate);
+   tcase_add_test(tc_core, test_addentry_escape);
 
    tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
    suite_add_tcase(s, tc_query);

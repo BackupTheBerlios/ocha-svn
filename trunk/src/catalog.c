@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <stdarg.h>
+#include "mempool.h"
 
 /** Hidden catalog structure */
 struct catalog
@@ -25,6 +27,8 @@ struct catalog
    void *callback_userdata;
    GCond *busy_wait_cond;
    GMutex *busy_wait_mutex;
+
+   struct mempool *escape_mempool;
 
    char path[];
 };
@@ -74,6 +78,7 @@ static bool handle_sqlite_retval(struct catalog *catalog, int retval, char *errm
                           catalog->sql->str);
    return false;
 }
+
 static int execute_update_nocatalog(sqlite *db, const char *sql, char **errmsg)
 {
    sqlite_busy_timeout(db, 30000/*30 seconds timout, for updates*/);
@@ -83,6 +88,8 @@ static int execute_update_nocatalog(sqlite *db, const char *sql, char **errmsg)
                          NULL/*no callback*/,
                          NULL/*no userdata*/,
                          errmsg/*no errmsg*/);
+   if(ret!=0)
+      sqlite_exec(db, "ROLLBACK;", NULL, NULL, NULL);
 
    sqlite_busy_timeout(db, -1/*disable, for queries*/);
 
@@ -211,10 +218,53 @@ struct catalog *catalog_connect(const char *path, char **_errmsg)
    catalog->error=g_string_new("");
    catalog->busy_wait_cond=g_cond_new();
    catalog->busy_wait_mutex=g_mutex_new();
+   catalog->escape_mempool=NULL;
    strcpy(catalog->path, path);
    return catalog;
 }
 
+static int count(const char *str, char c)
+{
+   int count=0;
+   for(const char *ptr = str; *ptr!='\0'; ptr++)
+      {
+         if(*ptr==c)
+            count++;
+      }
+   return count;
+}
+static const char *escape(struct catalog *catalog, const char *orig)
+{
+   int quotes = count(orig, '\'');
+   if(quotes==0)
+      return orig;
+   if(!catalog->escape_mempool)
+      catalog->escape_mempool=mempool_new();
+   char *retval = (char *)mempool_alloc(catalog->escape_mempool, strlen(orig)+quotes+1);
+   char *retval_ptr = retval;
+   char *orig_ptr = orig;
+   while(*orig_ptr!='\0')
+      {
+         *retval_ptr=*orig_ptr;
+         retval_ptr++;
+         if(*orig_ptr=='\'')
+            {
+               *retval_ptr='\'';
+               retval_ptr++;
+            }
+         orig_ptr++;
+      }
+   *retval_ptr='\0';
+   return retval;
+}
+static void escape_free(struct catalog *catalog)
+{
+   if(catalog->escape_mempool)
+      {
+         mempool_delete(catalog->escape_mempool);
+         catalog->escape_mempool=NULL;
+      }
+}
 
 const char *catalog_error(struct catalog *catalog)
 {
@@ -231,6 +281,7 @@ void catalog_disconnect(struct catalog *catalog)
    g_mutex_free(catalog->busy_wait_mutex);
    g_string_free(catalog->sql, true/*free_segment*/);
    g_string_free(catalog->error, true/*free_segment*/);
+   escape_free(catalog);
    g_free(catalog);
 }
 
@@ -486,8 +537,9 @@ bool catalog_addcommand(struct catalog *catalog, const char *name, const char *e
       {
          g_string_printf(catalog->sql,
                          "UPDATE command SET execute='%s' WHERE id=%d;",
-                         execute,
+                         escape(catalog, execute),
                          old_id);
+         escape_free(catalog);
          if(id_out)
             *id_out=old_id;
          return execute_update(catalog);
@@ -496,9 +548,9 @@ bool catalog_addcommand(struct catalog *catalog, const char *name, const char *e
       {
          g_string_printf(catalog->sql,
                          "INSERT INTO command (id, display_name, execute) VALUES (NULL, '%s', '%s');",
-                         name,
-                         execute);
-
+                         escape(catalog, name),
+                         escape(catalog, execute));
+         escape_free(catalog);
          return insert_and_get_id(catalog, id_out);
       }
 }
@@ -522,7 +574,8 @@ bool catalog_findcommand(struct catalog *catalog, const char *name, int *id_out)
 
    g_string_printf(catalog->sql,
                    "SELECT id FROM command where display_name='%s';",
-                   name);
+                   escape(catalog, name));
+   escape_free(catalog);
    int id=-1;
 
    if( execute_query(catalog, findid_callback, &id) && id!=-1)
@@ -541,7 +594,8 @@ bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out)
 
    g_string_printf(catalog->sql,
                    "SELECT id FROM entries WHERE path='%s';",
-                   path);
+                   escape(catalog, path));
+   escape_free(catalog);
    int id=-1;
 
    if(execute_query(catalog, findid_callback, &id) && id!=-1)
@@ -555,6 +609,7 @@ bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out)
 
 bool catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
 {
+   printf("addentry(%s, %s)\n", path, display_name);
    g_return_val_if_fail(catalog!=NULL, false);
    g_return_val_if_fail(path!=NULL, false);
    g_return_val_if_fail(display_name!=NULL, false);
@@ -564,18 +619,20 @@ bool catalog_addentry(struct catalog *catalog, const char *path, const char *dis
       {
          g_string_printf(catalog->sql,
                          "UPDATE entries SET display_name='%s', command_id=%d WHERE id=%d;",
-                         display_name,
+                         escape(catalog, display_name),
                          command_id,
                          old_id);
+         escape_free(catalog);
          return execute_update(catalog);
       }
    else
       {
          g_string_printf(catalog->sql,
                          "INSERT INTO entries (id, path, display_name, command_id) VALUES (NULL, '%s', '%s', %d);",
-                         path,
-                         display_name,
+                         escape(catalog, path),
+                         escape(catalog, display_name),
                          command_id);
+         escape_free(catalog);
          return insert_and_get_id(catalog, id_out);
       }
 }

@@ -33,6 +33,8 @@ static bool bookmarks_read_line(FILE *, GString *);
 
 static char *html_expand_common_entities(const char *orig);
 
+static void doze_off(bool really);
+
 /* ------------------------- public functions */
 
 void catalog_index_init()
@@ -49,7 +51,7 @@ bool catalog_index_directory(struct catalog *catalog, const char *directory, int
    g_return_val_if_fail(DEFAULT_IGNORE!=NULL, false); /* call catalog_index_init!() */
 
    int cmd = -1;
-   if(!catalog_addcommand(catalog, "gnome-open", "gnome-open '%f'", &cmd))
+   if(!catalog_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", &cmd))
       return false;
 
 
@@ -73,7 +75,7 @@ bool catalog_index_applications(struct catalog *catalog, const char *directory, 
    g_return_val_if_fail(maxdepth==-1 || maxdepth>0, false);
 
    int cmd = -1;
-   if(!catalog_addcommand(catalog, "run-desktop-entry", "run-desktop-entry '%f'", &cmd))
+   if(!catalog_addcommand(catalog, "run-desktop-entry", "run-desktop-entry \"%f\"", &cmd))
       return false;
 
 
@@ -90,7 +92,7 @@ bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file)
    g_return_val_if_fail(bookmark_file!=NULL, false);
 
    int cmd = -1;
-   if(!catalog_addcommand(catalog, "gnome-moz-remote", "gnome-moz-remote '%f'", &cmd))
+   if(!catalog_addcommand(catalog, "gnome-moz-remote", "gnome-moz-remote \"%f\"", &cmd))
       return false;
 
    bool retval=true;
@@ -185,6 +187,7 @@ static bool catalog_index_directory_recursive(struct catalog *catalog, const cha
                                                                  slow,
                                                                  cmd))
                               retval=false;
+                           doze_off(slow);
                         }
                   }
                else if(is_accessible_file(mode))
@@ -241,6 +244,7 @@ static bool catalog_index_applications_recursive(struct catalog *catalog, const 
                                                                     slow,
                                                                     cmd))
                               retval=false;
+                           doze_off(slow);
                         }
                   }
                else if(is_accessible_file(mode))
@@ -471,4 +475,10 @@ static char *html_expand_common_entities(const char *str)
    char *retval_str = retval->str;
    g_string_free(retval, false/*don't free retval_str*/);
    return retval_str;
+}
+
+static void doze_off(bool really)
+{
+   if(really)
+      sleep(3);
 }

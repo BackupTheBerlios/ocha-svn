@@ -53,7 +53,7 @@ START_TEST(test_index_directory)
 {
    printf("---test_index_directory\n");
    int gnome_open_id=8;
-   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open '%f'", gnome_open_id);
+   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
@@ -72,7 +72,7 @@ START_TEST(test_index_directory_maxdepth_1)
 {
    printf("---test_index_directory_maxdepth_1\n");
    int gnome_open_id=8;
-   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open '%f'", gnome_open_id);
+   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
 
@@ -88,7 +88,7 @@ START_TEST(test_index_directory_maxdepth_2)
 {
    printf("---test_index_directory_maxdepth_2\n");
    int gnome_open_id=8;
-   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open '%f'", gnome_open_id);
+   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
@@ -114,7 +114,7 @@ START_TEST(test_index_directory_default_ignore)
    touch(TEMPDIR "/xF.txt.bak");
 
    int gnome_open_id=8;
-   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open '%f'", gnome_open_id);
+   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
@@ -135,7 +135,7 @@ START_TEST(test_index_directory_ignore_others)
    printf("---test_index_directory_ignore_others\n");
 
    int gnome_open_id=8;
-   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open '%f'", gnome_open_id);
+   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
 
    fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, ignore, false/*not slow*/),
@@ -216,7 +216,7 @@ START_TEST(test_index_applications)
    int run_id=2;
    mock_catalog_expect_addcommand(catalog,
                                   "run-desktop-entry",
-                                  "run-desktop-entry '%f'",
+                                  "run-desktop-entry \"%f\"",
                                   run_id);
    mock_catalog_expect_addentry(catalog,
                                 TEMPDIR "/xmms.desktop",
@@ -254,7 +254,7 @@ START_TEST(test_index_applications_depth)
    int run_id=2;
    mock_catalog_expect_addcommand(catalog,
                                   "run-desktop-entry",
-                                  "run-desktop-entry '%f'",
+                                  "run-desktop-entry \"%f\"",
                                   run_id);
    mock_catalog_expect_addentry(catalog,
                                 TEMPDIR "/xmms.desktop",
@@ -291,7 +291,7 @@ START_TEST(test_index_applications_skip_terminal)
    int run_id=2;
    mock_catalog_expect_addcommand(catalog,
                                   "run-desktop-entry",
-                                  "run-desktop-entry '%f'",
+                                  "run-desktop-entry \"%f\"",
                                   run_id);
 
    fail_unless(catalog_index_applications(catalog,
@@ -340,7 +340,7 @@ START_TEST(test_index_applications_skip_withargs)
    int run_id=2;
    mock_catalog_expect_addcommand(catalog,
                                   "run-desktop-entry",
-                                  "run-desktop-entry '%f'",
+                                  "run-desktop-entry \"%f\"",
                                   run_id);
 
    fail_unless(catalog_index_applications(catalog,
@@ -402,7 +402,7 @@ START_TEST(test_index_bookmarks)
    int run_id=2;
    mock_catalog_expect_addcommand(catalog,
                                   "gnome-moz-remote",
-                                  "gnome-moz-remote '%f'",
+                                  "gnome-moz-remote \"%f\"",
                                   run_id);
    mock_catalog_expect_addentry(catalog,
                                 "http://slashdot.org/",
@@ -458,7 +458,7 @@ START_TEST(test_index_bookmarks_escape)
    int run_id=2;
    mock_catalog_expect_addcommand(catalog,
                                   "gnome-moz-remote",
-                                  "gnome-moz-remote '%f'",
+                                  "gnome-moz-remote \"%f\"",
                                   run_id);
    mock_catalog_expect_addentry(catalog,
                                 "http://texturizer.net/firefox/extensions/",
