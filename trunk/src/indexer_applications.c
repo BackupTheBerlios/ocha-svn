@@ -272,6 +272,18 @@ static gboolean add_source(struct catalog *catalog, const char *path, int depth,
    return TRUE;
 }
 
+static gboolean add_source_for_directory(struct catalog *catalog, const char *possibility)
+{
+   if(g_file_test(possibility, G_FILE_TEST_EXISTS)
+      && g_file_test(possibility, G_FILE_TEST_IS_DIR))
+      {
+         return add_source(catalog,
+                           possibility,
+                           10/*depth*/,
+                           "locale:man:themes:doc:fonts:perl:pixmaps");
+      }
+   return TRUE;
+}
 static gboolean discover(struct indexer *indexer, struct catalog *catalog)
 {
    gboolean retval = FALSE;
@@ -290,17 +302,10 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
 
    for(char **ptr=possibilities; *ptr; ptr++)
       {
+         gboolean ok=TRUE;
          char *possibility = *ptr;
-         if(g_file_test(possibility, G_FILE_TEST_EXISTS)
-            && g_file_test(possibility, G_FILE_TEST_IS_DIR))
-            {
-               if(!add_source(catalog,
-                              possibility,
-                              10/*depth*/,
-                              "locale:man:themes:doc:fonts:perl:pixmaps"))
-                  goto error;
-
-            }
+         if(!add_source_for_directory(catalog, possibility))
+            goto error;
       }
    retval=TRUE;
  error:
