@@ -72,11 +72,10 @@ char *ocha_gconf_get_source_attribute(const char *type, int source_id, const cha
 
     ocha_gconf_get_client();
 
-    char *key = g_strdup_printf("%s/%s/%d/%s",
-                                OCHA_GCONF_INDEXERS,
-                                type,
-                                source_id,
-                                attribute);
+    char *key = ocha_gconf_get_source_attribute_key(type,
+                                                    source_id,
+                                                    attribute);
+
     char *retval = gconf_client_get_string(client,
                                            key,
                                            NULL/*err*/);
@@ -91,11 +90,9 @@ gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const 
 
     ocha_gconf_get_client();
 
-    char *key = g_strdup_printf("%s/%s/%d/%s",
-                                OCHA_GCONF_INDEXERS,
-                                type,
-                                source_id,
-                                attribute);
+    char *key = ocha_gconf_get_source_attribute_key(type,
+                                                    source_id,
+                                                    attribute);
 
     gboolean retval;
     if(value==NULL)
@@ -111,11 +108,21 @@ gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const 
     return retval;
 }
 
-gchar *ocha_gconf_get_source_path(const char *type, int id)
+gchar *ocha_gconf_get_source_key(const char *type, int id)
 {
     g_return_val_if_fail(type, NULL);
     return g_strdup_printf("%s/%s/%d",
                            OCHA_GCONF_INDEXERS,
                            type,
                            id);
+}
+
+gchar *ocha_gconf_get_source_attribute_key(const char *type, int id, const char *attribute)
+{
+   g_return_val_if_fail(type, NULL);
+   return g_strdup_printf("%s/%s/%d/%s",
+                          OCHA_GCONF_INDEXERS,
+                          type,
+                          id,
+                          attribute);
 }

@@ -48,6 +48,25 @@ struct indexer indexer_applications =
     "most often work with."
 };
 
+static guint notify_display_name_change(struct indexer_source *source,
+                                        struct catalog *catalog,
+                                        indexer_source_notify_f notify,
+                                        gpointer userdata)
+{
+    g_return_val_if_fail(source, 0);
+    g_return_val_if_fail(notify, 0);
+    return source_attribute_change_notify_add(INDEXER_NAME,
+                                              source->id,
+                                              "path",
+                                              catalog,
+                                              notify,
+                                              userdata);
+}
+static void remove_notification(struct indexer_source *source,
+                                guint id)
+{
+    source_attribute_change_notify_remove(id);
+}
 static struct indexer_source *load(struct indexer *self, struct catalog *catalog, int id)
 {
    struct indexer_source *retval = g_new(struct indexer_source, 1);
@@ -57,6 +76,8 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
    retval->release=release;
    retval->display_name=display_name(catalog, id);
    retval->editor_widget=editor_widget;
+   retval->notify_display_name_change=notify_display_name_change;
+   retval->remove_notification=remove_notification;
    return retval;
 }
 static void release(struct indexer_source *source)

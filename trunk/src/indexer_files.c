@@ -59,6 +59,26 @@ struct indexer indexer_files =
 
 /* ------------------------- private functions */
 
+static guint notify_display_name_change(struct indexer_source *source,
+                                        struct catalog *catalog,
+                                        indexer_source_notify_f notify,
+                                        gpointer userdata)
+{
+    g_return_val_if_fail(source, 0);
+    g_return_val_if_fail(notify, 0);
+    return source_attribute_change_notify_add(INDEXER_NAME,
+                                              source->id,
+                                              "path",
+                                              catalog,
+                                              notify,
+                                              userdata);
+}
+static void remove_notification(struct indexer_source *source,
+                                guint id)
+{
+    source_attribute_change_notify_remove(id);
+}
+
 /**
  * Load a source from the catalog.
  *
@@ -78,6 +98,8 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
    retval->release=release_source;
    retval->display_name=display_name(catalog, id);
    retval->editor_widget=editor_widget;
+   retval->notify_display_name_change=notify_display_name_change;
+   retval->remove_notification=remove_notification;
    return retval;
 }
 static void release_source(struct indexer_source *source)
@@ -304,10 +326,12 @@ static char *display_name(struct catalog *catalog, int id)
                 retval=g_strdup("GNOME Desktop");
             else if(g_str_has_prefix(path, home))
                 retval=g_strdup(&path[strlen(home)+1]);
+            else if(strcmp("/", path)==0)
+                retval=g_strdup("Filesystem");
             else
             {
-                retval=path;
-                uri=NULL;
+                char *last_slash = strrchr(path, '/');
+                retval=g_strdup(last_slash+1);
             }
         }
         if(!retval)

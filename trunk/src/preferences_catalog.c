@@ -102,7 +102,57 @@ static void add_indexer(GtkTreeStore *model, struct indexer *indexer, struct cat
         g_free(ids);
     }
 }
+static gboolean find_iter_for_source(GtkTreeStore *model, int goal_id, GtkTreeIter *iter_out)
+{
+    g_return_val_if_fail(model, FALSE);
+    g_return_val_if_fail(iter_out, FALSE);
 
+    int source_id;
+    GtkTreeIter iter_parent;
+    if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
+                                     &iter_parent))
+    {
+        do
+        {
+            GtkTreeIter iter_child;
+            if(gtk_tree_model_iter_children(GTK_TREE_MODEL(model),
+                                            iter_out,
+                                            &iter_parent))
+            {
+                do
+                {
+                    gtk_tree_model_get(GTK_TREE_MODEL(model), iter_out,
+                                       COLUMN_SOURCE_ID, &source_id,
+                                       -1);
+                    if(source_id==goal_id)
+                        return TRUE;
+                }
+                while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model),
+                                               iter_out));
+            }
+        }
+        while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model),
+                                       &iter_parent));
+    }
+    /* iter_out has been set to be invalid */
+    return FALSE;
+
+}
+
+static void display_name_changed(struct indexer_source *source, gpointer userdata)
+{
+    GtkTreeStore *model = GTK_TREE_STORE(userdata);
+    g_return_if_fail(source);
+    g_return_if_fail(model);
+    GtkTreeIter iter;
+
+    if(find_iter_for_source(model, source->id, &iter))
+    {
+        gtk_tree_store_set(model, &iter,
+                           COLUMN_LABEL, source->display_name,
+                           -1);
+    }
+}
 static void add_source(GtkTreeStore *model,
                        GtkTreeIter *parent,
                        struct indexer *indexer,
@@ -123,6 +173,10 @@ static void add_source(GtkTreeStore *model,
                                COLUMN_SOURCE_ID, source_id,
                                -1);
 
+            indexer_source_notify_display_name_change(source,
+                                                      catalog,
+                                                      display_name_changed,
+                                                      model);
             update_entry_count(model, &iter, source_id, catalog);
             indexer_source_release(source);
         }
@@ -436,6 +490,20 @@ static void delete_cb(GtkButton *button, gpointer userdata)
                     gtk_tree_model_iter_parent(GTK_TREE_MODEL(prefs->model),
                                                &parent_iter,
                                                &iter);
+                    int child_count, parent_count;
+                    gtk_tree_model_get(GTK_TREE_MODEL(prefs->model),
+                                       &parent_iter,
+                                       COLUMN_COUNT, &parent_count,
+                                       -1);
+                    gtk_tree_model_get(GTK_TREE_MODEL(prefs->model),
+                                       &iter,
+                                       COLUMN_COUNT, &child_count,
+                                       -1);
+                    gtk_tree_store_set(prefs->model,
+                                       &parent_iter,
+                                       COLUMN_COUNT, parent_count-child_count,
+                                       -1);
+
                     if(gtk_tree_store_remove(prefs->model, &iter))
                         gtk_tree_selection_select_iter(prefs->selection, &iter);
                     else

@@ -14,7 +14,7 @@ gboolean indexer_source_destroy(struct indexer_source *source, struct catalog *c
         success=FALSE;
     }
 
-    gchar *path = ocha_gconf_get_source_path(source->indexer->name,
+    gchar *path = ocha_gconf_get_source_key(source->indexer->name,
                                              source->id);
     if(!gconf_client_recursive_unset(ocha_gconf_get_client(),
                                      path,

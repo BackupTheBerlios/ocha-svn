@@ -83,4 +83,29 @@ GPatternSpec **create_patterns(const char *patterns);
 void free_patterns(GPatternSpec **patterns);
 
 gboolean uri_exists(const char *uri);
+
+/**
+ * Get told when a particular source attribute is modified.
+ * @param type
+ * @param id
+ * @param attribute
+ * @param catalog a catalog that will exist for as long as the
+ * notification is active
+ * @param callback
+ * @param userdata
+ * @return an ID to pass to _source_attribute_change_notify_remove()
+ */
+guint source_attribute_change_notify_add(const char *type,
+                                         int source_id,
+                                         const char *attribute,
+                                         struct catalog *catalog,
+                                         indexer_source_notify_f callback,
+                                         gpointer userdata);
+/**
+ * Remove a notification registered wyth _source_attribute_change_notify_add
+ * @param id return value of _source_attribute_change_notify_add
+ */
+void source_attribute_change_notify_remove(guint id);
+
+
 #endif /*INDEXER_UTILS_H*/

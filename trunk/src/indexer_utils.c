@@ -11,6 +11,7 @@
 
 #include "ocha_gconf.h"
 #include "indexer_utils.h"
+#include "indexers.h"
 
 /** \file implementation of the API defined in indexer_utils.h */
 
@@ -350,6 +351,69 @@ void free_patterns(GPatternSpec **patterns)
    g_free(patterns);
 }
 
+struct attribute_change_notify_userdata
+{
+    struct indexer *indexer;
+    indexer_source_notify_f callback;
+    gpointer userdata;
+    struct catalog *catalog;
+    int source_id;
+};
+void attribute_change_notify_cb(GConfClient *client, guint id, GConfEntry *entry, gpointer _userdata)
+{
+    struct attribute_change_notify_userdata *userdata;
+    g_return_if_fail(userdata);
+
+    userdata = (struct attribute_change_notify_userdata *)_userdata;
+    struct indexer_source *source = indexer_load_source(userdata->indexer,
+                                                        userdata->catalog,
+                                                        userdata->source_id);
+    if(source)
+    {
+        userdata->callback(source, userdata->userdata);
+        indexer_source_release(source);
+    }
+}
+
+guint source_attribute_change_notify_add(const char *type,
+                                         int source_id,
+                                         const char *attribute,
+                                         struct catalog *catalog,
+                                         indexer_source_notify_f callback,
+                                         gpointer callback_userdata)
+{
+    char *key = ocha_gconf_get_source_attribute_key(type, source_id, attribute);
+
+
+    struct attribute_change_notify_userdata *userdata;
+    userdata=g_new(struct attribute_change_notify_userdata, 1);
+    userdata->callback=callback;
+    userdata->userdata=callback_userdata;
+    userdata->indexer=indexers_get(type);
+    userdata->source_id=source_id;
+    userdata->catalog=catalog;
+
+    gboolean retval = TRUE;
+    if(!gconf_client_notify_add(ocha_gconf_get_client(),
+                                key,
+                                attribute_change_notify_cb,
+                                userdata,
+                                g_free/*free userdata*/,
+                                NULL/*err*/))
+    {
+        g_free(userdata);
+        retval=FALSE;
+    }
+    g_free(key);
+    return retval;
+}
+
+
+void source_attribute_change_notify_remove(guint id)
+{
+    gconf_client_notify_remove(ocha_gconf_get_client(),
+                               id);
+}
 
 /* ------------------------- private functions */
 static void catalog_index_init()

@@ -252,6 +252,13 @@ static inline struct indexer_source *indexer_new_source(struct indexer *self, st
 }
 
 /**
+ * Notify function for whatching indexer sources
+ * @param source source that has changed
+ * @param userdata
+ */
+typedef void (*indexer_source_notify_f)(struct indexer_source * source, gpointer userdata);
+
+/**
  * A indexer_source is an instance of an indexer
  * that manages a subset of catalog entries.
  */
@@ -289,6 +296,28 @@ struct indexer_source
     * a window to edit the source
     */
    GtkWidget *(*editor_widget)(struct indexer_source *source);
+
+   /**
+    * Get told when the display name has changed.
+    *
+    * Notifications outlive the struct indexer_source *. They'll
+    * last as long as the object exists in the configuration.
+    *
+    * @param source
+    * @param catalog a catalog that will exist for as long
+    * as the notification or the source hasn't been removed
+    * @param notify_func function to call when the name has changed
+    * @param userdata userdata to pass to the function
+    * @return an id to use to remove the notification request
+    */
+   guint (*notify_display_name_change)(struct indexer_source *, struct catalog *, indexer_source_notify_f, gpointer);
+
+   /**
+    * Remove a notification request added with notify_display_name_change
+    * @param source
+    * @param id number returned by notify_display_name_change
+    */
+   void (*remove_notification)(struct indexer_source *source, guint id);
 
    /**
     * Release the source structure.
@@ -352,6 +381,43 @@ static inline void indexer_source_release(struct indexer_source *source)
 {
    g_return_if_fail(source);
    source->release(source);
+}
+
+/**
+ * Get told when the display name has changed.
+ *
+ * Notifications outlive the struct indexer_source *. They'll
+ * last as long as the object exists in the configuration.
+ *
+ * This is a shortcut for source->notify_display_name_change(source)
+ * @param source
+ * @param catalog a catalog that will exist for as long
+ * as the notification or the source hasn't been removed
+ * @param notify_func function to call when the name has changed
+ * @param userdata userdata to pass to the function
+ * @return an id to use to remove the notification request
+ */
+static inline guint indexer_source_notify_display_name_change(struct indexer_source *source,
+                                                              struct catalog *catalog,
+                                                              indexer_source_notify_f notify,
+                                                              gpointer userdata)
+{
+   g_return_val_if_fail(source, 0);
+   return source->notify_display_name_change(source,
+                                             catalog,
+                                             notify,
+                                             userdata);
+}
+
+/**
+ * Remove a notification request added with notify_display_name_change
+ * @param source
+ * @param id number returned by notify_display_name_change
+ */
+static inline void indexer_source_remove_notification(struct indexer_source *source, guint id)
+{
+   g_return_if_fail(source);
+   source->remove_notification(source, id);
 }
 
 /**
