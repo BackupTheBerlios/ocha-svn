@@ -1,6 +1,7 @@
 #ifndef TARGET_H
 #define TARGET_H
 
+#include <stdbool.h>
 #include <glib.h>
 #include "mempool.h"
 
@@ -38,20 +39,20 @@ struct target
 	* some pseudo-url that's guaranteed to be unique and
 	* reproducable.
 	*
-	* Never null;
+	* Never null. read-only.
 	*/
-   const gchar* const id;
+   const gchar* id;
 
-   /** A user-friendly name for this target. Never null.  */
-   const gchar* const name;
+   /** A user-friendly name for this target. Never null. read-only. */
+   const gchar* name;
 
-   /** Absolute path to the file if relevant, NULL otherwise. */
-   const gchar * const filepath;
+   /** Absolute path to the file if relevant, NULL otherwise. read-only.*/
+   const gchar* filepath;
 
-   /** URL to the file if relevant, NULL otherwise. */
-   const gchar * const url;
+   /** URL to the file if relevant, NULL otherwise. read-only. */
+   const gchar* url;
 
-   struct mempool * const mempool;
+   struct mempool* mempool;
 };
 
 /**
@@ -93,7 +94,7 @@ struct target_action
  * @param target_action the structure where this callback was found
  * @param target target on which the action should be executed
  */
-typedef void (*target_action_f)(struct target_action*, struct target*);
+typedef void (*target_action_f)(struct target*, struct target_action*);
 
 /**
  * Create a new target associated to a file.
@@ -206,7 +207,8 @@ void target_add_action(struct target* target, struct target_action* target_actio
  * @return true if the action was found in the target and executed. 
  * false otherwise
  *
-void target_execute_action(struct target* target, struct target_action* target_action);x
+ */
+void target_execute_action(struct target* target, struct target_action* target_action);
  
 /**
  * Remove an action from a target.

@@ -37,6 +37,21 @@ size_t mempool_size();
 void *mempool_alloc(struct mempool *, size_t size);
 
 /**
+ * Shortcut that allocates one element of a specific type.
+ *
+ * mempool_alloc_type(mempool, struct toto) is the same as
+ * (struct toto *)mempool_alloc(mempool, sizeof(struct toto))
+ */
+#define mempool_alloc_type(mempool, type) (type *)mempool_alloc(mempool, sizeof(type))
+/**
+ * Shortcut that allocates several elements of a specific type.
+ *
+ * mempool_alloc_type(mempool, struct toto) is the same as
+ * (struct toto *)mempool_alloc(mempool, sizeof(struct toto))
+ */
+#define mempool_alloc_array(mempool, type, count) (type *)mempool_alloc(mempool, sizeof(type)*count)
+
+/**
  * Method used to free a resource.
  *
  */

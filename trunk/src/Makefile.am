@@ -1,13 +1,17 @@
 noinst_HEADERS=target.h mempool.h
 bin_PROGRAMS=
 
-noinst_PROGRAMS=mempool_check
+noinst_PROGRAMS=mempool_check target_check
 
-TESTS=mempool_check
+TESTS=mempool_check target_check
 
 mempool_check_SOURCES=mempool_check.c mempool.c mempool.h
 mempool_check_INCLUDES=@CHECK_CFLAGS@ 
 mempool_check_LDADD=@CHECK_LIBS@ 
+
+target_check_SOURCES=target_check.c target.c target.h mempool.c mempool.h
+target_check_INCLUDES=@CHECK_CFLAGS@ 
+target_check_LDADD=@CHECK_LIBS@ 
 
 #lint:
 #	flags="+posixlib -booltype bool" ;\
