@@ -161,12 +161,12 @@ class Catalog:
         try:
             sofar=[]
             cursor.execute(self.__like_query, (query+"%"))
-            ret=self.__parse_results(cursor,callback, sofar)
+            ret=self.__parse_results(cursor,callback, sofar=sofar)
             if not ret:
                 return False
 
             cursor.execute(self.__like_query, ("%"+query+"%"))
-            ret=self.__parse_results(cursor,callback, sofar)
+            ret=self.__parse_results(cursor,callback, sofar=sofar)
             return ret
         finally:
             cursor.close()
@@ -180,8 +180,8 @@ class Catalog:
 
         for row in cursor:
             id=row[0]
-            if not sofar or id not in sofar:
-                if sofar:
+            if sofar==None or id not in sofar:
+                if sofar!=None:
                     sofar.append(id)
                 entry=Entry(self, id, filename=row[1], directory=row[2], display_name=row[3], command_id=row[4])
                 if not callback(self, entry):
