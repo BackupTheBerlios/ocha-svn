@@ -35,14 +35,14 @@ static struct mock_result results[] =
 #define assert_released(result, expected) fail_unless(##result " released ? expected " ##expected, results[result].released==released)
 
 
-/*define TEST_VERBOSE*/
+#define TEST_VERBOSE
 
 #ifdef TEST_VERBOSE
 # define TEST_HEADER(name) printf("---- " #name "\n")
 # define TEST_FOOTER() printf("----\n")
 #else
-# define TEST_HEADER(name) ((void *)0)
-# define TEST_FOOTER() ((void *)0)
+# define TEST_HEADER(name)
+# define TEST_FOOTER()
 #endif
 
 
@@ -63,7 +63,7 @@ static void release_cb(struct result *_result)
 
 static void setup()
 {
-   g_thread_init_with_errorcheck_mutexes(NULL/*vtable*/);
+   g_thread_init(NULL/*vtable*/);
 }
 
 static void teardown()
