@@ -1,0 +1,11 @@
+#! /bin/sh
+AUTOMAKE_VERSION=1.6
+automake --version 2>&1 | head -1 | grep -q -F $AUTOMAKE_VERSION || { \
+ echo "automake version $AUTOMAKE_VERSION is required"
+ echo -n "not: "
+ automake --version 2>&1 | head -1
+ exit 10
+}
+set -x
+aclocal -I macros && libtoolize --force --copy && autoheader && automake --add-missing --copy && autoconf
+./configure --enable-maintainer-mode
