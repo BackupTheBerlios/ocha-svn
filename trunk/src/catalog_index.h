@@ -4,6 +4,8 @@
 #include "catalog.h"
 /** \file index directories and put that into the catalog */
 
+/** Call this function before any other functions in this module */
+void catalog_index_init(void);
 
 /**
  * Index or re-index the content of the directory.
@@ -13,10 +15,15 @@
  * @param maxdepth maximum depth to look for files in,
  * 1 means that only the files in the given directory
  * will be taken into account.
+ * @param ignore additional files to ignore (in addition to the
+ * hardcoded ones). This can either be NULL or be a NULL-terminated
+ * array of unix glob patterns (*.bak). If a file or directory matches
+ * one of the patterns, it'll be ignored (together with its content, if
+ * it's a directory). Only * and ? are supported (no [..] character ranges)
  * @param slow slow down operation not to waste CPU cycles
  * @return true if all went well
  */
-bool catalog_index_directory(struct catalog *catalog, const char *directory, int maxdepth, bool slow);
+bool catalog_index_directory(struct catalog *catalog, const char *directory, int maxdepth, const char **ignore, bool slow);
 
 /**
  * Index or re-index the applications in the directory.

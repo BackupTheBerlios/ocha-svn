@@ -27,6 +27,8 @@ static void setup()
    touch(TEMPDIR "/x2.gif");
    touch(TEMPDIR "/d1/x3.txt");
    touch(TEMPDIR "/d1/d2/x4.txt");
+
+   catalog_index_init();
 }
 
 static void teardown()
@@ -44,7 +46,7 @@ START_TEST(test_index_directory)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", gnome_open_id, 4);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, false/*not slow*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, false/*not slow*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -61,7 +63,7 @@ START_TEST(test_index_directory_maxdepth_1)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, 1, false/*not slow*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, 1, NULL/*ignore*/, false/*not slow*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -78,7 +80,7 @@ START_TEST(test_index_directory_maxdepth_2)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, 2, false/*not slow*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, 2, NULL/*ignore*/, false/*not slow*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -86,7 +88,61 @@ START_TEST(test_index_directory_maxdepth_2)
 }
 END_TEST
 
+START_TEST(test_index_directory_default_ignore)
+{
+   printf("---test_index_directory_default_ignore\n");
+   touch(TEMPDIR "/.xA.txt");
+   mkdir(TEMPDIR "/CVS", 0777);
+   touch(TEMPDIR "/CVS/xB.txt");
+   mkdir(TEMPDIR "/.svn", 0777);
+   touch(TEMPDIR "/.svn/xC.txt");
+   touch(TEMPDIR "/xD.txt~");
+   touch(TEMPDIR "/#xE.txt#");
+   touch(TEMPDIR "/xF.txt.bak");
 
+   int gnome_open_id=8;
+   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open '%f'", gnome_open_id);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", gnome_open_id, 4);
+
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, false/*not slow*/),
+               "indexing failed");
+
+   mock_catalog_assert_expectations_met(catalog);
+   printf("---test_index_directory_default_ignore OK\n");
+}
+END_TEST
+
+START_TEST(test_index_directory_ignore_others)
+{
+   const char *ignore[] = { "*.txt", NULL };
+
+   printf("---test_index_directory_ignore_others\n");
+
+   int gnome_open_id=8;
+   mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open '%f'", gnome_open_id);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
+
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, ignore, false/*not slow*/),
+               "indexing failed");
+
+   mock_catalog_assert_expectations_met(catalog);
+   printf("---test_index_directory_ignore_others OK\n");
+}
+END_TEST
+
+/* ------------------------- mock gnome_vfs functions */
+void gnome_vfs_init() {}
+gchar *gnome_vfs_get_mime_type(const gchar *uri)
+{
+   return g_strdup("text/plain");
+}
+gchar *gnome_vfs_mime_get_default_desktop_entry(const gchar *mimetype)
+{
+   return g_strdup("emacs"); /* emacs can handle anything */
+}
 /* ------------------------- static functions */
 static void deltree(const char *path)
 {
@@ -113,6 +169,8 @@ Suite *catalog_index_check_suite(void)
    tcase_add_test(tc_core, test_index_directory);
    tcase_add_test(tc_core, test_index_directory_maxdepth_1);
    tcase_add_test(tc_core, test_index_directory_maxdepth_2);
+   tcase_add_test(tc_core, test_index_directory_default_ignore);
+   tcase_add_test(tc_core, test_index_directory_ignore_others);
 
    return s;
 }

@@ -4,8 +4,14 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
+#include <libgnomevfs/gnome-vfs.h>
 
 /** \file implementation of the API defined in catalog_index.h */
+
+/** default patterns, as strings */
+static const char *DEFAULT_IGNORE_STRINGS[] = { "CVS", "*~", "*.bak", "#*#", NULL };
+/** pattern spec created the 1st time catalog_index_directory() is called (and never freed) */
+static GPatternSpec **DEFAULT_IGNORE;
 
 static bool getmode(const char *path, mode_t *mode);
 static bool is_accessible_directory(mode_t mode);
@@ -13,20 +19,44 @@ static bool is_accessible_file(mode_t mode);
 static bool is_readable(mode_t mode);
 static bool is_executable(mode_t mode);
 
-static bool catalog_index_directory_recursive(struct catalog *catalog, const char *directory, int maxdepth, bool slow, int cmd);
+static bool to_ignore(const char *filename, GPatternSpec **patterns);
+
+static bool catalog_index_directory_recursive(struct catalog *catalog, const char *directory, int maxdepth, GPatternSpec **patterns, bool slow, int cmd);
+static GPatternSpec **create_patterns(const char **patterns);
+static void free_patterns(GPatternSpec **);
+
+static bool has_gnome_mime_command(const char *path);
 
 /* ------------------------- public functions */
 
-bool catalog_index_directory(struct catalog *catalog, const char *directory, int maxdepth, bool slow)
+void catalog_index_init()
+{
+   DEFAULT_IGNORE=create_patterns(DEFAULT_IGNORE_STRINGS);
+   gnome_vfs_init();
+}
+
+bool catalog_index_directory(struct catalog *catalog, const char *directory, int maxdepth, const char **ignore, bool slow)
 {
    g_return_val_if_fail(catalog!=NULL, false);
    g_return_val_if_fail(directory!=NULL, false);
    g_return_val_if_fail(maxdepth==-1 || maxdepth>0, false);
+   g_return_val_if_fail(DEFAULT_IGNORE!=NULL, false); /* call catalog_index_init!() */
 
    int cmd = -1;
    catalog_addcommand(catalog, "gnome-open", "gnome-open '%f'", &cmd);
 
-   return catalog_index_directory_recursive(catalog, directory, maxdepth, slow, cmd);
+
+
+
+   GPatternSpec **ignore_patterns = create_patterns(ignore);
+   bool retval = catalog_index_directory_recursive(catalog,
+                                                   directory,
+                                                   maxdepth,
+                                                   ignore_patterns,
+                                                   slow,
+                                                   cmd);
+   free_patterns(ignore_patterns);
+   return retval;
 }
 
 bool catalog_index_applications(struct catalog *catalog, const char *directory, int maxdepth, bool slow)
@@ -45,7 +75,7 @@ bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file)
 
 /* ------------------------- private functions */
 
-static bool catalog_index_directory_recursive(struct catalog *catalog, const char *directory, int maxdepth, bool slow, int cmd)
+static bool catalog_index_directory_recursive(struct catalog *catalog, const char *directory, int maxdepth, GPatternSpec **ignore, bool slow, int cmd)
 {
    if(maxdepth==0)
       return true;
@@ -61,7 +91,9 @@ static bool catalog_index_directory_recursive(struct catalog *catalog, const cha
    while( (dirent=readdir(dir)) != NULL )
       {
          const char *filename = dirent->d_name;
-         if(*filename=='.')
+         if(*filename=='.'
+            || to_ignore(filename, DEFAULT_IGNORE)
+            || to_ignore(filename, ignore))
             continue;
 
          char buffer[strlen(directory)+1+strlen(filename)+1];
@@ -76,17 +108,25 @@ static bool catalog_index_directory_recursive(struct catalog *catalog, const cha
                   {
                      if(maxdepth!=0)
                         {
-                           if(!catalog_index_directory_recursive(catalog, buffer, maxdepth, slow, cmd))
+                           if(!catalog_index_directory_recursive(catalog,
+                                                                 buffer,
+                                                                 maxdepth,
+                                                                 ignore,
+                                                                 slow,
+                                                                 cmd))
                               retval=false;
                         }
                   }
                else if(is_accessible_file(mode))
-                  catalog_addentry(catalog,
-                                   directory,
-                                   filename,
-                                   filename,
-                                   cmd,
-                                   NULL/*id_out*/);
+                  {
+                     if(has_gnome_mime_command(buffer))
+                        catalog_addentry(catalog,
+                                         directory,
+                                         filename,
+                                         filename,
+                                         cmd,
+                                         NULL/*id_out*/);
+                  }
             }
       }
 
@@ -129,4 +169,72 @@ static bool is_readable(mode_t mode)
 static bool is_executable(mode_t mode)
 {
    return true;
+}
+
+static bool to_ignore(const char *filename, GPatternSpec **patterns)
+{
+   if(patterns==NULL)
+      return false;
+   for(int i=0; patterns[i]!=NULL; i++)
+      {
+         if(g_pattern_match_string(patterns[i], filename))
+            return true;
+      }
+   return false;
+}
+
+static int null_terminated_array_length(const char **patterns)
+{
+   int count;
+   for(count=0; *patterns!=NULL; count++, patterns++);
+   return count;
+}
+static GPatternSpec **create_patterns(const char **patterns)
+{
+   if(patterns==NULL)
+      return NULL;
+
+   int len = null_terminated_array_length(patterns);
+   GPatternSpec **retval = g_new(GPatternSpec *, len+1);
+   for(int i=0; i<len; i++)
+      retval[i]=g_pattern_spec_new(patterns[i]);
+   retval[len]=NULL;
+   return retval;
+}
+static void free_patterns(GPatternSpec **patterns)
+{
+   if(patterns==NULL)
+      return;
+   for(int i=0; patterns[i]!=NULL; i++)
+      g_pattern_spec_free(patterns[i]);
+   g_free(patterns);
+}
+
+static bool has_gnome_mime_command(const char *path)
+{
+   GString *uri = g_string_new("file://");
+   if(*path!='/')
+      {
+         const char *cwd = g_get_current_dir();
+         g_string_append(uri, cwd);
+         g_free((void *)cwd);
+         if(uri->str[uri->len-1]!='/')
+            g_string_append_c(uri, '/');
+      }
+   g_string_append(uri, path);
+
+   bool retval=false;
+   char *mimetype = gnome_vfs_get_mime_type(uri->str);
+   if(mimetype)
+      {
+         char *app = gnome_vfs_mime_get_default_desktop_entry(mimetype);
+         if(app)
+            {
+               g_free(app);
+               retval=true;
+            }
+         g_free(mimetype);
+      }
+
+   return retval;
 }
