@@ -39,6 +39,7 @@ struct preferences_catalog
 
         struct catalog *catalog;
         struct indexer_view *properties;
+
         /**
          * A prefs_and_indexer structure
          * for each existing indexer. null-terminated
@@ -360,6 +361,7 @@ static void update_properties(struct preferences_catalog  *prefs)
                                                                            source);
                                                 indexer_source_release(source);
                                         }
+
                                 } else {
                                         indexer_view_attach_indexer(prefs->properties,
                                                                     indexer);

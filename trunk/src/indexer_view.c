@@ -1,6 +1,7 @@
 #include "indexer_view.h"
 #include <gtk/gtk.h>
 #include <string.h>
+#include "content_view.h"
 
 /** \file implementation of the API defined in indexer_view.h */
 
@@ -23,6 +24,8 @@ struct indexer_view
         /** id of current source or -1 (no source) */
         int current_source_id;
         struct indexer_source_view *current_view;
+
+        struct content_view *content;
 };
 
 /* ------------------------- prototypes */
@@ -42,6 +45,7 @@ struct indexer_view *indexer_view_new(struct catalog *catalog)
         view->catalog=catalog;
         view->current_source_id=-1;
         view->current_view=NULL;
+        view->content=content_view_new(catalog);
         init_widgets(view);
         return view;
 }
@@ -65,6 +69,7 @@ void indexer_view_destroy(struct indexer_view *view)
         if(view->root_widget) {
                 gtk_widget_destroy(view->properties_widget_container);
         }
+        content_view_destroy(view->content);
         g_free(view);
 }
 void indexer_view_attach_indexer(struct indexer_view *view,
@@ -111,6 +116,12 @@ void indexer_view_attach_source(struct indexer_view *view,
 
                 gtk_container_add(GTK_CONTAINER(view->properties_widget_container),
                                   widget);
+
+                if(source) {
+                        content_view_attach(view->content, source->id);
+                } else {
+                        content_view_detach(view->content);
+                }
         }
 }
 void indexer_view_detach(struct indexer_view *view)
@@ -124,6 +135,8 @@ void indexer_view_detach(struct indexer_view *view)
         view->properties_widget=NULL;
         view->current_indexer=NULL;
         view->current_source_id=-1;
+
+        content_view_detach(view->content);
 }
 
 /* ------------------------- static functions */
@@ -155,7 +168,7 @@ static void init_widgets(struct indexer_view *view)
 
         view->properties_widget_container=location;
 
-        contentlist =  gtk_label_new("Content\nList");
+        contentlist =  content_view_get_widget(view->content);
         gtk_widget_show(contentlist);
         gtk_container_add(GTK_CONTAINER(notebook), contentlist);
 
