@@ -161,13 +161,15 @@ static gboolean find_iter_for_source(GtkListStore *model,
         g_return_val_if_fail(iter_out, FALSE);
 
         if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model), iter_out)) {
-                gtk_tree_model_get(GTK_TREE_MODEL(model), iter_out,
-                                   COLUMN_SOURCE_ID, &source_id,
-                                   -1);
-                if(source_id==goal_id) {
-                        return TRUE;
-                }
-        } while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model), iter_out));
+                do {
+                        gtk_tree_model_get(GTK_TREE_MODEL(model), iter_out,
+                                           COLUMN_SOURCE_ID, &source_id,
+                                           -1);
+                        if(source_id==goal_id) {
+                                return TRUE;
+                        }
+                } while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model), iter_out));
+        }
         /* iter_out has been set to be invalid */
         return FALSE;
 
