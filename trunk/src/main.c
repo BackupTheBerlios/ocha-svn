@@ -7,6 +7,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
 
+#define QUERY_TIMEOUT 800
 
 static struct querywin win_data;
 static struct result_queue *result_queue;
@@ -15,6 +16,7 @@ static GtkListStore *list_model;
 static GString* query_str;
 static GList* results;
 static struct result* selected;
+static guint32 last_keypress;
 
 static void querywin_start()
 {
@@ -98,10 +100,10 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
       case GDK_BackSpace:
          if(query_str && query_str->len>0)
             {
-               query_str=g_string_truncate(query_str, query_str->len-1);
+               g_string_truncate(query_str, query_str->len-1);
                run_query();
-
             }
+         last_keypress=ev->time;
          return TRUE; /*handled*/
 
       case GDK_Return:
@@ -114,10 +116,12 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
       default:
          if(ev->string && ev->string[0]!='\0')
             {
-               printf("add: %s\n", ev->string);
-               g_string_append(query_str, ev->string);
-               printf("->%s\n", query_str->str);
+               if((ev->time-last_keypress)>QUERY_TIMEOUT)
+                  g_string_assign(query_str, ev->string);
+               else
+                  g_string_append(query_str, ev->string);
                run_query();
+               last_keypress=ev->time;
                return TRUE;/*handled*/
             }
          break;
