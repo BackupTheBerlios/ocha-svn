@@ -36,8 +36,19 @@ struct entry_definition entries[] = {
    { "/tmp/hullo.txt", "hullo.txt"}
 };
 #define entries_length (sizeof(entries)/sizeof(struct entry_definition))
+static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered);
+static gboolean collect_result_names_callback(struct catalog *catalog,
+                                              float pertinence,
+                                              int entry_id,
+                                              const char *name,
+                                              const char *long_name,
+                                              const char *path,
+                                              int source_id,
+                                              const char *source_type,
+                                              void *userdata);
 
-static void catalog_cmd(struct catalog *catalog, const char *comment, gboolean ret)
+#define catalog_cmd(catalog, comment, ret) _catalog_cmd(catalog, comment, ret, __FILE__, __LINE__)
+static void _catalog_cmd(struct catalog *catalog, const char *comment, gboolean ret, const char *file, int line)
 {
    if(ret)
       return;
@@ -46,7 +57,7 @@ static void catalog_cmd(struct catalog *catalog, const char *comment, gboolean r
                    "catalog function %s failed: %s\n",
                    comment,
                    catalog_error(catalog));
-   fail(msg->str);
+   _fail_unless(0, file, line, msg->str);
    g_string_free(msg, TRUE/*free content*/);
 }
 static gboolean exists(const char *path)
@@ -356,6 +367,97 @@ START_TEST(test_addentry_noduplicate)
 }
 END_TEST
 
+static void addentries(struct catalog *catalog, int sourceid, int count, const char *name_pattern)
+{
+   for(int i=0; i<count; i++)
+   {
+       char *name = g_strdup_printf(name_pattern, i);
+       printf("adding %s into source %d\n", name, sourceid);
+       catalog_cmd(catalog,
+                   name,
+                   catalog_addentry(catalog,
+                                    name,
+                                    name,
+                                    name,
+                                    sourceid,
+                                    NULL/*id_out*/));
+       g_free(name);
+   }
+}
+
+START_TEST(test_get_source_content_size)
+{
+   printf("--- test_get_source_content_size\n");
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+   int source1_id = -1;
+   catalog_cmd(catalog,
+               "add_source(edit)",
+               catalog_add_source(catalog, "test", &source1_id));
+   int source2_id = -1;
+   catalog_cmd(catalog,
+               "add_source(edit)",
+               catalog_add_source(catalog, "test", &source2_id));
+   addentries(catalog, source1_id, 10, "source1-entry-%d");
+   addentries(catalog, source2_id, 3, "source2-entry-%d");
+
+   unsigned int source1_count = -1;
+   unsigned int source2_count = -1;
+   catalog_cmd(catalog,
+               "count source1",
+               catalog_get_source_content_count(catalog, source1_id, &source1_count));
+   catalog_cmd(catalog,
+               "count source2",
+               catalog_get_source_content_count(catalog, source2_id, &source2_count));
+   printf("source1: %d, source2: %d\n", source1_count, source2_count);
+   fail_unless(10==source1_count,
+               g_strdup_printf("wrong count for source 1, expected 10, got %d", source1_count));
+   fail_unless(3==source2_count, "wrong count for source 2");
+
+   catalog_disconnect(catalog);
+
+   printf("--- test_get_source_content_size_OK\n");
+}
+END_TEST
+
+START_TEST(test_get_source_content)
+{
+   printf("--- test_get_source_content\n");
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+   int source1_id = -1;
+   catalog_cmd(catalog,
+               "add_source(edit)",
+               catalog_add_source(catalog, "test", &source1_id));
+   int source2_id = -1;
+   catalog_cmd(catalog,
+               "add_source(edit)",
+               catalog_add_source(catalog, "test", &source2_id));
+
+   addentries(catalog, source1_id, 5, "source1-entry-%d");
+   addentries(catalog, source2_id, 3, "source1-entry-%d");
+
+   mark_point();
+   GArray *array = g_array_new(TRUE/*zero_terminated*/, TRUE/*clear*/, sizeof(char *));
+   mark_point();
+   catalog_cmd(catalog,
+               "get_source_content(source1)",
+               catalog_get_source_content(catalog, source1_id, collect_result_names_callback, &array));
+   mark_point();
+   assert_array_contains("get content of source 1",
+                         5,
+                         (char *[]){ "source1-entry-0",
+                                 "source1-entry-1",
+                                 "source1-entry-2",
+                                 "source1-entry-3",
+                                 "source1-entry-4" },
+                         array,
+                         FALSE/*not ordered*/);
+
+   catalog_disconnect(catalog);
+
+   printf("--- test_get_source_content_size_OK\n");
+}
+END_TEST
+
 /**
  * Add the result name into a GArray
  * @param catalog ignored
@@ -376,6 +478,8 @@ static gboolean collect_result_names_callback(struct catalog *catalog,
                                               const char *source_type,
                                               void *userdata)
 {
+    printf("collect_result_names_callback\n");
+    mark_point();
    GArray **results = (GArray **)userdata;
    g_return_val_if_fail(results, FALSE);
 
@@ -412,6 +516,10 @@ static void execute_query_and_expect(const char *query, int goal_length, char *g
    catalog_cmd(catalog,
                "executequery()",
                catalog_executequery(catalog, query, collect_result_names_callback, &array));
+   assert_array_contains(query, goal_length, goal, array, ordered);
+}
+static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered)
+{
    mark_point();
    int found_length = array->len;
    mark_point();
@@ -786,6 +894,8 @@ Suite *catalog_check_suite(void)
    tcase_add_test(tc_core, test_addentry);
    tcase_add_test(tc_core, test_addentry_noduplicate);
    tcase_add_test(tc_core, test_addentry_escape);
+   tcase_add_test(tc_core, test_get_source_content_size);
+   tcase_add_test(tc_core, test_get_source_content);
 
    tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
    suite_add_tcase(s, tc_query);

@@ -379,6 +379,59 @@ gboolean catalog_addentry(struct catalog *catalog, const char *path, const char 
          return FALSE;
       }
 }
+/**
+ * sqlite callback that expects an unsigned integer as the 1st (and only) result
+ */
+static int getcount_callback(void *userdata, int column_count, char **result, char **names)
+{
+   g_return_val_if_fail(userdata!=NULL, 1);
+   g_return_val_if_fail(column_count>0, 1);
+   unsigned int *number_out = (int *)userdata;
+   long l = atol(result[0]);
+   *number_out=(unsigned int)l;
+   return 1; /* no need for more results */
+}
+
+gboolean catalog_get_source_content_count(struct catalog *catalog,
+                                          int source_id,
+                                          unsigned int *count_out)
+{
+    g_return_val_if_fail(catalog!=NULL, FALSE);
+    g_return_val_if_fail(count_out!=NULL, FALSE);
+
+    unsigned int number=0;
+    if(execute_query_printf(catalog,
+                            getcount_callback,
+                            &number,
+                            "SELECT COUNT(*) FROM entries WHERE source_id=%d",
+                            source_id))
+    {
+        *count_out=number;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+gboolean catalog_get_source_content(struct catalog *catalog,
+                                    int source_id,
+                                    catalog_callback_f callback,
+                                    void *userdata)
+{
+    catalog->callback=callback;
+    catalog->callback_userdata=userdata;
+    gboolean ret = execute_query_printf(catalog,
+                                        result_sqlite_callback,
+                                        catalog/*userdata*/,
+                                        "SELECT e.id, e.path, e.name, e.long_name, s.id, s.type, e.lastuse "
+                                        "FROM entries e, sources s "
+                                        "WHERE e.source_id=%d and s.id=%d "
+                                        "ORDER BY e.path",
+                                        source_id,
+                                        source_id);
+    catalog->callback=NULL;
+    catalog->callback_userdata=userdata;
+    return ret;
+}
 
 /* ------------------------- static functions */
 static gboolean exists(const char *path)
@@ -560,6 +613,7 @@ gboolean catalog_update_entry_timestamp(struct catalog *catalog, int entry_id)
    GTimeVal timeval;
    g_get_current_time(&timeval);
 
+
    return execute_update_printf(catalog, TRUE/*autocommit*/,
                                 "UPDATE entries SET lastuse='%16.16lx.%6.6lu' WHERE id=%d",
                                 (unsigned long)timeval.tv_sec,
@@ -574,7 +628,7 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
    catalog_callback_f callback = catalog->callback;
    g_return_val_if_fail(callback!=NULL, 1); /* executequery called by another thread: forbidden */
 
-   /* this must correspond to the query in catalog_executequery() */
+   /* this must correspond to the query in catalog_executequery() and catalog_get_source_content() */
    const int entry_id = atoi(col_data[0]);
    const char *path = col_data[1];
    const char *name = col_data[2];

@@ -109,8 +109,7 @@ int main(int argc, char *argv[])
                            if(verbose)
                               printf("indexing %s: %s...\n",
                                      indexer->display_name,
-                                     source->display_name,
-                                     source_id);
+                                     source->display_name);
 
                            GError *err = NULL;
                            if(!source->index(source, catalog, &err))
@@ -123,6 +122,21 @@ int main(int argc, char *argv[])
                                  g_error_free(err);
                                  retval++;
                               }
+
+                           if(verbose)
+                           {
+                               unsigned int size=0;
+                               if(catalog_get_source_content_count(catalog,
+                                                                   source_id,
+                                                                   &size))
+                               {
+                                   printf("indexing %s: %s: %d entries\n",
+                                          indexer->display_name,
+                                          source->display_name,
+                                          size);
+                               }
+                           }
+
                         }
                   }
                if(source_ids)

@@ -76,11 +76,6 @@ typedef gboolean (*catalog_callback_f)(struct catalog *catalog,
  * @param query query to run
  * @param callback function to call for every results
  * @param userdata userdata to pass to the callback
- * @param if non-null and if this function returns
- * FALSE, you'll find there an error message (in english)
- * explaining why the query failed. This is a static
- * pointer; it is always valid and does not need to be freed.
- * @param userdata pointer to pass to the callback
  * @return return FALSE if there was a fatal error, in
  * which case the catalog must be immediately
  * disconnected.
@@ -89,6 +84,36 @@ gboolean catalog_executequery(struct catalog *catalog,
                               const char *query,
                               catalog_callback_f callback,
                               void *userdata);
+
+/**
+ * Get the content of a source as a query result.
+ * If the catalog has been interrupted some time before, th
+ * query will return immediately. Use catalog_restart() to
+ * recover from an interruption.
+ *
+ * @param catalog the catalog
+ * @param source_id source ID
+ * @param callback function to call for every results
+ * @param userdata userdata to pass to the callback
+ * @return return FALSE if there was an error
+ */
+gboolean catalog_get_source_content(struct catalog *catalog,
+                                    int source_id,
+                                    catalog_callback_f callback,
+                                    void *userdata);
+
+/**
+ * Get the size of the content of a source.
+ *
+ * @param catalog the catalog
+ * @param source_id source ID
+ * @param count_out a non-null pointer on an unsigned
+ * integer that will be set by the function if it returns true
+ * @return FALSE if there was an error
+ */
+gboolean catalog_get_source_content_count(struct catalog *catalog,
+                                          int source_id,
+                                          unsigned int *count_out);
 
 /**
  * Update the timestamp of the given entry, because it
