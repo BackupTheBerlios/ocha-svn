@@ -221,7 +221,7 @@ static void free_result(gpointer data, gpointer userdata)
    g_return_if_fail(result!=NULL);
    result->release(result);
 }
-static void execute_query_and_expect(const char *query, int goal_length, char *goal[])
+static void execute_query_and_expect(const char *query, int goal_length, char *goal[], bool ordered)
 {
    GList *list = NULL;
    catalog_cmd(catalog,
@@ -232,7 +232,10 @@ static void execute_query_and_expect(const char *query, int goal_length, char *g
    for(int i=0; i<found_length; i++)
       found[i]=((struct result *)g_list_nth_data(list, i))->name;
 
-   GString* msg = g_string_new("found: [");
+   GString* msg = g_string_new("");
+   g_string_append(msg, "query: '");
+   g_string_append(msg, query);
+   g_string_append(msg, "' found: [");
    for(int i=0; i<found_length; i++)
       {
          g_string_append_c(msg, ' ');
@@ -250,22 +253,40 @@ static void execute_query_and_expect(const char *query, int goal_length, char *g
          g_string_append(msg, "wrong length");
          fail(msg->str);
       }
-   for(int i=0; i<goal_length; i++)
+   if(ordered)
       {
-         bool ok=false;
-         for(int j=0; j<found_length; j++)
+         for(int i=0; i<goal_length; i++)
             {
-               if(found[j]!=NULL && strcmp(goal[i], found[j])==0)
+               if(strcmp(goal[i], found[i])!=0)
                   {
-                     found[j]=NULL;
-                     ok=true;
-                     break;
+                     g_string_append_printf(msg,
+                                            "expected '%s' at index %d, got '%s",
+                                            goal[i],
+                                            i,
+                                            found[i]);
+                     fail(msg->str);
                   }
             }
-         if(!ok)
+      }
+   else /* not ordered */
+      {
+         for(int i=0; i<goal_length; i++)
             {
-               g_string_append_printf(msg, "%s not found", goal[i]);
-               fail(msg->str);
+               bool ok=false;
+               for(int j=0; j<found_length; j++)
+                  {
+                     if(found[j]!=NULL && strcmp(goal[i], found[j])==0)
+                        {
+                           found[j]=NULL;
+                           ok=true;
+                           break;
+                        }
+                  }
+               if(!ok)
+                  {
+                     g_string_append_printf(msg, "%s not found", goal[i]);
+                     fail(msg->str);
+                  }
             }
       }
    g_list_foreach(list, free_result, NULL/*userdata*/);
@@ -277,7 +298,40 @@ START_TEST(test_execute_query)
    printf("--- test_execute_query\n");
    execute_query_and_expect("toto.c",
                             1,
-                            (char *[]){ "toto.c" });
+                            (char *[]){ "toto.c" },
+                            false/*not ordered*/);
+}
+END_TEST
+
+static bool execute_result(GList *list, const char *name)
+{
+   bool executed=false;
+   for(GList *current = list; current; current=g_list_next(current))
+      {
+         struct result *result=current->data;
+         if(strcmp(name, result->name)==0)
+            {
+               executed=true;
+               result->execute(result);
+            }
+      }
+   return executed;
+}
+
+
+START_TEST(test_lastexecuted_first)
+{
+   printf("--- test_lastexecuted_first\n");
+   GList *list = NULL;
+   catalog_cmd(catalog,
+               "test_lastexecuted_first()",
+               catalog_executequery(catalog, "tot", collect_results_callback, &list));
+   fail_unless(execute_result(list, "total.h"), "total.h");
+   fail_unless(execute_result(list, "toto.h"), "toto.h");
+   execute_query_and_expect("tot",
+                            3,
+                            (char *[]){ "toto.h", "total.h", "toto.c" },
+                            true/*ordered*/);
 }
 END_TEST
 
@@ -286,7 +340,8 @@ START_TEST(test_execute_query_with_space)
    printf("--- test_execute_query\n");
    execute_query_and_expect("to .c",
                             1,
-                            (char *[]){ "toto.c" });
+                            (char *[]){ "toto.c" },
+                            false/*not ordered*/);
 }
 END_TEST
 
@@ -461,7 +516,7 @@ START_TEST(test_busy)
    printf("test_busy: execute query\n");
    execute_query_and_expect("toto.c",
                             0,
-                            (char *[]) { NULL });
+                            (char *[]) { NULL }, false/*not ordered*/);
    printf("test_busy: query done\n");
    catalog_restart(catalog);
 
@@ -473,7 +528,7 @@ START_TEST(test_busy)
 
    execute_query_and_expect("toto.c",
                             1,
-                            (char *[]) { "toto.c" });
+                            (char *[]) { "toto.c" }, false/*not ordered*/);
 
    g_mutex_lock(execute_query_mutex);
    g_cond_broadcast(execute_query_cond); /* tell the thread to finish*/
@@ -541,6 +596,7 @@ Suite *catalog_check_suite(void)
    tcase_add_test(tc_query, test_interrupt_stops_query);
    tcase_add_test(tc_query, test_recover_from_interruption);
    tcase_add_test(tc_query, test_busy);
+   tcase_add_test(tc_query, test_lastexecuted_first);
 
    tcase_add_checked_fixture(tc_execute, setup_execute, teardown_execute);
    suite_add_tcase(s, tc_execute);

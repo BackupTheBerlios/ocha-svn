@@ -156,7 +156,6 @@ static gboolean run_query(gpointer userdata)
          char buffer[query_str->len+1];
          strcpy(buffer, query_str->str);
          g_string_assign(running_query, g_strstrip(buffer));
-         resultlist_set_current_query(running_query->str);
          queryrunner->run_query(queryrunner, running_query->str);
       }
    return FALSE;
@@ -170,8 +169,10 @@ static gboolean run_query(gpointer userdata)
  */
 static void set_query_string()
 {
+   printf("set_query_string('%s')\n", query_str->str);
    strncpy(query_label_text, query_str->str, query_label_text_len-1);
    gtk_label_set_text(GTK_LABEL(query_label), query_label_text);
+   resultlist_set_current_query(query_str->str);
    g_timeout_add(300, run_query, NULL/*userdata*/);
 }
 

@@ -25,6 +25,8 @@ struct catalog
    void *callback_userdata;
    GCond *busy_wait_cond;
    GMutex *busy_wait_mutex;
+
+   char path[];
 };
 
 /**
@@ -34,9 +36,11 @@ struct catalog_result
 {
    /** catalog_result are result */
    struct result base;
+   int entry_id;
    const char *execute;
+   const char *catalog_path;
 
-   /** buffer for the path, display name and execute string */
+   /** buffer for the path, catalog path, display name and execute string */
    char buffer[];
 };
 static bool exists(const char *path)
@@ -147,6 +151,7 @@ static bool create_tables(sqlite *db, char **errmsg)
                                       "display_name VARCHAR NOT NULL, "
                                       "command_id INTEGER, "
                                       "lastuse TIMESTAMP);"
+                                      "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
                                       "CREATE TABLE command (id INTEGER PRIMARY KEY , "
                                       "display_name VARCHAR NOT NULL, "
                                       "execute VARCHAR NOT NULL, "
@@ -195,13 +200,14 @@ struct catalog *catalog_connect(const char *path, char **_errmsg)
             }
       }
 
-   struct catalog *catalog = g_new(struct catalog, 1);
+   struct catalog *catalog = (struct catalog *)g_malloc(sizeof(struct catalog)+strlen(path)+1);
    catalog->stop=false;
    catalog->db=db;
    catalog->sql=g_string_new("");
    catalog->error=g_string_new("");
    catalog->busy_wait_cond=g_cond_new();
    catalog->busy_wait_mutex=g_mutex_new();
+   strcpy(catalog->path, path);
    return catalog;
 }
 
@@ -265,6 +271,20 @@ static void execute_parse(GString *gstr, const char *pattern, const char *path)
    printf("execute_parse(,%s,%s)->%s\n", pattern, path, gstr->str);
 }
 
+static bool update_entry_timestamp(struct catalog *catalog, int entry_id)
+{
+   g_return_val_if_fail(catalog, false);
+   GTimeVal timeval;
+   g_get_current_time(&timeval);
+
+   g_string_printf(catalog->sql,
+                   "BEGIN;UPDATE entries SET lastuse='%16.16lx.%6.6lu' WHERE id=%d;COMMIT;",
+                   (unsigned long)timeval.tv_sec,
+                   (unsigned long)timeval.tv_usec,
+                   entry_id);
+   return execute_update(catalog);
+}
+
 static bool execute_result(struct result *_self)
 {
    struct catalog_result *self = (struct catalog_result *)_self;
@@ -291,6 +311,19 @@ static bool execute_result(struct result *_self)
          exit(99);
       }
    /* the parent */
+
+   struct catalog *catalog = catalog_connect(self->catalog_path, NULL/*errmsg*/);
+   if(catalog)
+      {
+         if(!update_entry_timestamp(catalog, self->entry_id))
+            {
+               fprintf(stderr,
+                       "lastuse timestamp update failed: %s\n",
+                       catalog_error(catalog));
+            }
+         catalog_disconnect(catalog);
+      }
+
    return true;
 }
 
@@ -299,14 +332,19 @@ static void free_result(struct result *self)
    g_return_if_fail(self);
    g_free(self);
 }
-static struct result *create_result(const char *path, const char *display_name, const char *execute)
+static struct result *create_result(struct catalog *catalog, const char *path, const char *display_name, const char *execute, int entry_id)
 {
-   g_return_val_if_fail(path && display_name && execute, NULL);
+   g_return_val_if_fail(catalog, NULL);
+   g_return_val_if_fail(path, NULL);
+   g_return_val_if_fail(display_name, NULL);
+   g_return_val_if_fail(execute, NULL);
 
    struct catalog_result *result = g_malloc(sizeof(struct catalog_result)
                                             +strlen(path)+1
                                             +strlen(display_name)+1
-                                            +strlen(execute)+1);
+                                            +strlen(execute)+1
+                                            +strlen(catalog->path)+1);
+   result->entry_id=entry_id;
    char *buf = result->buffer;
 
    result->base.path=buf;
@@ -319,6 +357,10 @@ static struct result *create_result(const char *path, const char *display_name, 
 
    result->execute=buf;
    strcpy(buf, execute);
+   buf+=strlen(execute)+1;
+
+   result->catalog_path=catalog->path;
+   strcpy(buf, catalog->path);
 
    result->base.execute=execute_result;
    result->base.release=free_result;
@@ -334,14 +376,19 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
    catalog_callback_f callback = catalog->callback;
    g_return_val_if_fail(callback!=NULL, 1); /* executequery called by another thread: forbidden */
 
-   const char *path = col_data[0];
-   const char *display_name = col_data[1];
-   const char *execute = col_data[2];
+   const int entry_id = atoi(col_data[0]);
+   const char *path = col_data[1];
+   const char *display_name = col_data[2];
+   const char *execute = col_data[3];
 
    if(catalog->stop)
       return 1;
 
-   struct result *result = create_result(path, display_name, execute);
+   struct result *result = create_result(catalog,
+                                         path,
+                                         display_name,
+                                         execute,
+                                         entry_id);
    bool go_on = catalog->callback(catalog,
                                   0.5/*pertinence*/,
                                   result,
@@ -363,7 +410,7 @@ bool catalog_executequery(struct catalog *catalog,
 
 
    g_string_assign(catalog->sql,
-                   "SELECT e.path, e.display_name, c.execute "
+                   "SELECT e.id, e.path, e.display_name, c.execute, e.lastuse "
                    "FROM entries e, command c "
                    "WHERE e.display_name LIKE '%");
    bool has_space=false;
@@ -393,7 +440,7 @@ bool catalog_executequery(struct catalog *catalog,
       }
    g_string_append(catalog->sql,
                    "%' AND e.command_id=c.id "
-                   "ORDER BY e.path;");
+                   "ORDER BY e.lastuse DESC;");
    catalog->callback=callback;
    catalog->callback_userdata=userdata;
    bool ret = execute_query(catalog,
@@ -434,6 +481,7 @@ bool catalog_addcommand(struct catalog *catalog, const char *name, const char *e
                    "INSERT INTO command (id, display_name, execute) VALUES (NULL, '%s', '%s');",
                    name,
                    execute);
+
    return insert_and_get_id(catalog, id_out);
 }
 

@@ -53,6 +53,16 @@ START_TEST(test_ismatch_exact)
 }
 END_TEST
 
+START_TEST(test_ismatch_empty_match_nothing)
+{
+   printf("--test_ismatch_empty_match_nothing\n");
+   assertTrue("ba ba and ''",
+              !query_ismatch("", "ba ba"));
+   assertTrue("'' and ''",
+              !query_ismatch("", ""));
+}
+END_TEST
+
 START_TEST(test_ismatch_substring)
 {
    printf("--test_ismatch_substring\n");
@@ -302,6 +312,7 @@ Suite *query_check_suite(void)
    tcase_add_checked_fixture(tc_core, setup, teardown);
 
    tcase_add_test(tc_core, test_ismatch_exact);
+   tcase_add_test(tc_core, test_ismatch_empty_match_nothing);
    tcase_add_test(tc_core, test_ismatch_substring);
    tcase_add_test(tc_core, test_ismatch_multiple_substring);
    tcase_add_test(tc_core, test_ismatch_case_insensitive);

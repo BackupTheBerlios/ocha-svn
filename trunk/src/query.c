@@ -13,6 +13,10 @@ bool query_ismatch(const char *query, const char *name)
 {
    g_return_val_if_fail(query!=NULL, false);
    g_return_val_if_fail(name!=NULL, false);
+
+   if(query[0]=='\0' || name[0]=='\0')
+      return false;
+
    char *query_prepared = prepare(query);
    const char *name_prepared = prepare(name);
 
