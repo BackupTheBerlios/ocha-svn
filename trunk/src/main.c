@@ -239,6 +239,9 @@ static void init_ui(void)
    querywin_create(&win_data);
    GtkWidget* querywin = win_data.querywin;
 
+   gtk_window_stick(GTK_WINDOW(querywin));
+   gtk_window_set_keep_above(GTK_WINDOW(querywin), 
+			     true);
    querywin_init_list();
 
    g_signal_connect(querywin,
