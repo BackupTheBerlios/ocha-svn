@@ -1,3 +1,4 @@
+- check XDG_DATA_HOME and XDG_DATA_DIRS in discover for indexer applications
 - get data from ~/.recently-used http://standards.freedesktop.org/recent-file-spec/recent-file-spec-0.2.html
 - use lastvisited from bookmark file
 - keep recent windows/recently-used in memory (lastuse flag on catalog does not apply to them)
