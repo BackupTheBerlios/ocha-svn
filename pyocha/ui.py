@@ -7,7 +7,6 @@ import os
 import os.path
 import conf
 import time
-import threading
 
 def now():
     return time.time()
@@ -38,181 +37,91 @@ class QueryResult:
     def execute(self):
         command_id=self.result.command_id
         catalog=self.query.openCatalog()
-        try:
-            command=catalog.loadCommand(command_id)
-            command.executeWithEntry(self.result)
-        finally:
-            catalog.close()
-
-
-class QueryThread(threading.Thread):
-    def __init__(self, catalog_path, catalog_cb, query_end_cb, condition):
-        threading.Thread.__init__(self)
-        self.path=catalog_path
-        self.query=""
-        self.catalog_cb=catalog_cb
-        self.query_end_cb=query_end_cb
-        self.condition=condition
-
-    def run(self):
-        condition=self.condition
-        path=self.path
-        end_cb=self.query_end_cb
-        while(True):
-
-            condition.acquire()
-            try:
-                while not self.query:
-                    condition.wait()
-                q=self.query
-                self.query=""
-            finally:
-                condition.release()
-
-            def cb(catalog, entry):
-                return self.catalog_cb(q, catalog, entry)
-
-            catalog=Catalog(path)
-            try:
-                print "run query: "+q
-                catalog.query(q, cb)
-                end_cb(q)
-            finally:
-                catalog.close()
-
+        command=catalog.loadCommand(command_id)
+        command.executeWithEntry(self.result)
 
 class Query:
     def __init__(self, catalog_path):
-        self.path=catalog_path
-        # threading: query, runquery and result protected by 'condition'
-        self.__results=[]
         self.__query=""
-        self.__runquery=False
-        self.__condition=threading.Condition()
-        c=self.__condition
-
-        # threading: __observers protected by 'observers_lock'
         self.__observers=[]
-        self.__observers_lock=self.__condition
-
-        self.qthread=QueryThread(catalog_path,
-                                 self.__query_cb,
-                                 self.__query_end_cb,
-                                 self.__condition)
-        self.qthread.setDaemon(True)
-        self.qthread.start()
-
-    def __query_cb(self, querystr, catalog, entry):
-        self.__condition.acquire()
-        try:
-            if not self.__runquery or self.__query!=querystr:
-                return False
-            if len(self.__results)>10:
-                return False
-            print "result "+str(len(self.__results))+" for "+self.__query
-            self.__results.append(QueryResult(entry.display_name,
-                                              entry.path,
-                                              entry))
-        finally:
-            self.__condition.release()
-        self.__sendListChanged()
-        return True
-
-    def __query_end_cb(self, querystr):
-        self.__condition.acquire()
-        try:
-            if self.__query!=querystr:
-                return
-        finally:
-            self.__condition.release()
-
-        self.__sendListChanged()
+        self.__results=[]
+        self.__catalog_path=catalog_path
+        self.__catalog=None
 
     def stop(self):
-        """Stop a running query, even if not
-        all results were found"""
-        self.__condition.acquire()
-        try:
-            self.__runquery=False
-        finally:
-            self.__condition.release()
+        if self.__catalog:
+            self.__catalog.close()
+            self.__catalog=None
 
     def getQueryString(self):
-        """Get the current query string"""
         return self.__query
 
     def getQueryResults(self):
-        """Get the current query results.
+        return [] + self.__results
 
-        @return a new list that can be modified safely
-        """
-        self.__condition.acquire()
-        try:
-            return [] + self.__results
-        finally:
-            self.__condition.release()
+    def addResult(self, display_name, path, result):
+        if os.path.exists(path):
+            self.__results.append(QueryResult(self, display_name=display_name, path=path, result=result))
 
     def set(self, str):
-        """Set the query string"""
-        print "set to: "+str
-        if self.__query==str:
-            return
-        self.__condition.acquire()
-        try:
-            self.__query=str
-            self.__results=[]
-            if not self.__query:
-                self.__runquery=False
-                return
-            self.__runquery=True
-            self.qthread.query=self.__query
-            self.__condition.notifyAll()
-        finally:
-            self.__condition.release()
+        self.__query=str
         self.__sendQueryChanged()
+        self.__run_query()
 
     def append(self, str):
-        """Append something to the query string"""
-        self.set(self.getQueryString()+str)
+        self.__query=self.__query+str
+        self.__sendQueryChanged()
+        self.__run_query()
 
     def backspace(self):
-        """Remove one character from the query string"""
-        str=self.getQueryString()
-        if len(str) >= 1:
-            self.set(str[0:-1])
+        if len(self.__query)>0:
+            self.__query=self.__query[0:-1]
+            self.__sendQueryChanged()
+            self.__run_query()
+
 
     def reset(self):
-        """Reset the query string"""
-        self.set("")
+        self.__query=""
+        self.__sendQueryChanged()
+        self.__stop_query()
+
 
     def openCatalog(self):
-        """Get a new catalog object, opening it if necessary.
+        if not self.__catalog:
+            self.__catalog=Catalog(self.__catalog_path)
+        return self.__catalog
 
-        The caller is responsible for closing the catalog.
-        """
-        return Catalog(self.path)
+    def __stop_query(self):
+        self.__results=[]
+        self.__sendListChanged()
+
+    def __run_query(self):
+        self.__stop_query()
+        if not self.__query:
+            return
+        catalog=self.openCatalog()
+        catalog=self.__catalog
+        catalog.query(self.__query, self.__query_cb)
+        self.__sendListChanged()
+
+    def __query_cb(self, catalog, entry):
+        if len(self.__results)>10:
+            return False
+        self.addResult(entry.display_name, entry.path, entry)
+        self.__sendListChanged()
+        return True
 
     def addObserver(self, observer):
-        self.__observers_lock.acquire()
-        try:
-            self.__observers.append(observer)
-        finally:
-            self.__observers_lock.release()
-
-    def __getObservers(self):
-        self.__observers_lock.acquire()
-        try:
-            return [] + self.__observers
-        finally:
-            self.__observers_lock.release()
+        self.__observers.append(observer)
 
     def __sendListChanged(self):
-        for observer in self.__getObservers():
+        for observer in self.__observers:
             observer.listChanged(self)
 
     def __sendQueryChanged(self):
-        for observer in self.__getObservers():
+        for observer in self.__observers:
             observer.queryChanged(self)
+
 
 class QueryWin(QueryObserver):
     def __init__(self, query, timeout):
@@ -266,12 +175,10 @@ class QueryWin(QueryObserver):
         self.ping()
 
     def listChanged(self, query):
-
         self.ping()
         model=self.list_model
         iter=model.get_iter_first()
         results=query.getQueryResults()
-        print "refresh list: "+str(len(results))
         for result in results:
             if not iter:
                 iter=model.append()
@@ -327,7 +234,6 @@ class QueryWin(QueryObserver):
             else:
                 self.query.append(event.string)
 
-gtk.gdk.threads_init()
 
 query=Query(conf.catalog_path())
 win=QueryWin(query, conf.timeout())
