@@ -14,9 +14,8 @@ mempool_check_LDADD=$(TEST_LIBS)
 #	splint $$flags target.h hello.c
 
 xref:
-	if [ -d @top_srcdir@/Xrefs ] ; then xref -update @top_srcdir@; else xref -create @top_srcdir@; fi
+	cd @top_srcdir@ && if [ -d @top_srcdir@/Xrefs ] ; then xref -update; else xref -create; fi
 
 doxygen:
 	doxygen Doxyfile
-
 
