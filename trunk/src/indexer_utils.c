@@ -111,22 +111,40 @@ gboolean uri_exists(const char *text_uri)
 }
 
 
+/**
+ * Recurse through directories.
+ *
+ * @param catalog
+ * @param directory full path to the directory represented by dirhandle
+ * @param dirhandle handle on a directory (which will be closed by this function)
+ * @param ignore_patterns additional patterns to ignore (or NULL)
+ * @param maxdepth maximum depth to go through 0=> do not look into sub directories, -1=> infinite
+ * @param slow if true, slow down search
+ * @param cmd source ID
+ * @param callback
+ * @param userdata
+ * @parma err
+ * @return true if it worked
+ */
 static gboolean _recurse(struct catalog *catalog,
-                     const char *directory,
-                     DIR *dirhandle,
-                     GPatternSpec **ignore_patterns,
-                     int maxdepth,
-                     gboolean slow,
-                     int cmd,
-                     handle_file_f callback,
-                     gpointer userdata,
-                     GError **err)
+                         const char *directory,
+                         DIR *dirhandle,
+                         GPatternSpec **ignore_patterns,
+                         int maxdepth,
+                         gboolean slow,
+                         int cmd,
+                         handle_file_f callback,
+                         gpointer userdata,
+                         GError **err)
 {
    if(maxdepth==0)
       return TRUE;
    if(maxdepth>0)
       maxdepth--;
 
+   GPtrArray *subdirectories = NULL;
+   if(maxdepth!=0)
+       subdirectories = g_ptr_array_new();
    gboolean error=FALSE;
    struct dirent *dirent;
    while( !error && (dirent=readdir(dirhandle)) != NULL )
@@ -144,41 +162,54 @@ static gboolean _recurse(struct catalog *catalog,
          mode_t mode;
          if(getmode(current_path, &mode))
             {
-               if(is_accessible_directory(mode))
+                gboolean acc_dir=is_accessible_directory(mode);
+                gboolean acc_file=is_accessible_file(mode);
+
+                if(acc_dir && maxdepth!=0)
                   {
-                     if(maxdepth!=0)
-                        {
-                           DIR *subdir = opendir(current_path);
-                           if(subdir!=NULL)
-                              {
-                                 if(!_recurse(catalog,
-                                              current_path,
-                                              subdir,
-                                              ignore_patterns,
-                                              maxdepth,
-                                              slow,
-                                              cmd,
-                                              callback,
-                                              userdata,
-                                              err))
-                                    {
-                                       error=TRUE;
-                                    }
-                                 else
-                                    {
-                                       doze_off(slow);
-                                    }
-                                 closedir(subdir);
-                              }
-                        }
+                      char *current_path_dup = g_strdup(current_path);
+                      g_ptr_array_add(subdirectories, current_path_dup);
                   }
-               else if(is_accessible_file(mode))
+                if(acc_dir || acc_file)
                   {
                      if(!callback(catalog, cmd, current_path, filename, userdata, err))
                         error=TRUE;
                   }
             }
       }
+   closedir(dirhandle);
+
+   if(subdirectories)
+   {
+       for(int i=0; i<subdirectories->len; i++)
+       {
+           char *current_path = subdirectories->pdata[i];
+           DIR *subdir = opendir(current_path);
+           if(subdir!=NULL)
+           {
+               if(!_recurse(catalog,
+                            current_path,
+                            subdir,
+                            ignore_patterns,
+                            maxdepth,
+                            slow,
+                            cmd,
+                            callback,
+                            userdata,
+                            err))
+               {
+                   error=TRUE;
+               }
+               else
+               {
+                   doze_off(slow);
+               }
+           }
+           g_free(current_path);
+       }
+       g_ptr_array_free(subdirectories, TRUE/*free segments*/);
+   }
+
    return !error;
 }
 gboolean recurse(struct catalog *catalog,
@@ -206,7 +237,6 @@ gboolean recurse(struct catalog *catalog,
                                 callback,
                                 userdata,
                                 err);
-         closedir(dir);
          return retval;
       }
    else
