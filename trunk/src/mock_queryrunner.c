@@ -20,6 +20,7 @@ static void release(struct queryrunner *self);
 
 static struct result *result_new(const char *query, int index);
 static gboolean result_execute(struct result *, GError **);
+static gboolean result_validate(struct result *);
 static void result_release(struct result *);
 
 /** keep up to 256 characters of a query */
@@ -84,6 +85,7 @@ static struct result *result_new(const char *query, int index)
    retval->path=name->str;
    g_string_free(name, FALSE/*not free_segment*/);
    retval->execute=result_execute;
+   retval->validate=result_validate;
    retval->release=result_release;
    return retval;
 }
@@ -99,6 +101,12 @@ static gboolean result_execute(struct result *result, GError **errors)
 {
    g_return_val_if_fail(result!=NULL, FALSE);
    printf("execute result: %s\n", result->name);
+   return TRUE;
+}
+
+/** Mock results are always valid */
+static gboolean result_validate(struct result *result)
+{
    return TRUE;
 }
 

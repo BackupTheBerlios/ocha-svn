@@ -54,6 +54,10 @@ static gboolean execute_cb(struct result *_result, GError **err)
    result->executed=TRUE;
 }
 
+static gboolean validate_cb(struct result *_result)
+{
+   fail(g_strdup_printf("unexpected call to validate on %s %s", _result->name, _result->path));
+}
 static void release_cb(struct result *_result)
 {
    struct mock_result *result = (struct mock_result *)_result;
@@ -222,6 +226,7 @@ static gpointer producer_thread(gpointer mocks)
          mock[i].result.long_name="resultx (long)";
          mock[i].result.path="resultx/path";
          mock[i].result.release=release_cb;
+         mock[i].result.validate=validate_cb;
          mock[i].result.execute=execute_cb;
          mock[i].executed=FALSE;
          mock[i].released=FALSE;

@@ -57,6 +57,7 @@ static void release(struct queryrunner *self);
 
 static struct result *result_new(Display *display, Window win, const char *title, const char *description);
 static gboolean result_execute(struct result *self, GError **);
+static gboolean result_validate(struct result *self);
 static void result_release(struct result *self);
 
 /* ------------------------- public functions */
@@ -194,6 +195,7 @@ static struct result *result_new(Display *display, Window win, const char *title
    retval->base.long_name=g_strdup(description);
    retval->base.path=g_strdup_printf("x-win:0x%lx", (unsigned long)win);
    retval->base.execute=result_execute;
+   retval->base.validate=result_validate;
    retval->base.release=result_release;
    retval->display=display;
    retval->win=win;
@@ -228,6 +230,26 @@ static gboolean result_execute(struct result *_self, GError **err)
       }
    return retval;
 }
+
+static gboolean result_validate(struct result *_self)
+{
+   gboolean retval = TRUE;
+   struct window_result *self = TO_WINDOW_RESULT(_self);
+   g_return_val_if_fail(self, FALSE);
+
+   gdk_error_trap_push();
+   char *title = netwm_get_window_title(self->display, self->win);
+   if(title==NULL)
+      retval=FALSE;
+   else
+      g_free(title);
+   gdk_flush();
+   if(gdk_error_trap_pop())
+      retval=FALSE;
+
+   return retval;
+}
+
 static void result_release(struct result *_self)
 {
    struct window_result *self = TO_WINDOW_RESULT(_self);

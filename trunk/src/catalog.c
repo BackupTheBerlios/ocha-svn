@@ -59,6 +59,7 @@ static gboolean create_tables(sqlite *db, char **errmsg);
 static int count(const char *str, char c);
 static void execute_parse(GString *gstr, const char *pattern, const char *path);
 static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id);
+static gboolean validate_result(struct result *_self);
 static gboolean execute_result(struct result *_self, GError **);
 static void free_result(struct result *self);
 static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *long_name, const char *execute, int entry_id);
@@ -521,6 +522,22 @@ static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id)
                                 entry_id);
 }
 
+static gboolean validate_result(struct result *_self)
+{
+   struct catalog_result *self = (struct catalog_result *)_self;
+   g_return_val_if_fail(self, FALSE);
+
+   if(self->base.path[0]=='/')
+      {
+         /* it's a file */
+         gboolean retval = exists(self->base.path);
+         if(!retval)
+            printf("invalid result: %s\n", self->base.path);
+         return retval;
+      }
+   /* otherwise It's an URL and I can't check that... */
+   return TRUE;
+}
 static gboolean execute_result(struct result *_self, GError **err)
 {
    struct catalog_result *self = (struct catalog_result *)_self;
@@ -608,6 +625,7 @@ static struct result *create_result(struct catalog *catalog, const char *path, c
    strcpy(buf, catalog->path);
 
    result->base.execute=execute_result;
+   result->base.validate=validate_result;
    result->base.release=free_result;
 
    return &result->base;

@@ -50,6 +50,21 @@ struct result
    gboolean (*execute)(struct result *self, GError **errors);
 
    /**
+    * Make sure the result is still valid.
+    *
+    * If a result is kept for more than the duration
+    * of a query, it could have become invalid. This
+    * function checks whether it's the case.
+    *
+    * Executing an invalid result will result in an
+    * error. Executing a valid result might result in
+    * an error.
+    *
+    * @return FALSE if the result is invalid
+    */
+   gboolean (*validate)(struct result *self);
+
+   /**
     * Free all memory and resources held by this result
     * @param self the result
     */

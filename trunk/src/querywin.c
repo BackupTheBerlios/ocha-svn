@@ -92,6 +92,7 @@ void querywin_start()
    if(shown)
       return;
    last_keypress=0;
+   resultlist_verify();
    queryrunner->start(queryrunner);
    gtk_window_reshow_with_initial_size(GTK_WINDOW(querywin));
    shown=TRUE;

@@ -162,7 +162,7 @@ void resultlist_add_result(float pertinence, struct result *result)
 {
    GtkTreeIter iter;
    const char *path = result->path;
-   if(g_hash_table_lookup(hash, path))
+   if(g_hash_table_lookup(hash, path) || !result->validate(result))
       {
          result->release(result);
       }
@@ -178,6 +178,31 @@ void resultlist_add_result(float pertinence, struct result *result)
                              g_strdup(result->path),
                              holder);
 
+      }
+}
+
+void resultlist_verify(void)
+{
+   GtkTreeIter iter;
+   if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
+                                    &iter))
+      {
+         gboolean go_on;
+         do
+            {
+               struct resultholder *holder;
+               gtk_tree_model_get(GTK_TREE_MODEL(model), &iter, 0, &holder, -1);
+               if(!holder->result->validate(holder->result))
+                  {
+                     g_hash_table_remove(hash, holder->result->path);
+                     go_on=gtk_list_store_remove(GTK_LIST_STORE(model), &iter);
+                  }
+               else
+                  {
+                     go_on=gtk_tree_model_iter_next(GTK_TREE_MODEL(model), &iter);
+                  }
+            }
+         while(go_on);
       }
 }
 

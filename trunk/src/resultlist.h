@@ -27,7 +27,7 @@ void resultlist_init();
 GtkWidget *resultlist_get_widget(void);
 
 /**
- * Get the currently selected result or NULL.
+ * Get the currently selected result or NULL
  *
  * @return the selected result or NULL
  */
@@ -49,5 +49,13 @@ void resultlist_add_result(float pertinence, struct result *);
  * @param query new query string to highlight
  */
 void resultlist_set_current_query(const char *query);
+
+/**
+ * Remove the results that have become invalid.
+ * This function should be called after long inactivity
+ * periods, during which files may have been deleted or
+ * removed or windows closed.
+ */
+void resultlist_verify(void);
 
 #endif

@@ -357,6 +357,38 @@ static void execute_query_and_expect(const char *query, int goal_length, char *g
    g_list_free(list);
 }
 
+static struct result  *get_one_result(const char *query) {
+   struct result  *result;
+   GList *list = NULL;
+   catalog_cmd(catalog,
+               "executequery()",
+               catalog_executequery(catalog, query, collect_results_callback, &list));
+   fail_unless(g_list_length(list)==1, "expected 1 result exactly");
+
+   result = (struct result *)list->data;
+   g_list_free(list);
+   return(result);
+}
+
+
+START_TEST(test_validate)
+{
+   struct result *result;
+   printf("--- test_execute_query\n");
+   result = get_one_result("toto.c");
+   fail_unless(!result->validate(result),
+               "result should not be valid (file does not exist)");
+
+   catalog_cmd(catalog,
+               "addentry(catalog_check.c)",
+               catalog_addentry(catalog, "catalog_check.c", "catalog_check.c", "catalog_check.c", command_id, NULL/*id_out*/));
+
+   result = get_one_result("catalog_check.c");
+   fail_unless(result->validate(result),
+               "result should be valid (file exists)");
+}
+END_TEST
+
 START_TEST(test_execute_query)
 {
    printf("--- test_execute_query\n");
@@ -665,6 +697,7 @@ Suite *catalog_check_suite(void)
    tcase_add_test(tc_query, test_recover_from_interruption);
    tcase_add_test(tc_query, test_busy);
    tcase_add_test(tc_query, test_lastexecuted_first);
+   tcase_add_test(tc_query, test_validate);
 
    tcase_add_checked_fixture(tc_execute, setup_execute, teardown_execute);
    suite_add_tcase(s, tc_execute);
