@@ -88,6 +88,15 @@ bool locate_has_more(struct locate *_locate)
    return false;
 }
 
+static void locate_skip_empty_lines(struct full_locate *locate)
+{
+   guchar *cur = locate->cur;
+   const guchar *end = locate->end;
+   /* skip empty lines */
+   for(;cur<end && *cur=='\n'; cur++);
+   locate->cur=cur;
+}
+
 bool locate_next(struct locate *_locate, GString* dest)
 {
    g_return_val_if_fail(_locate!=NULL, false);
@@ -95,13 +104,12 @@ bool locate_next(struct locate *_locate, GString* dest)
 
    bool eof = false;
 
+   locate_skip_empty_lines(locate);
+
    do {
       guchar *cur = locate->cur;
       const guchar *end = locate->end;
       bool found_newline=false;
-      /* skip empty lines */
-      for(;cur<end && *cur=='\n'; cur++);
-      locate->cur=cur;
 
       /* skip to next newline or end of data */
       for(;cur<end; cur++) {
