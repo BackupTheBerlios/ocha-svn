@@ -21,7 +21,14 @@ struct full_target
    const gchar* mimetype;
    GArray *actions;
    int refs;
+   /** GArray of struct target_freer */
+   GArray* target_freer_array;
    GStaticMutex mutex;
+};
+struct target_freer
+{
+   target_freer_f call;
+   gpointer resource;
 };
 #define LOCK(target) g_static_mutex_lock(&((struct full_target *)target)->mutex)
 #define UNLOCK(target) g_static_mutex_unlock(&((struct full_target *)target)->mutex)
@@ -67,12 +74,23 @@ static struct full_target *target_new()
 				  actions,
 				  (mempool_freer_f)target_free_array);
    target->actions=actions;
-
+   target->target_freer_array=g_array_new(false/*zero_terminated*/,
+										  false/*clear*/,
+										  sizeof(struct target_freer));
    g_static_mutex_init(&target->mutex);
    return target;
 }
 static void target_delete(struct full_target *target)
 {
+   int freer_count = target->target_freer_array->len;
+   if(freer_count>0) {
+	  struct target_freer *start = (struct target_freer *)target->target_freer_array->data;
+	  struct target_freer *end = start+freer_count;
+	  for(struct target_freer *item=start; item<end; item++) {
+		 item->call(&target->target, 
+					item->resource);
+	  }
+   }
    mempool_delete(target->mempool);
 }
 
@@ -283,12 +301,14 @@ gpointer target_mempool_alloc(struct target* target, size_t size)
    return retval;
 }
 
-void target_mempool_enlist(struct target *target, gpointer resource, mempool_freer_f freer)
+void target_enlist(struct target *target, gpointer resource, target_freer_f freer)
 {
    g_return_if_fail(target!=NULL);
    struct full_target *full_target = to_full_target(target);
 
    LOCK(target);
-   mempool_enlist(full_target->mempool, resource, freer);
+   struct target_freer data = { .call = freer, .resource = resource };
+   g_array_append_val(full_target->target_freer_array, 
+					  data);
    UNLOCK(target);
 }

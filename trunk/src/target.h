@@ -238,6 +238,12 @@ bool target_remove_action(struct target* target, struct target_action* target_ac
 gpointer target_mempool_alloc(struct target* target, size_t size);
 
 /**
+ * Function to pass to target_enlist() to be called when
+ * the target is really destroyed.
+ */
+typedef void (*target_freer_f)(struct target* target, gpointer resource);
+
+/**
  * Enlist some resource into the target's memory pool.
  *
  * The resource will be freed at the same time as the
@@ -247,6 +253,6 @@ gpointer target_mempool_alloc(struct target* target, size_t size);
  * @param freer function that will free the resource
  * @see mempool_enlist(struct mempool *, void *, mempool_freer_f)
  */
-void target_mempool_enlist(struct target* target, gpointer resource, mempool_freer_f freer);
+void target_enlist(struct target* target, gpointer resource, target_freer_f freer);
 
 #endif

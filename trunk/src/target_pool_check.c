@@ -18,7 +18,7 @@ struct target_stub
    struct target target;
    bool freed;
    int refs;
-   mempool_freer_f freer;
+   target_freer_f freer;
    gpointer freer_data;
    gchar id[];
 };
@@ -223,14 +223,15 @@ void target_unref(struct target* target)
    if(stub->refs==0) {
 	  stub->freed=true;
 	  if(stub->freer)
-		 stub->freer(stub->freer_data);
+		 stub->freer(target, stub->freer_data);
    }
 }
 
 
-void target_mempool_enlist(struct target* target, gpointer resource, mempool_freer_f freer)
+void target_enlist(struct target* target, gpointer resource, target_freer_f freer)
 {
    fail_unless(target!=NULL, "null target");
+   fail_unless(freer!=NULL, "null freer function");
    struct target_stub *stub = (struct target_stub *)target;
    fail_unless(!stub->freed, "already freed");
    fail_unless(stub->refs>0, "refs<=0");

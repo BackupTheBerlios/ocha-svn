@@ -17,10 +17,7 @@ struct target_pool
 	*/
    GStaticMutex mutex;
 
-   /** Data chucks of type freer_data.*/
-   GMemChunk* freer_data_chunk;
-
-   /** Number of freer_data still being used */
+   /** Number of target_freer still keeping a reference to the pool */
    int freer_data_num;
 
    /** The target pool should be deleted once table_entries reaches 0. 
@@ -31,23 +28,11 @@ struct target_pool
 	*/
    bool deleted;
 };
-/** Data passed to the freer methods passed to target_mempool_enlist. 
- * Such structures are allocated using freer_data_chunk
- */
-struct freer_data
-{
-   struct target_pool *pool;
-   struct target *target;
-};
 
 struct target_pool *target_pool_new()
 {
    struct target_pool *retval = g_malloc0(sizeof(struct target_pool));
    retval->table = g_hash_table_new(g_str_hash, g_str_equal);
-   retval->freer_data_chunk = g_mem_chunk_new("freer_data_chunk",
-											  sizeof(struct freer_data),
-											  sizeof(struct freer_data)*10,
-											  G_ALLOC_ONLY);
    g_static_mutex_init(&retval->mutex);
    retval->deleted=false;
    return retval;
@@ -62,7 +47,6 @@ static void target_pool_really_delete(struct target_pool *pool)
 {
    g_return_if_fail(pool->freer_data_num==0);
    g_hash_table_destroy(pool->table);
-   g_mem_chunk_destroy(pool->freer_data_chunk);
    g_static_mutex_free(&pool->mutex);
    g_free(pool);
 }
@@ -92,11 +76,11 @@ struct target *target_pool_get(struct target_pool *pool, const char *id)
    return target;
 }
 
-static void target_pool_freer(struct freer_data *data)
+static void target_pool_freer(struct target *target, gpointer data)
 {
+   g_return_if_fail(target!=NULL);
    g_return_if_fail(data!=NULL);
-   struct target_pool *pool=data->pool;
-   struct target *target=data->target;
+   struct target_pool *pool=(struct target_pool *)data;
 
    g_static_mutex_lock(&pool->mutex);
    
@@ -105,7 +89,6 @@ static void target_pool_freer(struct freer_data *data)
 	  g_hash_table_remove(pool->table, id);
    }
 
-   g_mem_chunk_free(pool->freer_data_chunk, data);
    pool->freer_data_num--;
 
    if(pool->deleted && pool->freer_data_num==0) {
@@ -124,12 +107,9 @@ void target_pool_register(struct target_pool *pool, struct target *target)
    if(g_hash_table_lookup(pool->table, id)!=target) {
 	  g_hash_table_replace(pool->table, (gpointer)id, target);
 	  pool->freer_data_num++;
-	  struct freer_data *freer_data = g_mem_chunk_alloc(pool->freer_data_chunk);
-	  freer_data->pool=pool;
-	  freer_data->target=target;
-	  target_mempool_enlist(target, 
-							freer_data,
-							(mempool_freer_f)target_pool_freer);
+	  target_enlist(target, 
+							pool,
+							target_pool_freer);
    }
    g_static_mutex_unlock(&pool->mutex);
 }

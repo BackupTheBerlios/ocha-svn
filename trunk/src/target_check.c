@@ -70,8 +70,9 @@ START_TEST(test_new_file_target)
 END_TEST
 
 static int test_target_pool_calls=0;
-static void test_target_pool_cb(void *ptr)
+static void test_target_pool_cb(struct target* target, void *ptr)
 {
+   fail_unless(target!=NULL, "no target specified");
    fail_unless(ptr==(void*)0x1ee1, "wrong resource pointer");
    fail_unless(test_target_pool_calls==0, "too many calls");
    test_target_pool_calls++;
@@ -80,7 +81,7 @@ START_TEST(test_target_pool)
 {
    struct target *target = target_new_file_target("/tmp/toto");
    test_target_pool_calls=0;
-   target_mempool_enlist(target,
+   target_enlist(target,
 						 (void*)0x1ee1, 
 						 test_target_pool_cb);
    fail_unless(test_target_pool_calls==0, 
@@ -95,7 +96,7 @@ START_TEST(test_refcounting)
 {
    struct target *target = target_new_file_target("/tmp/toto");
    test_target_pool_calls=0;
-   target_mempool_enlist(target, 
+   target_enlist(target, 
 						 (void*)0x1ee1, 
 						 test_target_pool_cb);
    fail_unless(target==target_ref(target), 
