@@ -22,6 +22,7 @@ static char query_label_text[256];
 gboolean shown;
 static struct result_queue *result_queue;
 static struct queryrunner *queryrunner;
+static gboolean queryrunner_started;
 
 #define QUERY_TIMEOUT 3000
 #define assert_initialized() g_return_if_fail(result_queue)
@@ -92,14 +93,10 @@ void querywin_start()
         if(shown)
                 return;
         last_keypress=0;
-        resultlist_verify();
-        queryrunner->start(queryrunner);
-        gtk_adjustment_set_value(gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scroll)),
-                                 0.0);
-        gtk_adjustment_set_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scroll)),
-                                 0.0);
+        /*resultlist_verify();*/
 
-        gtk_window_reshow_with_initial_size(GTK_WINDOW(querywin));
+        /*gtk_window_move(GTK_WINDOW(querywin), gdk_screen_width()/2, gdk_screen_height()/2);*/
+        gtk_widget_show(querywin);
         shown=TRUE;
 }
 void querywin_stop()
@@ -107,11 +104,19 @@ void querywin_stop()
         assert_initialized();
         assert_queryrunner_set();
 
-        queryrunner->stop(queryrunner);
+        if(queryrunner_started) {
+                queryrunner->stop(queryrunner);
+                queryrunner_started=FALSE;
+        }
         gtk_widget_hide(querywin);
         shown=FALSE;
 
         reset_query_string();
+
+        gtk_adjustment_set_value(gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scroll)),
+                                 0.0);
+        gtk_adjustment_set_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scroll)),
+                                 0.0);
 }
 
 /* ------------------------- static functions */
@@ -166,6 +171,10 @@ static void result_handler_cb(struct queryrunner *caller,
  */
 static gboolean run_query(gpointer userdata)
 {
+        if(!queryrunner_started) {
+                queryrunner->start(queryrunner);
+                queryrunner_started=TRUE;
+        }
         if(strcmp(running_query->str, query_str->str)!=0) {
                 g_string_assign(running_query, query_str->str);
                 strstrip_on_gstring(running_query);
@@ -258,6 +267,8 @@ static void querywin_create(GtkWidget *list)
         GtkWidget *scrolledwindow1;
 
         querywin = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+        gtk_window_set_type_hint(GTK_WINDOW(querywin), GDK_WINDOW_TYPE_HINT_DIALOG);
+        gtk_window_set_gravity(GTK_WINDOW(querywin), GDK_GRAVITY_CENTER);
         gtk_widget_set_size_request (querywin, 320, 200);
         gtk_window_set_title (GTK_WINDOW (querywin), "Ocha Query");
         gtk_window_set_position (GTK_WINDOW (querywin), GTK_WIN_POS_CENTER_ALWAYS);
@@ -265,6 +276,8 @@ static void querywin_create(GtkWidget *list)
         gtk_window_set_decorated (GTK_WINDOW (querywin), FALSE);
         gtk_window_set_skip_taskbar_hint (GTK_WINDOW (querywin), TRUE);
         gtk_window_set_skip_pager_hint (GTK_WINDOW (querywin), TRUE);
+
+
 
         vbox1 = gtk_vbox_new (FALSE, 0);
         gtk_widget_show (vbox1);
@@ -278,7 +291,7 @@ static void querywin_create(GtkWidget *list)
         gtk_widget_show (scrolledwindow1);
         gtk_box_pack_start (GTK_BOX (vbox1), scrolledwindow1, TRUE, TRUE, 0);
         gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow1),
-                                        GTK_POLICY_AUTOMATIC,
+                                        GTK_POLICY_NEVER,
                                         GTK_POLICY_AUTOMATIC);
 
         gtk_container_add (GTK_CONTAINER (scrolledwindow1),
