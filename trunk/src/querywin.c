@@ -5,13 +5,12 @@
  */
 
 
-void querywin_create(struct querywin *retval)
+void querywin_create(struct querywin *retval, GtkWidget *list)
 {
   GtkWidget *querywin;
   GtkWidget *vbox1;
   GtkWidget *query;
   GtkWidget *scrolledwindow1;
-  GtkWidget *list;
 
   querywin = gtk_window_new (GTK_WINDOW_TOPLEVEL);
   gtk_widget_set_size_request (querywin, 320, 200);
@@ -35,10 +34,7 @@ void querywin_create(struct querywin *retval)
   gtk_box_pack_start (GTK_BOX (vbox1), scrolledwindow1, TRUE, TRUE, 0);
   gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow1), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
-  list = gtk_tree_view_new();
-  gtk_widget_show (list);
   gtk_container_add (GTK_CONTAINER (scrolledwindow1), list);
-  gtk_tree_view_set_headers_visible (GTK_TREE_VIEW (list), FALSE);
 
   /* fill in structure */
   retval->querywin=querywin;

@@ -18,6 +18,6 @@ struct querywin
  * and fill a structure querywin.
  * @param querywin a structure querywin to fill
  */
-void querywin_create(struct querywin *);
+void querywin_create(struct querywin *, GtkWidget *treeview);
 
 #endif /*QUERYWIN_H*/

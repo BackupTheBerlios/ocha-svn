@@ -6,6 +6,7 @@
 #include "queryrunner.h"
 #include "catalog_queryrunner.h"
 #include "query.h"
+#include "resultlist.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
@@ -25,11 +26,8 @@
 static struct querywin win_data;
 static struct result_queue *result_queue;
 static struct queryrunner *queryrunner;
-static GtkListStore *list_model;
 static GString* query_str;
 static GString* running_query;
-static GList* results;
-static struct result* selected;
 static guint32 last_keypress;
 #define query_label_text_len 256
 static char query_label_text[256];
@@ -71,37 +69,7 @@ void result_handler_cb(struct queryrunner *caller,
 {
    g_return_if_fail(result);
 
-   bool was_empty = g_list_length(results)==0;
-   results=g_list_append(results, result);
-
-
-
-   GtkTreeIter iter;
-   gtk_list_store_append(list_model, &iter);
-   gtk_list_store_set(list_model, &iter,
-                      0, result,
-                      -1);
-
-   if(was_empty)
-      {
-         GtkTreeSelection* selection=gtk_tree_view_get_selection(GTK_TREE_VIEW(win_data.treeview));
-         gtk_tree_selection_select_iter(selection, &iter);
-      }
-}
-
-static void result_free_cb(struct result *result, gpointer userdata)
-{
-   if(selected==result)
-      selected=NULL;
-   result->release(result);
-}
-static void clear_list_model()
-{
-   gtk_list_store_clear(list_model);
-
-   g_list_foreach(results, (GFunc)result_free_cb, NULL/*user_data*/);
-   g_list_free(results);
-   results=NULL;
+   resultlist_add_result(pertinence, result);
 }
 
 static gboolean run_query(gpointer userdata)
@@ -109,7 +77,8 @@ static gboolean run_query(gpointer userdata)
    if(strcmp(running_query->str, query_str->str)!=0)
       {
          g_string_assign(running_query, query_str->str);
-         clear_list_model();
+         resultlist_set_current_query(query_str->str);
+         resultlist_clear();
          queryrunner->run_query(queryrunner, running_query->str);
       }
    return FALSE;
@@ -140,12 +109,16 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
          return TRUE; /*handled*/
 
       case GDK_Return:
-         if(selected!=NULL)
-            {
-               querywin_stop();
-               selected->execute(selected);
-            }
-         return TRUE; /*handled*/
+         {
+            struct result *selected = resultlist_get_selected();
+            if(selected!=NULL)
+               {
+                  querywin_stop();
+                  selected->execute(selected);
+               }
+            return TRUE; /*handled*/
+         }
+
       default:
          if(ev->string && ev->string[0]!='\0')
             {
@@ -161,102 +134,18 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
       }
    return FALSE; /*propagate*/
 }
-static void str_lower(char *dest, const char *from)
-{
-   int len = strlen(from);
-   for(int i=0; i<len; i++)
-      dest[i]=tolower(from[i]);
-   dest[len]='\0';
-}
 
-static void g_string_append_markup_escaped(GString *gstr, const char *str)
-{
-   char *escaped = g_markup_escape_text(str, -1);
-   g_string_append(gstr, escaped);
-   g_free(escaped);
-}
-static void g_string_append_query_pango_highlight(GString *gstr, const char *query, const char *str, const char *on, const char *off)
-{
-   const char *markup = query_pango_highlight(query, str, on, off);
-   g_string_append(gstr, markup);
-   g_free((void *)markup);
-}
-static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, GtkTreeModel* model, GtkTreeIter* iter, gpointer userdata)
-{
-   struct result *result = NULL;
-   gtk_tree_model_get(model, iter, 0, &result, -1);
-   g_return_if_fail(result);
-
-   const char *query = query_str->str;
-   const char *name = result->name;
-
-   GString *full = g_string_new("");
-   g_string_append(full, "<big><b>");
-   g_string_append_query_pango_highlight(full, query, name, "<u>", "</u>");
-   g_string_append(full, "</b></big>\n<small>");
-   g_string_append_markup_escaped(full, result->path);
-   g_string_append(full, "</small>");
-
-   g_object_set(renderer,
-                "markup",
-                full->str,
-                NULL);
-
-   g_string_free(full, true/*free content*/);
-}
-
-
-static void selection_changed_cb(GtkTreeSelection* selection, gpointer userdata)
-{
-   GtkTreeIter iter;
-   if(gtk_tree_selection_get_selected(selection,
-                                      NULL/* *model */,
-                                      &iter))
-      {
-         gtk_tree_model_get(GTK_TREE_MODEL(list_model), &iter, 0, &selected, -1);
-         g_return_if_fail(selected);
-      }
-   else
-      {
-         selection=NULL;
-      }
-}
-static void querywin_init_list()
-{
-   list_model=gtk_list_store_new(1/*n_columns*/, G_TYPE_POINTER);
-   GtkTreeView *view = GTK_TREE_VIEW(win_data.treeview);
-
-
-   GtkTreeViewColumn* col = gtk_tree_view_column_new();
-   GtkCellRenderer* cell_renderer_name = gtk_cell_renderer_text_new();
-   gtk_tree_view_column_set_title(col, "Result");
-   gtk_tree_view_column_pack_start(col, cell_renderer_name, TRUE/*expand*/);
-   gtk_tree_view_column_set_cell_data_func(col,
-                                           cell_renderer_name,
-                                           cell_name_data_func,
-                                           NULL/*data*/,
-                                           NULL/*destroy*/);
-   gtk_tree_view_append_column(view, col);
-
-   gtk_tree_view_set_model(view, GTK_TREE_MODEL(list_model));
-
-   GtkTreeSelection *selection = gtk_tree_view_get_selection(view);
-   g_signal_connect(selection,
-                    "changed",
-                    G_CALLBACK(selection_changed_cb),
-                    NULL/*userdata*/);
-}
 
 static void init_ui(void)
 {
-
-   querywin_create(&win_data);
+   resultlist_init();
+   querywin_create(&win_data, resultlist_get_widget());
    GtkWidget* querywin = win_data.querywin;
 
    gtk_window_stick(GTK_WINDOW(querywin));
    gtk_window_set_keep_above(GTK_WINDOW(querywin),
                  true);
-   querywin_init_list();
+
 
    g_signal_connect(querywin,
                     "key_release_event",

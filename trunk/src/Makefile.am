@@ -1,4 +1,4 @@
-noinst_HEADERS=mempool.h result.h result_queue.h queryrunner.h mock_queryrunner.h querywin.h
+noinst_HEADERS=mempool.h result.h result_queue.h queryrunner.h mock_queryrunner.h querywin.h resultlist.h catalog_queryrunner.h
 bin_PROGRAMS=ocha
 
 noinst_PROGRAMS=mempool_check result_queue_check catalog_check query_check
@@ -21,7 +21,7 @@ catalog_check_SOURCES=catalog_check.c catalog.c catalog.h result.h
 catalog_check_CFLAGS=$(TEST_CFLAGS) $(SQLITE_CFLAGS)
 catalog_check_LDADD=$(TEST_LIBS) $(SQLITE_LIBS)
 
-ocha_SOURCES=main.c result_queue.c result_queue.h querywin.h querywin.c querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h query.c query.h 
+ocha_SOURCES=main.c result_queue.c result_queue.h querywin.h querywin.c querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h query.c query.h resultlist.h resultlist.c
 ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS)
 ocha_LDADD=$(GTK_LIBS) $(SQLITE_LIBS)
 
