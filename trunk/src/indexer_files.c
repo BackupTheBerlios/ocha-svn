@@ -31,7 +31,7 @@ static gboolean has_gnome_mime_command(const char *path);
 static char *display_name(struct catalog *catalog, int id);
 static void release_source(struct indexer_source *source);
 static GtkWidget *editor_widget(struct indexer_source *source);
-static void new_source(struct indexer *indexer, GtkWindow *parent, indexer_new_source_cb callback, gpointer userdata);
+static struct indexer_source *new_source(struct indexer *indexer, struct catalog *catalog, GError **err);
 #define INDEXER_NAME "files"
 
 /** Definition of the indexer */
@@ -86,23 +86,29 @@ static void release_source(struct indexer_source *source)
     g_free(source);
 }
 
-static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore)
+static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore, int *id_ptr)
 {
    int id;
    if(!catalog_add_source(catalog, INDEXER_NAME, &id))
       return FALSE;
-   if(!ocha_gconf_set_source_attribute(INDEXER_NAME, id, "path", path))
-      return FALSE;
+   if(id_ptr)
+       *id_ptr=id;
+   if(path)
+   {
+       if(!ocha_gconf_set_source_attribute(INDEXER_NAME, id, "path", path))
+           return FALSE;
+   }
    if(depth!=-1)
       {
          char *depth_str = g_strdup_printf("%d", depth);
          gboolean ret = ocha_gconf_set_source_attribute(INDEXER_NAME, id, "depth", depth_str);
          g_free(depth_str);
-         return ret;
+         if(!ret)
+             return FALSE;
       }
    if(ignore)
       {
-         if(ocha_gconf_set_source_attribute(INDEXER_NAME, id, "ignore", ignore))
+         if(!ocha_gconf_set_source_attribute(INDEXER_NAME, id, "ignore", ignore))
             return FALSE;
       }
    return TRUE;
@@ -118,7 +124,7 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
    if(g_file_test(home_Desktop, G_FILE_TEST_EXISTS)
       && g_file_test(home_Desktop, G_FILE_TEST_IS_DIR))
       {
-         if(!add_source(catalog, home_Desktop, 2/*depth*/, NULL/*ignore*/))
+         if(!add_source(catalog, home_Desktop, 2/*depth*/, NULL/*ignore*/, NULL/*id_ptr*/))
             goto error;
          has_desktop=TRUE;
       }
@@ -126,7 +132,7 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
    if(g_file_test(home_dot_gnome_desktop, G_FILE_TEST_EXISTS)
       && g_file_test(home_dot_gnome_desktop, G_FILE_TEST_IS_DIR))
       {
-         if(!add_source(catalog, home_dot_gnome_desktop, 2/*depth*/, NULL/*ignore*/))
+         if(!add_source(catalog, home_dot_gnome_desktop, 2/*depth*/, NULL/*ignore*/, NULL/*id_ptr*/))
             goto error;
          has_desktop=TRUE;
       }
@@ -137,7 +143,7 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
          if(g_file_test(home, G_FILE_TEST_EXISTS)
             && g_file_test(home, G_FILE_TEST_IS_DIR))
             {
-               if(!add_source(catalog, home, 2/*depth*/, "Desktop"))
+               if(!add_source(catalog, home, 2/*depth*/, "Desktop", NULL/*id_ptr*/))
                   goto error;
             }
       }
@@ -278,7 +284,7 @@ static char *display_name(struct catalog *catalog, int id)
     char *uri=ocha_gconf_get_source_attribute(INDEXER_NAME, id, "path");
     char *retval=NULL;
     if(uri==NULL)
-        retval=g_strdup("Invalid");
+        retval=g_strdup(indexer_files.display_name);
     else
     {
         char *path=NULL;
@@ -610,7 +616,15 @@ static GtkWidget *editor_widget(struct indexer_source *source)
     return retval;
 }
 
-static void new_source(struct indexer *indexer, GtkWindow *parent, indexer_new_source_cb callback, gpointer userdata)
+static struct indexer_source *new_source(struct indexer *indexer, struct catalog *catalog, GError **err)
 {
-    printf("new source %s\n", indexer->display_name);
+    g_return_val_if_fail(indexer, NULL);
+    g_return_val_if_fail(err==NULL || (*err==NULL), NULL);
+
+    int id=-1;
+    if(add_source(catalog, NULL/*no path*/, 0/*ignore content*/, NULL/*default ignore*/, &id))
+    {
+        return load(indexer, catalog, id);
+    }
+    return NULL;
 }

@@ -126,19 +126,19 @@ struct indexer
    gboolean (*validate)(struct indexer *, const char *name, const char *long_name, const char *path);
 
    /**
-    * Create a dialog that, when done, will create a new source.
+    * Create a new source.
     *
     * Some indexers will not allow the creation of
     * new sources, in which case this function may
     * be null.
     *
     * @param indexer
-    * @param parent parent window (may be null)
-    * @param callback a function to be called just
-    * after the new source has been created (may be null)
-    * @param userdata pointer to pass to the callback
+    * @param catalog catalog to register the source in
+    * @param err error structure (may be null)
+    * @return a new, uninitialized source, to be freed the usual way or
+    * NULL if there was an error
     */
-   void (*new_source)(struct indexer *, GtkWindow *parent, indexer_new_source_cb callback, gpointer userdata);
+   struct indexer_source *(*new_source)(struct indexer *, struct catalog *catalog, GError **err);
 };
 
 /**

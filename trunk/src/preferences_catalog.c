@@ -23,6 +23,11 @@ typedef enum {
 } TreeViewColumns;
 
 /** Internal data */
+struct prefs_and_indexer
+{
+    struct preferences_catalog *prefs;
+    struct indexer *indexer;
+};
 struct preferences_catalog
 {
     GtkTreeStore *model;
@@ -31,11 +36,16 @@ struct preferences_catalog
 
     struct catalog *catalog;
     struct indexer_view *properties;
+    /**
+     * A prefs_and_indexer structure
+     * for each existing indexer. null-terminated
+     */
+    struct prefs_and_indexer pai[];
 };
 
 static GtkTreeStore *createModel(struct catalog *catalog);
 static void add_indexer(GtkTreeStore *model, struct indexer *indexer, struct catalog *catalog);
-static void add_source(GtkTreeStore *model, GtkTreeIter *parent, struct indexer *indexer, struct catalog *catalog, int source_id);
+static void add_source(GtkTreeStore *model, GtkTreeIter *parent, struct indexer *indexer, struct catalog *catalog, int source_id, GtkTreeIter *iter_out);
 static void update_entry_count(GtkTreeStore *model, GtkTreeIter *iter, unsigned int count, struct catalog *catalog);
 static GtkTreeView *createView();
 static void reload_cb(GtkButton *reload, gpointer userdata);
@@ -83,7 +93,7 @@ static void add_indexer(GtkTreeStore *model, struct indexer *indexer, struct cat
                        &iter,
                        indexer,
                        catalog,
-                       ids[i]);
+                       ids[i], NULL/*iter_out*/);
         }
         g_free(ids);
     }
@@ -93,19 +103,21 @@ static void add_source(GtkTreeStore *model,
                        GtkTreeIter *parent,
                        struct indexer *indexer,
                        struct catalog *catalog,
-                       int source_id)
+                       int source_id,
+                       GtkTreeIter *iter_out)
 {
     GtkTreeIter iter;
     struct indexer_source *source = indexer->load_source(indexer, catalog, source_id);
     if(source!=NULL)
         {
             gtk_tree_store_append(model, &iter, parent);
+            if(iter_out)
+                memcpy(iter_out, &iter, sizeof(GtkTreeIter));
             gtk_tree_store_set(model, &iter,
                                COLUMN_LABEL, source->display_name,
                                COLUMN_INDEXER_TYPE, indexer->name,
                                COLUMN_SOURCE_ID, source_id,
                                -1);
-
 
             update_entry_count(model, &iter, source_id, catalog);
             source->release(source);
@@ -242,6 +254,33 @@ static void reload_cb(GtkButton *button, gpointer userdata)
     }
 }
 
+static void display_properties(struct preferences_catalog  *prefs, GtkTreeIter *iter, gboolean activate) {
+    char *type=NULL;
+    int source_id=0;
+    gtk_tree_model_get(GTK_TREE_MODEL(prefs->model), iter,
+                       COLUMN_INDEXER_TYPE, &type,
+                       COLUMN_SOURCE_ID, &source_id,
+                       -1);
+    if(type)
+    {
+        struct indexer *indexer=indexers_get(type);
+        if(indexer)
+        {
+            if(source_id>0)
+                indexer_view_attach_source(prefs->properties,
+                                           indexer,
+                                           source_id,
+                                           activate);
+            else
+                indexer_view_attach_indexer(prefs->properties,
+                                            indexer,
+                                            activate);
+        }
+        g_free(type);
+    }
+}
+
+
 
 /** A row has been double-clicked: open properties */
 static void row_activated_cb(GtkTreeView *view,
@@ -250,50 +289,101 @@ static void row_activated_cb(GtkTreeView *view,
                              gpointer userdata)
 {
     struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
-    GtkTreeIter iter;
     g_return_if_fail(prefs);
 
+    GtkTreeIter iter;
     if(gtk_tree_model_get_iter(GTK_TREE_MODEL(prefs->model), &iter, path))
         {
-            char *type=NULL;
-            int source_id=0;
-            gtk_tree_model_get(GTK_TREE_MODEL(prefs->model), &iter,
-                               COLUMN_INDEXER_TYPE, &type,
-                               COLUMN_SOURCE_ID, &source_id,
-                               -1);
-            if(type)
-                {
-                    struct indexer *indexer=indexers_get(type);
-                    if(indexer)
-                        {
-                            if(source_id>0)
-                                indexer_view_attach_source(prefs->properties,
-                                                           indexer,
-                                                           source_id);
-                            else
-                                indexer_view_attach_indexer(prefs->properties,
-                                                            indexer);
-                        }
-                    g_free(type);
-                }
+            display_properties(prefs, &iter, TRUE/*activate*/);
         }
+}
+
+/** Selection has been modified */
+static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userdata)
+{
+    struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
+    g_return_if_fail(prefs);
+
+    if(indexer_view_is_visible(prefs->properties))
+    {
+        GtkTreeIter iter;
+        if(gtk_tree_selection_get_selected(selection, NULL, &iter))
+        {
+            display_properties(prefs, &iter, FALSE/*do not activate*/);
+        }
+    }
+}
+
+static gboolean find_indexer_iter(struct preferences_catalog *prefs, struct indexer *indexer, GtkTreeIter *iter_out)
+{
+    g_return_val_if_fail(prefs, FALSE);
+    g_return_val_if_fail(indexer, FALSE);
+    g_return_val_if_fail(iter_out, FALSE);
+
+    GtkTreeStore *model = prefs->model;
+    if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
+                                     iter_out))
+    {
+        do
+        {
+            gchar *type = NULL;
+            gtk_tree_model_get(GTK_TREE_MODEL(model), iter_out,
+                               COLUMN_INDEXER_TYPE, &type,
+                               -1);
+            if(type!=NULL)
+            {
+                gboolean success = strcmp(type, indexer->name)==0;
+                g_free(type);
+                if(success)
+                    return TRUE; /* iter_out contains the correct iterator */
+            }
+        }
+        while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model), iter_out));
+    }
+    /* iter_out has been set to be invalid */
+    return FALSE;
 }
 
 static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer userdata)
 {
-    struct indexer *indexer = (struct indexer *)userdata;
-    g_return_if_fail(indexer);
-    indexer->new_source(indexer,
-                        NULL/*no parent*/,
-                        NULL/*no callback: don't do anything for now*/,
-                        NULL/*userdata*/);
+    struct prefs_and_indexer *pai = (struct prefs_and_indexer *)userdata;
+    g_return_if_fail(pai);
+    struct preferences_catalog *prefs = pai->prefs;
+    struct indexer *indexer = pai->indexer;
+
+    struct indexer_source *source=indexer->new_source(indexer, prefs->catalog, NULL/*err*/);
+    if(source)
+    {
+        GtkTreeIter indexer_iter;
+        if(find_indexer_iter(prefs, indexer, &indexer_iter))
+        {
+            GtkTreeIter source_iter;
+            add_source(GTK_TREE_STORE(prefs->model),
+                       &indexer_iter,
+                       indexer,
+                       prefs->catalog,
+                       source->id,
+                       &source_iter);
+
+
+            GtkTreePath *path = gtk_tree_model_get_path(GTK_TREE_MODEL(prefs->model), &source_iter);
+            if(path)
+            {
+                gtk_tree_view_expand_to_path(prefs->view, path);
+                gtk_tree_view_scroll_to_cell(prefs->view, path, NULL/*column*/, FALSE/*do not use_align*/, 0, 0);
+                gtk_tree_path_free(path);
+            }
+            gtk_tree_selection_select_iter(prefs->selection, &source_iter);
+            display_properties(prefs, &source_iter, TRUE/*activate*/);
+        }
+        source->release(source);
+    }
 }
 static void new_source_popup_cb(GtkButton *button, gpointer userdata)
 {
    GtkMenu *menu = GTK_MENU(userdata);
    g_return_if_fail(menu);
 
-   printf("popup\n");
    gtk_menu_popup(menu,
                   NULL,
                   NULL/*parent_menu_item*/,
@@ -304,11 +394,23 @@ static void new_source_popup_cb(GtkButton *button, gpointer userdata)
 }
 
 /* ------------------------- public functions */
+static int count_indexers(struct indexer **indexers)
+{
+    int retval=0;
+
+    for(;*indexers; indexers++, retval++);
+
+    return retval;
+}
 struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
 {
     g_return_val_if_fail(catalog!=NULL, NULL);
 
-    struct preferences_catalog *prefs = g_new(struct preferences_catalog, 1);
+    struct indexer **indexers = indexers_list();
+    int indexer_count=count_indexers(indexers);
+
+    struct preferences_catalog *prefs = g_malloc(sizeof(struct preferences_catalog)
+                                                 +(indexer_count+1)*sizeof(struct prefs_and_indexer));
 
     prefs->model = createModel(catalog);
     prefs->view = createView(GTK_TREE_MODEL(prefs->model));
@@ -320,6 +422,18 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
                      "row-activated",
                      G_CALLBACK(row_activated_cb),
                      prefs);
+    g_signal_connect(prefs->selection,
+                     "changed",
+                     G_CALLBACK(row_selection_changed_cb),
+                     prefs);
+
+    for(int i=0; i<indexer_count; i++)
+    {
+        prefs->pai[i].indexer=indexers[i];
+        prefs->pai[i].prefs=prefs;
+    }
+    prefs->pai[indexer_count].indexer=NULL;
+    prefs->pai[indexer_count].prefs=NULL;
 
     return prefs;
 }
@@ -340,14 +454,11 @@ GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
                               GTK_BUTTONBOX_END);
 
     int new_source_count = 0;
-    struct indexer **indexers = indexers_list();
-    for(int i=0; indexers[i]; i++)
+    for(int i=0; prefs->pai[i].indexer; i++)
     {
-        struct indexer *indexer = indexers[i];
+        struct indexer *indexer = prefs->pai[i].indexer;
         if(indexer->new_source)
-        {
             new_source_count++;
-        }
     }
     if(new_source_count>0)
     {
@@ -357,15 +468,15 @@ GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
 
         if(new_source_count==1)
            {
-              for(int i=0; indexers[i]; i++)
-                 {
-                    struct indexer *indexer = indexers[i];
-                    if(indexer->new_source)
+               for(int i=0; prefs->pai[i].indexer; i++)
+               {
+                   struct prefs_and_indexer *pai = &prefs->pai[i];
+                    if(pai->indexer->new_source)
                        {
                           g_signal_connect(add,
                                            "clicked",
                                            G_CALLBACK(new_source_button_or_item_cb),
-                                           indexer);
+                                           pai);
                           break;
                        }
                  }
@@ -374,18 +485,18 @@ GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
            {
               GtkWidget *popup = gtk_menu_new();
               gtk_widget_show(popup);
-              for(int i=0; indexers[i]; i++)
-                 {
-                    struct indexer *indexer = indexers[i];
-                    if(indexer->new_source)
+               for(int i=0; prefs->pai[i].indexer; i++)
+               {
+                   struct prefs_and_indexer *pai = &prefs->pai[i];
+                    if(pai->indexer->new_source)
                        {
-                          GtkWidget *item=gtk_menu_item_new_with_label(indexer->display_name);
+                          GtkWidget *item=gtk_menu_item_new_with_label(pai->indexer->display_name);
                           gtk_widget_show(item);
                           gtk_menu_append(GTK_MENU(popup), item);
                           g_signal_connect(item,
                                            "activate",
                                            G_CALLBACK(new_source_button_or_item_cb),
-                                           indexer);
+                                           pai);
                        }
                  }
               g_signal_connect(add,

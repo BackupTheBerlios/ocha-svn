@@ -27,7 +27,6 @@ static gboolean discover(struct indexer *, struct catalog *catalog);
 static char *display_name(struct catalog *catalog, int id);
 static char *describe(struct indexer *indexer);
 static GtkWidget *editor_widget(struct indexer_source *source);
-static void new_source(struct indexer *indexer, GtkWindow *parent, indexer_new_source_cb callback, gpointer userdata);
 
 #define INDEXER_NAME "applications"
 struct indexer indexer_applications =
@@ -38,7 +37,7 @@ struct indexer indexer_applications =
    .execute=execute,
    .validate=validate,
    .discover=discover,
-   .new_source = new_source,
+   .new_source = NULL,
 
    .description =
     "This indexer looks recursively into directories for files "
@@ -380,11 +379,5 @@ static char *display_name(struct catalog *catalog, int id)
 static GtkWidget *editor_widget(struct indexer_source *source)
 {
     return gtk_label_new(source->display_name);
-}
-
-
-static void new_source(struct indexer *indexer, GtkWindow *parent, indexer_new_source_cb callback, gpointer userdata)
-{
-    printf("new source %s\n", indexer->display_name);
 }
 

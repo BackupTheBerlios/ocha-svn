@@ -17,8 +17,10 @@ struct indexer_view
     GtkWidget *properties_widget_container;
     /** widget that represents the view of the current source or indexer */
     GtkWidget *properties_widget;
-    struct indexer_source *current_source;
+
     struct indexer *current_indexer;
+    /** id of current source or -1 (no source) */
+    int current_source_id;
 };
 
 static void properties_window_destroy_cb(GtkWidget *widget, gpointer userdata);
@@ -36,6 +38,7 @@ struct indexer_view *indexer_view_new(struct catalog *catalog)
         g_new(struct indexer_view, 1);
     memset(view, 0, sizeof(struct indexer_view));
     view->catalog=catalog;
+    view->current_source_id=-1;
     return view;
 }
 void indexer_view_destroy(struct indexer_view *view)
@@ -46,28 +49,36 @@ void indexer_view_destroy(struct indexer_view *view)
         gtk_widget_destroy(view->window);
     g_assert(view->window==NULL);
     g_assert(view->properties_widget==NULL);
-    g_assert(view->current_source==NULL);
     g_assert(view->current_indexer==NULL);
     g_free(view);
 }
+gboolean indexer_view_is_visible(struct indexer_view *view)
+{
+    if(!view->window)
+        return FALSE;
+    gboolean visible = FALSE;
+    g_object_get(view->window, "visible", &visible, NULL);
+    return visible;
+}
 void indexer_view_attach_indexer(struct indexer_view *view,
-                                 struct indexer *indexer)
+                                 struct indexer *indexer,
+                                 gboolean activate)
 {
     g_return_if_fail(view);
     g_return_if_fail(indexer);
-    indexer_view_attach_source(view, indexer, -1);
+    indexer_view_attach_source(view, indexer, -1, activate);
 }
+
 void indexer_view_attach_source(struct indexer_view *view,
                                 struct indexer *indexer,
-                                int source_id)
+                                int source_id,
+                                gboolean activate)
 {
     g_return_if_fail(view);
     g_return_if_fail(indexer);
 
     gboolean issame = view->current_indexer==indexer
-        && ( (source_id==-1 && view->current_source==NULL)
-             || (view->current_source!=NULL && view->current_source->id==source_id));
-
+        && source_id==view->current_source_id;
     if(!issame)
     {
         if(view->current_indexer!=NULL)
@@ -87,18 +98,19 @@ void indexer_view_attach_source(struct indexer_view *view,
         const char *title;
 
         g_return_if_fail(view->current_indexer==NULL);
-        g_return_if_fail(view->current_source==NULL);
         g_return_if_fail(view->properties_widget==NULL);
         g_return_if_fail(view->window!=NULL);
 
         view->current_indexer=indexer;
         if(source)
         {
+            view->current_source_id=source_id;
             title=source->display_name;
             widget=properties_widget_from_source(indexer, source);
         }
         else
         {
+            view->current_source_id=-1;
             widget=properties_widget_from_indexer(indexer);
             title=indexer->display_name;
         }
@@ -112,8 +124,8 @@ void indexer_view_attach_source(struct indexer_view *view,
         if(source)
             source->release(source);
     }
-
-    gtk_window_present(GTK_WINDOW(view->window));
+    if(activate)
+        gtk_window_present(GTK_WINDOW(view->window));
 }
 void indexer_view_detach(struct indexer_view *view)
 {
@@ -128,12 +140,8 @@ void indexer_view_detach(struct indexer_view *view)
                                  "");
         }
     view->properties_widget=NULL;
-    if(view->current_source)
-        {
-            view->current_source->release(view->current_source);
-            view->current_source=NULL;
-        }
     view->current_indexer=NULL;
+    view->current_source_id=-1;
 }
 
 /* ------------------------- private functions */
@@ -190,7 +198,7 @@ static void properties_window_destroy_cb(GtkWidget *widget, gpointer userdata)
     view->window=NULL;
     g_assert(!view->properties_widget);
     g_assert(!view->current_indexer);
-    g_assert(!view->current_source);
+    g_assert(view->current_source_id==-1);
 }
 
 static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct indexer_source *source)
