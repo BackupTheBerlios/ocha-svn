@@ -1,3 +1,6 @@
+- get data from ~/.recently-used http://standards.freedesktop.org/recent-file-spec/recent-file-spec-0.2.html
+- keep recent windows/recently-used in memory (lastuse flag on catalog does not apply to them)
+- get URLs from firefox history file
 - canonize file paths
 - replace paths with URI
 - check result validity 
