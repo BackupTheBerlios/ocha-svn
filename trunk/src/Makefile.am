@@ -18,7 +18,7 @@ catalog_check_CFLAGS=$(TEST_CFLAGS) $(SQLITE_CFLAGS)
 catalog_check_LDADD=$(TEST_LIBS) $(SQLITE_LIBS)
 
 ocha_SOURCES=main.c result_queue.c result_queue.h querywin.h querywin.c querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h
-ocha_CFLAGS=$(GTK_CFLAGS) $(SQLITE_CFLAGS)
+ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS)
 ocha_LDADD=$(GTK_LIBS) $(SQLITE_LIBS)
 
 #lint:

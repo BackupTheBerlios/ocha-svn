@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <signal.h>
 #include "querywin.h"
 #include "result_queue.h"
@@ -6,6 +8,7 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
+#include <string.h>
 
 #define QUERY_TIMEOUT 800
 
@@ -17,7 +20,8 @@ static GString* query_str;
 static GList* results;
 static struct result* selected;
 static guint32 last_keypress;
-
+#define query_label_text_len 256
+static char query_label_text[256];
 static void querywin_start()
 {
    last_keypress=0;
@@ -84,7 +88,9 @@ static void clear_list_model()
 
 static void run_query()
 {
-   gtk_label_set_text(GTK_LABEL(win_data.query_label), query_str->str);
+
+   strncpy(query_label_text, query_str->str, query_label_text_len-1);
+   gtk_label_set_text(GTK_LABEL(win_data.query_label), query_label_text);
    clear_list_model();
 
    queryrunner->run_query(queryrunner, query_str->str);
@@ -146,17 +152,15 @@ static void selection_changed_cb(GtkTreeSelection* selection, gpointer userdata)
       {
          gtk_tree_model_get(GTK_TREE_MODEL(list_model), &iter, 0, &selected, -1);
          g_return_if_fail(selected);
-         printf("selected: %s\n", selected->name);
       }
    else
       {
-         printf("unselected\n");
          selection=NULL;
       }
 }
 static void querywin_init_list()
 {
-   list_model=gtk_list_store_new(1/*n_columns*/, G_TYPE_STRING);
+   list_model=gtk_list_store_new(1/*n_columns*/, G_TYPE_POINTER);
    GtkTreeView *view = GTK_TREE_VIEW(win_data.treeview);
 
 
@@ -206,6 +210,20 @@ static void init_ui(void)
 
 }
 
+void sighandler(int signum)
+{
+   gtk_widget_show(win_data.querywin);
+}
+static void install_sighandler()
+{
+   struct sigaction act;
+   act.sa_handler=sighandler;
+   sigemptyset(&act.sa_mask);
+   act.sa_flags=0;
+   act.sa_restorer=NULL;
+   sigaction(SIGUSR1, &act, NULL/*oldact*/);
+}
+
 int main(int argc, char *argv[])
 {
    g_thread_init(NULL/*vtable*/);
@@ -220,6 +238,7 @@ int main(int argc, char *argv[])
    init_ui();
    querywin_start();
 
+   install_sighandler();
    gtk_main();
 
    return 0;
