@@ -501,7 +501,7 @@ static gboolean has_gnome_mime_command(const char *path)
             }
          g_free(mimetype);
       }
-
+   g_string_free(uri, TRUE/*free content*/);
    return retval;
 }
 
