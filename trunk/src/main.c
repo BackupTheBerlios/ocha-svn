@@ -106,7 +106,7 @@ static void set_query_string()
 {
    strncpy(query_label_text, query_str->str, query_label_text_len-1);
    gtk_label_set_text(GTK_LABEL(win_data.query_label), query_label_text);
-   g_timeout_add(200, run_query, NULL/*userdata*/);
+   g_timeout_add(300, run_query, NULL/*userdata*/);
 }
 static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata)
 {

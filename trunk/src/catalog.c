@@ -103,7 +103,7 @@ static bool execute_query(struct catalog *catalog, sqlite_callback callback, voi
 {
    char *errmsg=NULL;
 
-   sqlite_progress_handler(catalog->db, 10, progress_callback, catalog);
+   sqlite_progress_handler(catalog->db, 1, progress_callback, catalog);
    int ret;
    do
       {
