@@ -57,6 +57,11 @@ static struct resultholder *resultholder_new(float pertinence, struct result *re
 static void resultholder_refresh(struct resultholder *, float pertinence);
 static void resultholder_delete(struct resultholder *);
 
+static void row_inserted_cb(GtkTreeModel *, GtkTreePath *, GtkTreeIter *, gpointer );
+static void row_deleted_cb(GtkTreeModel *, GtkTreePath *, gpointer );
+
+static void select_first_row_if_no_selection(void);
+
 /* ------------------------- public functions */
 void resultlist_init()
 {
@@ -87,6 +92,15 @@ void resultlist_init()
                               g_str_equal,
                               g_free/*key_destroy_func*/,
                               (GDestroyNotify)resultholder_delete/*value_destroy_func*/);
+
+   g_signal_connect(model,
+                    "row-inserted",
+                    G_CALLBACK(row_inserted_cb),
+                    NULL/*data*/);
+   g_signal_connect(model,
+                    "row-deleted",
+                    G_CALLBACK(row_deleted_cb),
+                    NULL/*data*/);
 }
 
 void resultlist_set_current_query(const char *query)
@@ -147,9 +161,6 @@ struct result *resultlist_get_selected()
 void resultlist_add_result(float pertinence, struct result *result)
 {
    GtkTreeIter iter;
-   gboolean was_empty = !gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
-                                                   &iter);
-
    const char *path = result->path;
    if(g_hash_table_lookup(hash, path))
       {
@@ -166,9 +177,6 @@ void resultlist_add_result(float pertinence, struct result *result)
          g_hash_table_insert(hash,
                              g_strdup(result->path),
                              holder);
-
-         if(was_empty)
-            gtk_tree_selection_select_iter(selection, &iter);
 
       }
 }
@@ -226,6 +234,37 @@ static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* rendere
 }
 
 /* ------------------------- resultholder functions */
+
+/**
+ * If it's the 1st row that's added, select it
+ */
+static void row_inserted_cb(GtkTreeModel *model, GtkTreePath *path, GtkTreeIter *iter, gpointer userdata)
+{
+   select_first_row_if_no_selection();
+}
+/**
+ * If the row that was selected is deleted, select the 1st row instead
+ */
+static void row_deleted_cb(GtkTreeModel *model, GtkTreePath *path, gpointer userdata)
+{
+   select_first_row_if_no_selection();
+}
+
+static void select_first_row_if_no_selection()
+{
+   GtkTreeIter iter;
+   if(!gtk_tree_selection_get_selected(selection,
+                                       NULL/* *model */,
+                                       &iter))
+      {
+         if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
+                                          &iter))
+            {
+               gtk_tree_selection_select_iter(selection, &iter);
+            }
+      }
+}
+
 /**
  * Create a new result holder.
  *
