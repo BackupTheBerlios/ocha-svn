@@ -1,13 +1,17 @@
 noinst_HEADERS=result.h result_queue.h queryrunner.h querywin.h resultlist.h catalog_queryrunner.h
 bin_PROGRAMS=ocha ocha_indexer ocha_preferences
 
-noinst_PROGRAMS=result_queue_check catalog_check query_check indexer_various_check catalog_queryrunner_check string_utils_check
+noinst_PROGRAMS=result_queue_check catalog_check query_check indexer_various_check catalog_queryrunner_check string_utils_check contentlist_check
 
-TESTS=result_queue_check catalog_check query_check indexer_various_check catalog_queryrunner_check
+TESTS=result_queue_check catalog_check query_check indexer_various_check catalog_queryrunner_check contentlist_check
 
 query_check_SOURCES=query_check.c query.c query.h
 query_check_CFLAGS=$(TEST_CFLAGS) 
 query_check_LDADD=$(TEST_LIBS) 
+
+contentlist_check_SOURCES=contentlist_check.c contentlist.c contentlist.h
+contentlist_check_CFLAGS=$(TEST_CFLAGS) 
+contentlist_check_LDADD=$(TEST_LIBS)  $(GNOME_CFLAGS)
 
 result_queue_check_SOURCES=result_queue_check.c result_queue.c result_queue_check.h result.h queryrunner.h
 result_queue_check_CFLAGS=$(TEST_CFLAGS)
