@@ -174,25 +174,37 @@ static void teardown_actions()
 }
 START_TEST(test_add_and_execute_action) 
 {
-   fail("write");
+   target_add_action(target, &action1, target_action_callback);
+   action_calls=0;
+   target_execute_action(target, &action1);
+   fail_unless(action_calls==1, "action not called");
+   for(int i=1; i<5; i++)
+	  target_execute_action(target, &action1);
+   fail_unless(action_calls==5, "action not called enough times");
 } 
 END_TEST
 
 START_TEST(test_add_and_remove_action) 
 {
-   fail("write");
+   target_add_action(target, &action1, target_action_callback);
+   fail_unless(target_remove_action(target, &action1), "action1 not removed");
 } 
 END_TEST
 
 START_TEST(test_remove_unknown_action) 
 {
-   fail("write");
+   target_add_action(target, &action1, target_action_callback);
+   target_remove_action(target, &action1);
+   fail_unless(!target_remove_action(target, &action1), "action1 removed twice");
+   fail_unless(!target_remove_action(target, &action2), "action2 removed but never added");
 } 
 END_TEST
 
 START_TEST(test_execute_unknown_action) 
 {
-   fail("write");
+   action_calls=0;
+   target_execute_action(target, &action1);
+   fail_unless(action_calls==0, "action called");
 } 
 END_TEST
 
@@ -211,22 +223,67 @@ static void teardown_get_actions()
 
 START_TEST(test_get_actions_null) 
 {
-   fail("write");
+   fail_unless(target_get_actions(target, NULL, 0)==3,
+			   "expected 3 actions");
 } 
 END_TEST
+
+#define FAKE ((struct target_action *)0xfaaaf000)
 START_TEST(test_get_actions_exact) 
 {
-   fail("write");
+   struct target_action *actions[5];
+   actions[0]=FAKE;
+   actions[4]=FAKE;
+   target_get_actions(target, &actions[1], 3);
+   fail_unless(FAKE==actions[0],
+			   "underrun");
+   fail_unless(&action1==actions[1], 
+			   "wrong actions[1]");
+   fail_unless(&action2==actions[2],
+			   "wrong actions[2]");
+   fail_unless(&action3==actions[3],
+			   "wrong actions[4]");
+   fail_unless(FAKE==actions[4],
+			   "overrun");
 } 
 END_TEST
 START_TEST(test_get_actions_toosmall) 
 {
-   fail("write");
+   struct target_action *actions[3];
+   actions[0]=FAKE;
+   actions[2]=FAKE;
+   fail_unless(target_get_actions(target, &actions[1], 1)==3,
+			   "expected 3 actions");
+   fail_unless(FAKE==actions[0],
+			   "underrun");
+   fail_unless(&action1==actions[1], 
+			   "wrong actions[1]");
+   fail_unless(FAKE==actions[2],
+			   "overrun");
 } 
 END_TEST
 START_TEST(test_get_actions_toolarge) 
 {
-   fail("write");
+   struct target_action *actions[7];
+   actions[0]=FAKE;
+   actions[4]=FAKE;
+   actions[5]=FAKE;
+   actions[6]=FAKE;
+   target_get_actions(target, &actions[1], 5);
+   fail_unless(FAKE==actions[0],
+			   "underrun");
+   fail_unless(&action1==actions[1], 
+			   "wrong actions[1]");
+   fail_unless(&action2==actions[2],
+			   "wrong actions[2]");
+   fail_unless(&action3==actions[3],
+			   "wrong actions[4]");
+   fail_unless(NULL==actions[4],
+			   "actions[4] not cleared");
+   fail_unless(NULL==actions[5],
+			   "actions[5] not cleared");
+   fail_unless(FAKE==actions[6],
+			   "overrun");
 } 
 END_TEST
 

@@ -180,7 +180,7 @@ void target_set_mimetype(struct target* target, const gchar *mimetype);
  * @param action_dest_size size of the array target_actions
  * @return total number of actions, which might be >action_dest_size
  */
-unsigned int target_get_actions(struct target* target, struct target_action *target_actions, unsigned int action_dest_size);
+unsigned int target_get_actions(struct target* target, struct target_action **target_actions, unsigned int action_dest_size);
 
 /**
  * Add an action into a target.
@@ -206,9 +206,8 @@ void target_add_action(struct target* target, struct target_action* target_actio
  * @param action the action to execute
  * @return true if the action was found in the target and executed. 
  * false otherwise
- *
  */
-void target_execute_action(struct target* target, struct target_action* target_action);
+bool target_execute_action(struct target* target, struct target_action* target_action);
  
 /**
  * Remove an action from a target.

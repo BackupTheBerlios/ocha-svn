@@ -15,7 +15,13 @@ struct full_target
 {
    struct target target;
    const gchar* mimetype;
+   GArray *actions;
    int refs;
+};
+struct action_ref
+{
+   struct target_action *ref;
+   target_action_f call;
 };
 
 static inline struct target* to_target(struct full_target *full)
@@ -36,12 +42,23 @@ static gchar *target_strdup(struct target* target, const char *str)
    strcpy(dup, str);
    return dup;
 }
+static void target_free_array(GArray* array)
+{
+   g_array_free(array, true/*free segment*/);
+}
 static struct full_target *target_new()
 {
    struct mempool *pool = mempool_new();
    struct full_target *target = mempool_alloc_type(pool, struct full_target);
    target->target.mempool = pool;
    target->refs=1;
+   GArray* actions = g_array_new(false/*zero_terminated*/, 
+									false/*clear*/,
+									sizeof(struct action_ref)/*element_size*/);
+   mempool_enlist(target->target.mempool, 
+				  actions,
+				  (mempool_freer_f)target_free_array);
+   target->actions=actions;
    return target;
 }
 static void target_delete(struct full_target *target)
@@ -121,22 +138,86 @@ void target_set_mimetype(struct target* target, const gchar *mimetype)
 	  full->mimetype=NULL;
 }
 
-unsigned int target_get_actions(struct target* target, struct target_action *target_actions, unsigned int action_dest_size)
+unsigned int target_get_actions(struct target* target, struct target_action **target_actions, unsigned int action_dest_size)
 {
-   return 0;
+   g_return_val_if_fail(target!=NULL, 0);
+   GArray* actions = to_full_target(target)->actions;
+   if(target_actions) {
+
+	  guint tocopy = action_dest_size;
+	  if(actions->len<tocopy)
+		 tocopy=actions->len;
+
+	  for(int i=0; i<tocopy; i++) {
+		 struct action_ref *ref = &g_array_index(actions, 
+												 struct action_ref, 
+												 i);
+		 target_actions[i]=ref->ref;
+	  }
+	  for(int i=tocopy; i<action_dest_size; i++)
+		 target_actions[i]=NULL;
+
+   }
+   return actions->len;
 }
 
 void target_add_action(struct target* target, struct target_action* target_action, target_action_f action_callback)
 {
-   return;
+   g_return_if_fail(target!=NULL);
+   g_return_if_fail(target_action!=NULL);
+   g_return_if_fail(action_callback!=NULL);
+
+   struct full_target *full_target = to_full_target(target);
+   GArray* actions = full_target->actions;
+   g_array_set_size(actions, actions->len+1);
+   struct action_ref *ref= &((struct action_ref*)actions->data)[actions->len-1];
+   ref->ref = target_action;
+   ref->call = action_callback;
 }
 
-void target_execute_action(struct target* target, struct target_action* target_action)
+static int target_find_action_ref_index(struct full_target *target, struct target_action *action)
 {
-   return;
+   struct action_ref *refs = (struct action_ref *)target->actions->data;
+   int len = target->actions->len;
+   for(int i=0; i<len; i++) {
+	  if(refs[i].ref==action)
+		 return i;
+   }
+   return -1;
+}
+
+
+bool target_execute_action(struct target* target, struct target_action* target_action)
+{
+   g_return_val_if_fail(target!=NULL, false);
+   g_return_val_if_fail(target_action!=NULL, false);
+
+   struct full_target *full_target = to_full_target(target);
+   int index = target_find_action_ref_index(full_target, target_action);
+   if(index>=0) {
+	  struct action_ref *ref = &g_array_index(full_target->actions, 
+											  struct action_ref, 
+											  index);
+	  ref->call(target, target_action);
+	  return true;
+   } else {
+	  return false;
+   }
 }
  
 bool target_remove_action(struct target* target, struct target_action* target_action)
 {
-   return false;
+   g_return_val_if_fail(target!=NULL, false);
+   g_return_val_if_fail(target_action!=NULL, false);
+
+   struct full_target *full_target = to_full_target(target);
+   int index = target_find_action_ref_index(full_target, target_action);
+   if(index>=0) {
+	  g_array_remove_index(full_target->actions, index);
+	  return true;
+   } else {
+	  return false;
+   }
+
 }
+  
