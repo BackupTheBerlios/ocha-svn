@@ -39,20 +39,24 @@ START_TEST(test_new_get_set)
                 int id_out = -1;
                 char *name_out = "unmodified";
                 char *long_name_out = "unmodified";
+                gboolean enabled;
+                gboolean enabled_out;
                 sprintf(&name[0], "name%d", i);
                 sprintf(&long_name[0], "long_name%d", i);
 
                 mark_point();
-                fail_unless(!contentlist_get(list, i, NULL/*id_out*/, NULL/*name_out*/, NULL/*long_name_out*/),
+                fail_unless(!contentlist_get(list, i, NULL/*id_out*/, NULL/*name_out*/, NULL/*long_name_out*/, NULL/*enabled_out*/),
                             "could get content not initialized");
                 mark_point();
+                enabled = (i%2)==0;
                 contentlist_set(list,
                                 i,
                                 100+i/*id*/,
                                 name,
-                                long_name);
+                                long_name,
+                                enabled);
                 mark_point();
-                fail_unless(contentlist_get(list, i, &id_out, &name_out, &long_name_out),
+                fail_unless(contentlist_get(list, i, &id_out, &name_out, &long_name_out, &enabled_out),
                             "could not get initialized content");
                 mark_point();
                 printf("[%d] id=%d, name='%s', long_name='%s'\n",
@@ -68,6 +72,8 @@ START_TEST(test_new_get_set)
                             "wrong long_name");
                 fail_unless(long_name!=long_name_out,
                             "long_name not strdup'ed");
+                fail_unless(enabled_out!=enabled,
+                            "wrong value for enabled");
         }
         g_object_unref(list);
 
@@ -82,8 +88,8 @@ START_TEST(test_get_with_nulls)
         printf("\n%s:%d: test start ---\n", __FILE__, __LINE__);
 
         list = contentlist_new(1);
-        contentlist_set(list, 0, 29/*id*/, "My Name", "My Description");
-        fail_unless(contentlist_get(list, 0, NULL, NULL, NULL),
+        contentlist_set(list, 0, 29/*id*/, "My Name", "My Description", TRUE);
+        fail_unless(contentlist_get(list, 0, NULL, NULL, NULL, NULL),
                     "not set ?");
 
         g_object_unref(list);
@@ -104,7 +110,7 @@ START_TEST(test_send_changed)
                          "row-changed",
                          G_CALLBACK(row_changed_cb),
                          &run/*userdata*/);
-        contentlist_set(list, 0, 29/*id*/, "My Name", "My Description");
+        contentlist_set(list, 0, 29/*id*/, "My Name", "My Description", TRUE);
         loop_as_long_as_necessary();
         fail_unless(run==0, "callback not called");
 
@@ -140,7 +146,9 @@ START_TEST(test_get_column_type)
                     "wrong type for 'name' column");
         fail_unless(gtk_tree_model_get_column_type(GTK_TREE_MODEL(list), CONTENTLIST_COL_LONG_NAME)==G_TYPE_STRING,
                     "wrong type for 'long_name' column");
-        fail_unless(CONTENTLIST_N_COLUMNS==3,
+        fail_unless(gtk_tree_model_get_column_type(GTK_TREE_MODEL(list), CONTENTLIST_COL_ENABLED)==G_TYPE_BOOLEAN,
+                    "wrong type for 'enabled' column");
+        fail_unless(CONTENTLIST_N_COLUMNS==4,
                     "column list changed, but test_get_column_type not updated");
 
         printf("%s:%d: test end ---\n", __FILE__, __LINE__);
@@ -433,7 +441,7 @@ static void row_changed_cb(GtkTreeModel *model, GtkTreePath *path, GtkTreeIter *
         fail_unless(gtk_tree_path_get_depth(path_from_iter)==1, "wrong path_from_iter depth");
         fail_unless(indices[0]>=0 && indices[0]<contentlist_get_size(contentlist), "wrong indice in path_from_iter");
 
-        fail_unless(contentlist_get_at_iter(contentlist, iter, NULL, NULL, NULL),
+        fail_unless(contentlist_get_at_iter(contentlist, iter, NULL, NULL, NULL, NULL/*enabled_out*/),
                     "cannot get data at iter");
 }
 
@@ -456,7 +464,8 @@ static ContentList *new_full_list(guint size)
                                 i,
                                 i+100,
                                 g_strdup_printf("name %d", i),
-                                g_strdup_printf("long name %d", i));
+                                g_strdup_printf("long name %d", i),
+                                TRUE);
         }
         return retval;
 }
@@ -464,7 +473,7 @@ static ContentList *new_full_list(guint size)
 static void assert_iter_index_is(int i, ContentList *list, GtkTreeIter *iter)
 {
         int id = -1;
-        fail_unless(contentlist_get_at_iter(list, iter, &id, NULL, NULL),
+        fail_unless(contentlist_get_at_iter(list, iter, &id, NULL, NULL, NULL/*enabled_out*/),
                     "could not get id");
         fail_unless(id==(i+100), "wrong id");
 }

@@ -90,7 +90,7 @@ gboolean catalog_addentry_witherrors(struct catalog *catalog,
                                      const struct catalog_entry *entry,
                                      GError **err)
 {
-        if(!catalog_add_entry_struct(catalog, entry, NULL/*id_out*/))
+        if(!catalog_add_entry(catalog, entry, NULL/*id_out*/))
         {
                 g_set_error(err,
                             INDEXER_ERROR,

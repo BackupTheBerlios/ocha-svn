@@ -18,6 +18,7 @@ typedef enum
 /** get the error quark for the errors returned by catalog */
 GQuark catalog_error_quark(void);
 
+
 /**
  * Information about an entry of the catalog
  */
@@ -37,9 +38,30 @@ struct catalog_entry
 
         /** owner source ID */
         int source_id;
+};
 
-        /** entry ID */
+/**
+ * Data passed to the query callback
+ */
+struct catalog_query_result
+{
+        /** entry id */
         int id;
+
+        /** entry values */
+        struct catalog_entry entry;
+
+        /** result pertinence */
+        float pertinence;
+
+        /**
+         * TRUE if the entry is enabled.
+         * Only enabled entries are sent by run_query, so
+         * this field is always TRUE, then. When getting
+         * the source content, on the other hand, this
+         * field is meaningful.
+         */
+        gboolean enabled;
 };
 
 /**
@@ -51,6 +73,7 @@ struct catalog_entry
  * CATALOG_ENTRY_INIT(&entry)
  */
 #define CATALOG_ENTRY_INIT(entry) memset((entry), 0, sizeof(struct catalog_entry))
+
 /**
  * Make a connection to an sqlite catalog,
  * creating it if necessary.
@@ -84,8 +107,7 @@ void catalog_disconnect(struct catalog *catalog);
  * @return TRUE to continue adding results, FALSE to stop looking for results
  */
 typedef gboolean (*catalog_callback_f)(struct catalog *catalog,
-                                       float pertinence,
-                                       const struct catalog_entry *entry,
+                                       const struct catalog_query_result *result,
                                        void *userdata);
 
 /**
@@ -208,12 +230,11 @@ gboolean catalog_remove_source(struct catalog *catalog, int source_id);
 /**
  * Add an entry into the catalog or refresh/confirm it if it already exists.
  * @param catalog
- * @param entry the entry to add (field id is ignored - and certainly not modified)
- * @param id_out if non-null, this variable will be set to the generated ID of the entry, set
- * it to &entry->id if you want the struct field to be modified
+ * @param entry the entry to add
+ * @param id_out if non-null, this variable will be set to the generated ID of the entry
  * @return TRUE if the entry was added, FALSE otherwise
  */
-gboolean catalog_add_entry_struct(struct catalog *catalog, const struct catalog_entry *entry, int *id_out);
+gboolean catalog_add_entry(struct catalog *catalog, const struct catalog_entry *entry, int *id_out);
 
 /**
  * Start updating a source entries.

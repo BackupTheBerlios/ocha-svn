@@ -29,6 +29,9 @@ typedef enum
         /** The entry's description */
         CONTENTLIST_COL_LONG_NAME,
 
+        /** Whether the entry's enabled */
+        CONTENTLIST_COL_ENABLED,
+
         /** Total number of columns */
         CONTENTLIST_N_COLUMNS
 } ContentListColumn;
@@ -56,11 +59,12 @@ ContentList *contentlist_new (guint size);
  * later calls are ignored.
  * @param contentlist
  * @param index between 0 and size-1
+ * @param id entry id
  * @param name short name
  * @param long_name description
- * @param entry id
+ * @param enabled
  */
-void contentlist_set(ContentList *contentlist, guint index, int id, const char *name, const char *long_name);
+void contentlist_set(ContentList *contentlist, guint index, int id, const char *name, const char *long_name, gboolean enabled);
 
 /**
  * Define an entry given its iter.
@@ -69,11 +73,12 @@ void contentlist_set(ContentList *contentlist, guint index, int id, const char *
  * later calls are ignored.
  * @param contentlist
  * @param index between 0 and size-1
+ * @param id entry id
  * @param name short name
  * @param long_name description
- * @param entry id
+ * @param enabled
  */
-void contentlist_set_at_iter(ContentList *contentlist, GtkTreeIter *iter, int id, const char *name, const char *long_name);
+void contentlist_set_at_iter(ContentList *contentlist, GtkTreeIter *iter, int id, const char *name, const char *long_name, gboolean enabled);
 
 /**
  * Get an entry's values given its index.
@@ -91,7 +96,7 @@ void contentlist_set_at_iter(ContentList *contentlist, GtkTreeIter *iter, int id
  * be valid for as long as the content list exists. Don't free or modify it.
  * @return true if the entry has been set, false otherwise
  */
-gboolean contentlist_get(ContentList *contentlist, guint index, int *id_out, char **name_out, char **long_name_out);
+gboolean contentlist_get(ContentList *contentlist, guint index, int *id_out, char **name_out, char **long_name_out, gboolean *enabled_out);
 
 /**
  * Get an entry's values given its iter.
@@ -107,9 +112,10 @@ gboolean contentlist_get(ContentList *contentlist, guint index, int *id_out, cha
  * be valid for as long as the content list exists. Don't free or modify it.
  * @param long_name_out if non-null and if the entry has been set, the entry name. It'll
  * be valid for as long as the content list exists. Don't free or modify it.
+ * @param enabled_out if non-null and if the entry's been set, whether the entry is enabled
  * @return true if the entry has been set, false otherwise
  */
-gboolean contentlist_get_at_iter(ContentList *contentlist, GtkTreeIter *iter, int *id_out, char **name_out, char **long_name_out);
+gboolean contentlist_get_at_iter(ContentList *contentlist, GtkTreeIter *iter, int *id_out, char **name_out, char **long_name_out, gboolean *enabled_out);
 
 /**
  * Get the size of the list.
@@ -118,4 +124,25 @@ gboolean contentlist_get_at_iter(ContentList *contentlist, GtkTreeIter *iter, in
  * @return number of rows on the list
  */
 guint contentlist_get_size(ContentList *contentlist);
+
+/**
+ * Change the 'enabled' flag of the contentlist.
+ *
+ * This only works if the entry's been defined
+ * @param contentlist
+ * @param iter
+ * @param enabled new value
+ */
+void contentlist_set_enabled_at_iter(ContentList *contentlist, GtkTreeIter *iter, gboolean enabled);
+
+/**
+ * Change the 'enabled' flag of the contentlist.
+ *
+ * This only works if the entry's been defined
+ * @param contentlist
+ * @param index
+ * @param enabled new value
+ */
+void contentlist_set_enabled(ContentList *contentlist, guint index, gboolean enabled);
+
 #endif

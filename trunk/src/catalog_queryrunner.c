@@ -102,7 +102,7 @@ static gboolean query_has_changed(struct catalog_queryrunner *queryrunner);
 static gpointer runquery_thread(gpointer userdata);
 static void catalog_queryrunner_start(struct queryrunner *_self);
 static void wait_on_condition(struct catalog_queryrunner *self, int time_ms);
-static gboolean result_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
+static gboolean result_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
 static void catalog_queryrunner_run_query(struct queryrunner *_self, const char *query);
 static void catalog_queryrunner_consolidate(struct queryrunner *_self);
 static void catalog_queryrunner_stop(struct queryrunner *_self);
@@ -422,10 +422,10 @@ static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
 
 }
 static gboolean result_callback(struct catalog *catalog,
-                                float pertinence,
-                                const struct catalog_entry *entry,
+                                const struct catalog_query_result *qresult,
                                 void *userdata)
 {
+        const struct catalog_entry *entry = &qresult->entry;
         struct catalog_queryrunner *self;
         struct launcher *launcher;
         const char *query;
@@ -452,10 +452,7 @@ static gboolean result_callback(struct catalog *catalog,
 
         result = catalog_result_create(self->path,
                                        launcher,
-                                       entry->path,
-                                       entry->name,
-                                       entry->long_name,
-                                       entry->id);
+                                       qresult);
         query = self->running_query->str;
 #ifdef DEBUG
 
@@ -466,7 +463,7 @@ static gboolean result_callback(struct catalog *catalog,
         result_queue_add(self->queue,
                          QUERYRUNNER(self),
                          query,
-                         pertinence,
+                         qresult->pertinence,
                          result);
         count = self->count;
         count++;

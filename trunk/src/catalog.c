@@ -61,7 +61,7 @@ static gboolean source_version(struct catalog *catalog, int source_id, int *vers
 
 /* ------------------------- public functions */
 
-gboolean catalog_add_entry_struct(struct catalog *catalog,
+gboolean catalog_add_entry(struct catalog *catalog,
                                   const struct catalog_entry *entry,
                                   int *id_out)
 {
@@ -214,7 +214,7 @@ gboolean catalog_executequery(struct catalog *catalog,
         /* the order of the columns is important, see result_sqlite_callback() */
 
         sql = g_string_new("SELECT e.id, e.path, e.name, e.long_name, "
-                           "       s.id, s.type, e.launcher, e.lastuse "
+                           "       s.id, e.launcher, e.enabled, e.lastuse "
                            "FROM entries e, sources s "
                            "WHERE e.enabled==1 AND e.source_id=s.id AND s.enabled==1 AND e.name LIKE '%%");
 
@@ -295,7 +295,7 @@ gboolean catalog_get_source_content(struct catalog *catalog,
                                    result_sqlite_callback,
                                    catalog/*userdata*/,
                                    "SELECT e.id, e.path, e.name, e.long_name, "
-                                   " s.id, s.type, e.launcher, e.lastuse "
+                                   " s.id, e.launcher, e.enabled, e.lastuse "
                                    "FROM entries e, sources s "
                                    "WHERE e.source_id=%d and s.id=%d "
                                    "ORDER BY UPPER(e.name), UPPER(e.long_name)",
@@ -694,7 +694,7 @@ static int result_sqlite_callback(void *userdata,
                                   char **col_names)
 {
         struct catalog *catalog;
-        struct catalog_entry entry;
+        struct catalog_query_result result;
         catalog_callback_f callback;
         gboolean go_on;
 
@@ -711,17 +711,17 @@ static int result_sqlite_callback(void *userdata,
         /* this must correspond to the query in catalog_executequery()
          * and catalog_get_source_content()
          */
-        entry.id = atoi(col_data[0]);
-        entry.path = col_data[1];
-        entry.name = col_data[2];
-        entry.long_name = col_data[3];
-        entry.source_id = atoi(col_data[4]);
-        /* IGNORED : source_type = col_data[5]; */
-        entry.launcher = col_data[6];
+        result.id = atoi(col_data[0]);
+        result.entry.path = col_data[1];
+        result.entry.name = col_data[2];
+        result.entry.long_name = col_data[3];
+        result.entry.source_id = atoi(col_data[4]);
+        result.entry.launcher = col_data[5];
+        result.pertinence = 0.5;
+        result.enabled = *col_data[6]=='1';
 
         go_on = catalog->callback(catalog,
-                                  0.5/*pertinence*/,
-                                  &entry,
+                                  &result,
                                   catalog->callback_userdata);
         return go_on && !catalog->stop ? 0:1;
 }

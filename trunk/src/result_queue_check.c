@@ -60,17 +60,17 @@ static void test_add_result_from_several_thread_handler(struct queryrunner *call
 
 /* ------------------------- definitions */
 static struct mock_result results[] = {
-        { { "result1", "Result 1", "/x/result1",
+        { { "result1", "Result 1", "/x/result1", TRUE/*enabled*/,
             mock_result_execute, mock_result_validate, mock_result_release }, },
-        { { "result2", "Result 2", "/x/result2",
+        { { "result2", "Result 2", "/x/result2", TRUE/*enabled*/,
             mock_result_execute, mock_result_validate, mock_result_release }, },
-        { { "result3", "Result 3", "/x/result3",
+        { { "result3", "Result 3", "/x/result3", TRUE/*enabled*/,
             mock_result_execute, mock_result_validate, mock_result_release }, },
-        { { "result4", "Result 4", "/x/result4",
+        { { "result4", "Result 4", "/x/result4", TRUE/*enabled*/,
             mock_result_execute, mock_result_validate, mock_result_release }, },
-        { { "result5", "Result 5", "/x/result5",
+        { { "result5", "Result 5", "/x/result5", TRUE/*enabled*/,
             mock_result_execute, mock_result_validate, mock_result_release }, },
-        { { "result6", "Result 6", "/x/result6",
+        { { "result6", "Result 6", "/x/result6", TRUE/*enabled*/,
             mock_result_execute, mock_result_validate, mock_result_release }, },
 };
 

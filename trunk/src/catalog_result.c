@@ -34,24 +34,21 @@ static void catalog_result_free(struct result *self);
 
 struct result *catalog_result_create(const char *catalog_path,
                                      struct launcher *launcher,
-                                     const char *path,
-                                     const char *name,
-                                     const char *long_name,
-                                     int entry_id)
+                                     const struct catalog_query_result *qresult)
 {
         struct catalog_result *result;
 
         g_return_val_if_fail(catalog_path, NULL);
-        g_return_val_if_fail(path, NULL);
-        g_return_val_if_fail(name, NULL);
+        g_return_val_if_fail(qresult, NULL);
         g_return_val_if_fail(launcher, NULL);
 
         result =  g_new(struct catalog_result, 1);
-        result->entry_id=entry_id;
+        result->entry_id=qresult->id;
         result->launcher=launcher;
-        result->base.path=g_strdup(path);
-        result->base.name=g_strdup(name);
-        result->base.long_name=g_strdup(long_name);
+        result->base.path=g_strdup(qresult->entry.path);
+        result->base.name=g_strdup(qresult->entry.name);
+        result->base.long_name=g_strdup(qresult->entry.long_name);
+        result->base.enabled=qresult->enabled;
         result->catalog_path=g_strdup(catalog_path);
 
         result->base.execute=catalog_result_execute;

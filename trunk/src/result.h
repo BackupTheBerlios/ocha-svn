@@ -25,6 +25,9 @@ struct result
         /** An URI that uniquely identifies the result (UTF-8). */
         const char *path;
 
+        /** Whether the entry is enabled */
+        gboolean enabled;
+
         /**
          * Execute this result.
          *

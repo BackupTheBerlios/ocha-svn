@@ -21,6 +21,8 @@ struct _ContentListEntry
         char *long_name;
         /** Entry ID */
         int id;
+        /** State of the enabled flag for the entry */
+        gboolean enabled;
 };
 
 
@@ -82,7 +84,8 @@ static GObjectClass *parent_class = NULL;
 static GType column_type[CONTENTLIST_N_COLUMNS] = {
         G_TYPE_BOOLEAN, /* DEFINED */
         G_TYPE_STRING, /* NAME */
-        G_TYPE_STRING /* LONG_NAME */
+        G_TYPE_STRING, /* LONG_NAME */
+        G_TYPE_BOOLEAN /* ENABLED */
 };
 
 /* ------------------------- public functions */
@@ -142,7 +145,7 @@ ContentList *contentlist_new(guint size)
         return retval;
 }
 
-void contentlist_set(ContentList *contentlist, guint index, int id, const char *name, const char *long_name)
+void contentlist_set(ContentList *contentlist, guint index, int id, const char *name, const char *long_name, gboolean enabled)
 {
         ContentListEntry *entry;
 
@@ -157,12 +160,13 @@ void contentlist_set(ContentList *contentlist, guint index, int id, const char *
                 entry->name=g_strdup(name);
                 entry->long_name=g_strdup(long_name);
                 entry->id=id;
+                entry->enabled=enabled;
                 entry->defined=TRUE;
                 send_row_changed(contentlist, index);
         }
 }
 
-gboolean contentlist_get(ContentList *contentlist, guint index, int *id_out, char **name_out, char **long_name_out)
+gboolean contentlist_get(ContentList *contentlist, guint index, int *id_out, char **name_out, char **long_name_out, gboolean *enabled_out)
 {
         ContentListEntry *entry;
 
@@ -183,11 +187,14 @@ gboolean contentlist_get(ContentList *contentlist, guint index, int *id_out, cha
                 if(long_name_out) {
                         *long_name_out=entry->long_name;
                 }
+                if(enabled_out) {
+                        *enabled_out=entry->enabled;
+                }
                 return TRUE;
         }
 }
 
-void contentlist_set_at_iter(ContentList *contentlist, GtkTreeIter *iter, int id, const char *name, const char *long_name)
+void contentlist_set_at_iter(ContentList *contentlist, GtkTreeIter *iter, int id, const char *name, const char *long_name, gboolean enabled)
 {
         g_return_if_fail(contentlist);
         g_return_if_fail(iter);
@@ -196,10 +203,10 @@ void contentlist_set_at_iter(ContentList *contentlist, GtkTreeIter *iter, int id
                         iter_get_index(contentlist, iter),
                         id,
                         name,
-                        long_name);
+                        long_name, enabled);
 }
 
-gboolean contentlist_get_at_iter(ContentList *contentlist, GtkTreeIter *iter, int *id_out, char **name, char **long_name)
+gboolean contentlist_get_at_iter(ContentList *contentlist, GtkTreeIter *iter, int *id_out, char **name, char **long_name, gboolean *enabled_out)
 {
         g_return_val_if_fail(contentlist, FALSE);
         g_return_val_if_fail(iter, FALSE);
@@ -208,7 +215,8 @@ gboolean contentlist_get_at_iter(ContentList *contentlist, GtkTreeIter *iter, in
                                iter_get_index(contentlist, iter),
                                id_out,
                                name,
-                               long_name);
+                               long_name,
+                               enabled_out);
 }
 
 guint contentlist_get_size(ContentList *contentlist)
@@ -218,7 +226,25 @@ guint contentlist_get_size(ContentList *contentlist)
         return contentlist->size;
 }
 
+void contentlist_set_enabled(ContentList *contentlist, guint index, gboolean enabled)
+{
+        g_return_if_fail(contentlist);
+        g_return_if_fail(IS_CONTENTLIST(contentlist));
+        g_return_if_fail(index>=0 && index<contentlist->size);
 
+        if(enabled!=contentlist->rows[index].enabled) {
+                contentlist->rows[index].enabled=enabled;
+                send_row_changed(contentlist, index);
+        }
+}
+
+void contentlist_set_enabled_at_iter(ContentList *contentlist, GtkTreeIter *iter, gboolean enabled)
+{
+       g_return_if_fail(contentlist);
+       g_return_if_fail(iter);
+       g_return_if_fail(IS_CONTENTLIST(contentlist));
+       contentlist_set_enabled(contentlist, iter_get_index(contentlist, iter), enabled);
+ }
 /* ------------------------- class functions(customlist_class) */
 /** Init callbacks for the gobject type system */
 static void contentlist_class_init(ContentListClass *klass)
@@ -416,6 +442,14 @@ static void contentlist_get_value(GtkTreeModel *tree_model,
                         g_value_set_string(value, entry->long_name);
                 } else {
                         g_value_set_string(value, UNDEFINED_STRING);
+                }
+                return;
+
+        case CONTENTLIST_COL_ENABLED:
+                if(entry->defined) {
+                        g_value_set_boolean(value, entry->enabled);
+                } else {
+                        g_value_set_boolean(value, FALSE);
                 }
                 return;
 

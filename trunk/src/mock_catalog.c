@@ -160,7 +160,7 @@ gboolean catalog_end_source_update(struct catalog *catalog, int source_id)
        catalog->updating_id=0;
        return TRUE;
 }
-gboolean catalog_add_entry_struct(struct catalog *catalog, const struct catalog_entry *entry, int *id_out)
+gboolean catalog_add_entry(struct catalog *catalog, const struct catalog_entry *entry, int *id_out)
 {
         struct addentry_args *args;
         args = (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,

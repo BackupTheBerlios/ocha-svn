@@ -41,8 +41,7 @@ struct fill_contentlist_userdata
 static void init_widget(struct content_view *view);
 static ContentList *run_query(struct content_view *view);
 static gboolean fill_contentlist_cb(struct catalog *catalog,
-                                    float pertinence,
-                                    const struct catalog_entry *entry,
+                                    const struct catalog_query_result *result,
                                     void *userdata);
 static void cell_data_func(GtkTreeViewColumn* col,
                            GtkCellRenderer* renderer,
@@ -50,6 +49,7 @@ static void cell_data_func(GtkTreeViewColumn* col,
                            GtkTreeIter* iter,
                            gpointer userdata);
 static void attach_unconditionally(struct content_view *view, int source_id);
+static void entry_enabled_toggle_cb(GtkCellRendererToggle *cell, gchar *path_string, gpointer userdata);
 
 /* ------------------------- definitions */
 
@@ -122,6 +122,7 @@ static void init_widget(struct content_view *view)
         GtkWidget *treeview;
         GtkTreeViewColumn *col;
         GtkCellRenderer *renderer;
+        GtkCellRenderer *enabledRenderer;
 
         scroll = gtk_scrolled_window_new (NULL, NULL);
         gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scroll),
@@ -134,6 +135,22 @@ static void init_widget(struct content_view *view)
                            treeview);
         gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(treeview), FALSE);
 
+        /* disable/enable */
+        enabledRenderer = gtk_cell_renderer_toggle_new();
+        g_object_set(enabledRenderer, "activatable", TRUE, NULL);
+        g_signal_connect(enabledRenderer,
+                         "toggled",
+                         G_CALLBACK(entry_enabled_toggle_cb),
+                         view);
+
+        gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(treeview),
+                                                    0,
+                                                    "Enabled",
+                                                    enabledRenderer,
+                                                    "active", CONTENTLIST_COL_ENABLED,
+                                                    NULL);
+
+        /* name/long_name */
         col = gtk_tree_view_column_new();
         renderer = gtk_cell_renderer_text_new();
         gtk_tree_view_column_pack_start(col,
@@ -177,10 +194,10 @@ static ContentList *run_query(struct content_view *view)
 }
 
 static gboolean fill_contentlist_cb(struct catalog *catalog,
-                                    float pertinence,
-                                    const struct catalog_entry *entry,
+                                    const struct catalog_query_result *result,
                                     void *_userdata)
 {
+        const struct catalog_entry *entry = &result->entry;
         struct fill_contentlist_userdata *userdata;
 
         g_return_val_if_fail(_userdata, FALSE);
@@ -188,9 +205,10 @@ static gboolean fill_contentlist_cb(struct catalog *catalog,
         userdata = (struct fill_contentlist_userdata *)_userdata;
         contentlist_set(userdata->contentlist,
                         userdata->index,
-                        entry->id,
+                        result->id,
                         entry->name,
-                        entry->long_name);
+                        entry->long_name,
+                        result->enabled);
         userdata->index++;
         return userdata->index<userdata->size;
 }
@@ -208,7 +226,7 @@ static void cell_data_func(GtkTreeViewColumn* col,
                                    iter,
                                    NULL/*id_out*/,
                                    &name/*name_out*/,
-                                   &long_name/*long_name_out*/))
+                                   &long_name/*long_name_out*/, NULL/*enabled_out*/))
         {
                 char *markup;
                 markup = g_markup_printf_escaped("<big><b>%s</b></big>\n"
@@ -245,4 +263,36 @@ static void attach_unconditionally(struct content_view *view, int source_id)
                                         GTK_TREE_MODEL(view->treemodel));
         }
         gtk_widget_show(view->widget);
+}
+
+static void entry_enabled_toggle_cb(GtkCellRendererToggle *cell, gchar *path_string, gpointer userdata)
+{
+        struct content_view *view;
+        gboolean enabled = TRUE;
+        int entry_id;
+        GtkTreeIter iter;
+
+        g_return_if_fail(path_string);
+        g_return_if_fail(userdata);
+
+        view = (struct content_view *)userdata;
+
+        if(gtk_tree_model_get_iter_from_string(GTK_TREE_MODEL(view->treemodel),
+                                               &iter,
+                                               path_string)) {
+                if(contentlist_get_at_iter(CONTENTLIST(view->treemodel),
+                                           &iter,
+                                           &entry_id,
+                                           NULL/*name*/,
+                                           NULL/*long_name*/,
+                                           &enabled)) {
+                        enabled=!enabled;
+                        catalog_entry_set_enabled(view->catalog,
+                                                  entry_id,
+                                                  enabled);
+                        contentlist_set_enabled_at_iter(CONTENTLIST(view->treemodel),
+                                                        &iter,
+                                                        enabled);
+                }
+        }
 }

@@ -87,7 +87,7 @@ static void setup()
                 entry.name=entries[i];
                 entry.path=entries[i];
                 entry.long_name=entries[i];
-                fail_unless(catalog_add_entry_struct(catalog,
+                fail_unless(catalog_add_entry(catalog,
                                               &entry,
                                               NULL/*id_out*/),
                             "add source");

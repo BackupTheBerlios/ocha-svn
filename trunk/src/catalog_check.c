@@ -23,7 +23,7 @@ static int source_id;
 static GMutex *execute_query_mutex;
 static GCond  *execute_query_cond;
 
-#define CATALOG_ENTRY(path, filename) { filename, path, path, TEST_LAUNCHER, 0, 0 }
+#define CATALOG_ENTRY(path, filename) { filename, path, path, TEST_LAUNCHER, 0 }
 struct catalog_entry entries[] = {
         CATALOG_ENTRY("/tmp/toto.c", "toto.c"),
         CATALOG_ENTRY("/tmp/toto.h", "toto.h"),
@@ -35,21 +35,22 @@ struct catalog_entry entries[] = {
         CATALOG_ENTRY("/tmp/hullo.txt", "hullo.txt")
 };
 #define entries_length (sizeof(entries)/sizeof(struct catalog_entry))
+int entries_id[entries_length];
 
 #define catalog_cmd(catalog, comment, ret) _catalog_cmd(catalog, comment, ret, __FILE__, __LINE__)
 
 /* ------------------------- prototypes */
 static Suite *catalog_check_suite(void);
 static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered);
-static gboolean collect_result_names_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
+static gboolean collect_result_names_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
 static void _catalog_cmd(struct catalog *catalog, const char *comment, gboolean ret, const char *file, int line);
 static gboolean exists(const char *path);
 static void unlink_if_exists(const char *path);
 static void execute_query_and_expect(const char *query, int goal_length, char *goal[], gboolean ordered);
 static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered);
-static gboolean test_source_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
-static gboolean countdown_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
-static gboolean countdown_interrupt_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
+static gboolean test_source_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
+static gboolean countdown_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
+static gboolean countdown_interrupt_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
 static gpointer execute_query_thread(void *userdata);
 static void addentries(struct catalog *catalog, int sourceid, int count, const char *name_pattern);
 
@@ -80,9 +81,9 @@ static void setup_query()
                     "source could not be created");
         for(i=0; i<entries_length; i++) {
                 entries[i].source_id=source_id;
-                fail_unless(catalog_add_entry_struct(catalog,
-                                                     &entries[i],
-                                                     &entries[i].id),
+                fail_unless(catalog_add_entry(catalog,
+                                              &entries[i],
+                                              &entries_id[i]),
                             "entry could not be created");
         }
 
@@ -125,9 +126,9 @@ START_TEST(test_addentry)
         catalog_add_source(catalog, "test", &entry.source_id);
         catalog_cmd(catalog,
                     "1st addentry(/tmp/toto.txt)",
-                    catalog_add_entry_struct(catalog,
-                                      &entry,
-                                      &entry.id));
+                    catalog_add_entry(catalog,
+                                             &entry,
+                                             NULL/*id_out*/));
         catalog_disconnect(catalog);
 }
 END_TEST
@@ -143,9 +144,9 @@ START_TEST(test_addentry_escape)
         catalog_add_source(catalog, "test", &entry.source_id);
         catalog_cmd(catalog,
                     "1st addentry(/tmp/toto.txt)",
-                    catalog_add_entry_struct(catalog,
-                                      &entry,
-                                      NULL/*id_out*/));
+                    catalog_add_entry(catalog,
+                                             &entry,
+                                             NULL/*id_out*/));
 
         catalog_disconnect(catalog);
 }
@@ -164,11 +165,11 @@ START_TEST(test_addentry_noduplicate)
 
         catalog_add_source(catalog, "test", &entry.source_id);
 
-        fail_unless(catalog_add_entry_struct(catalog,
+        fail_unless(catalog_add_entry(catalog,
                                       &entry,
                                       &entry_id_1),
                     "1st addentry failed");
-        fail_unless(catalog_add_entry_struct(catalog,
+        fail_unless(catalog_add_entry(catalog,
                                       &entry,
                                       &entry_id_2),
                     "2nd addentry failed");
@@ -367,9 +368,9 @@ START_TEST(test_source_update)
         entry.source_id=source1_id;
         catalog_cmd(catalog,
                     "custom addentry",
-                    catalog_add_entry_struct(catalog,
+                    catalog_add_entry(catalog,
                                              &entry,
-                                             &entry.id));
+                                             NULL/*id_out*/));
         catalog_end_source_update(catalog, source1_id);
 
         catalog_cmd(catalog,
@@ -422,8 +423,8 @@ START_TEST(test_lastexecuted_first)
 {
         static char *goal[] = { "toto.h", "total.h", "toto.c" };
         printf("--- test_lastexecuted_first\n");
-        catalog_update_entry_timestamp(catalog, entries[2].id/*total.h*/);
-        catalog_update_entry_timestamp(catalog, entries[1].id/*toto.h*/);
+        catalog_update_entry_timestamp(catalog, entries_id[2]/*total.h*/);
+        catalog_update_entry_timestamp(catalog, entries_id[1]/*toto.h*/);
         execute_query_and_expect("tot",
                                  3,
                                  goal,
@@ -567,7 +568,7 @@ START_TEST(test_disable_entry)
 
         catalog_cmd(catalog,
                     "set enabled(FALSE) failed",
-                    catalog_entry_set_enabled(catalog, entries[0].id, FALSE));
+                    catalog_entry_set_enabled(catalog, entries_id[0], FALSE));
 
         execute_query_and_expect("toto",
                                  1,
@@ -576,7 +577,7 @@ START_TEST(test_disable_entry)
 
         catalog_cmd(catalog,
                    "set_enabled(TRUE) failed",
-                   catalog_entry_set_enabled(catalog, entries[0].id, TRUE));
+                   catalog_entry_set_enabled(catalog, entries_id[0], TRUE));
 
         execute_query_and_expect("toto",
                                  2,
@@ -729,10 +730,10 @@ static void unlink_if_exists(const char *path)
  * @see #results
  */
 static gboolean collect_result_names_callback(struct catalog *catalog,
-                                              float pertinence,
-                                              const struct catalog_entry *entry,
+                                              const struct catalog_query_result *qresult,
                                               void *userdata)
 {
+        const struct catalog_entry *entry = &qresult->entry;
         GArray **results;
         char *name_dup;
 
@@ -835,14 +836,13 @@ static void assert_array_contains(const char *query,
 }
 
 static gboolean test_source_callback(struct catalog *catalog,
-                                     float pertinence,
-                                     const struct catalog_entry *entry,
+                                     const struct catalog_query_result *result,
                                      void *userdata)
 {
         gboolean *checked = (gboolean *)userdata;
-        fail_unless(source_id==entry->source_id,
+        fail_unless(source_id==result->entry.source_id,
                     "wrong source id");
-        fail_unless(strcmp(TEST_LAUNCHER, entry->launcher)==0,
+        fail_unless(strcmp(TEST_LAUNCHER, result->entry.launcher)==0,
                     "wrong launcher");
         *checked=TRUE;
         return TRUE/*continue*/;
@@ -857,8 +857,7 @@ static gboolean test_source_callback(struct catalog *catalog,
  * @param userdata a pointer to an integer (the counter), which will be decremented to 0
  */
 static gboolean countdown_callback(struct catalog *catalog,
-                                   float pertinence,
-                                   const struct catalog_entry *entry,
+                                   const struct catalog_query_result *result,
                                    void *userdata)
 {
         int *counter = (int *)userdata;
@@ -880,8 +879,7 @@ static gboolean countdown_callback(struct catalog *catalog,
  * @param userdata a pointer to an integer (the counter), which will be decremented to 0
  */
 static gboolean countdown_interrupt_callback(struct catalog *catalog,
-                                             float pertinence,
-                                             const struct catalog_entry *entry,
+                                             const struct catalog_query_result *result,
                                              void *userdata)
 {
         int *counter = (int *)userdata;
@@ -965,7 +963,7 @@ static void addentries(struct catalog *catalog,
                 printf("adding %s into source %d\n", name, sourceid);
                 catalog_cmd(catalog,
                             name,
-                            catalog_add_entry_struct(catalog,
+                            catalog_add_entry(catalog,
                                               &entry,
                                               NULL/*id_out*/));
                 g_free(name);
