@@ -8,8 +8,8 @@
 
 static struct indexer *indexers[] = {
         &indexer_files,
-        &indexer_mozilla,
         &indexer_applications,
+        &indexer_mozilla,
         NULL
 };
 

@@ -19,8 +19,8 @@ typedef enum {
         COLUMN_SOURCE_ID,
         /** # of entries in the source (or in the indexer) */
         COLUMN_COUNT,
-        /** TRUE if the row can be deleted */
-        COLUMN_CAN_DELETE,
+        /** TRUE if this is a system source */
+        COLUMN_IS_SYSTEM,
 
         NUMBER_OF_COLUMNS
 } TreeViewColumns;
@@ -69,6 +69,7 @@ static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer use
 static void new_source_popup_cb(GtkButton *button, gpointer userdata);
 static void delete_cb(GtkButton *button, gpointer userdata);
 static GtkWidget *init_widget(struct preferences_catalog *prefs);
+static gint list_sort_cb(GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b, gpointer userdata);
 
 /* ------------------------- public functions */
 static int count_indexers(struct indexer **indexers)
@@ -99,6 +100,9 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
         prefs->pai[indexer_count].prefs=NULL;
 
         prefs->model = createModel(catalog);
+
+
+
         prefs->view = createView(GTK_TREE_MODEL(prefs->model));
         prefs->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(prefs->view));
         prefs->properties=indexer_view_new(catalog);
@@ -108,6 +112,7 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
                          "changed",
                          G_CALLBACK(row_selection_changed_cb),
                          prefs);
+
 
         return prefs;
 }
@@ -137,6 +142,17 @@ static GtkListStore *createModel(struct catalog *catalog)
                 struct indexer *indexer = *indexers;
                 add_indexer(model, indexer, catalog);
         }
+
+        gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(model),
+                                        0/*sort_column_id*/,
+                                        list_sort_cb,
+                                        NULL/*userdata*/,
+                                        NULL/*destroy_notify*/);
+        gtk_tree_sortable_set_sort_column_id(GTK_TREE_SORTABLE(model),
+                                             0,
+                                             GTK_SORT_ASCENDING);
+
+
         return model;
 }
 
@@ -214,7 +230,7 @@ static void add_source(GtkListStore *model,
                                    COLUMN_LABEL, source->display_name,
                                    COLUMN_INDEXER_TYPE, indexer->name,
                                    COLUMN_SOURCE_ID, source_id,
-                                   COLUMN_CAN_DELETE, !source->system,
+                                   COLUMN_IS_SYSTEM, source->system,
                                    -1);
 
                 indexer_source_notify_display_name_change(source,
@@ -391,7 +407,7 @@ static void update_properties(struct preferences_catalog  *prefs)
 /** Selection has been modified */
 static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userdata)
 {
-        gboolean can_delete;
+        gboolean system;
         GtkTreeIter iter;
         struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
         g_return_if_fail(prefs);
@@ -400,9 +416,9 @@ static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userd
 
         if(gtk_tree_selection_get_selected(selection, NULL/*model_ptr*/, &iter)) {
                 gtk_tree_model_get(GTK_TREE_MODEL(prefs->model), &iter,
-                                   COLUMN_CAN_DELETE, &can_delete,
+                                   COLUMN_IS_SYSTEM, &system,
                                    -1);
-                gtk_widget_set_sensitive(prefs->delete_button, can_delete);
+                gtk_widget_set_sensitive(prefs->delete_button, !system);
                 gtk_widget_set_sensitive(prefs->refresh_button, TRUE);
         } else {
                 gtk_widget_set_sensitive(prefs->delete_button, FALSE);
@@ -663,4 +679,55 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
                         TRUE/*shrink*/);
 
         return twopanes;
+}
+
+static gint list_sort_cb(GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b, gpointer userdata)
+{
+        gboolean a_system = FALSE, b_system = FALSE;
+
+        gtk_tree_model_get(model, a,
+                           COLUMN_IS_SYSTEM, &a_system,
+                           -1);
+        gtk_tree_model_get(model, b,
+                           COLUMN_IS_SYSTEM, &b_system,
+                           -1);
+
+        if(a_system && !b_system) {
+                return -1;
+        } else if(!a_system && b_system) {
+                return 1;
+        }
+
+        g_assert(a_system==b_system);
+        if(a_system) {
+                int a_id, b_id;
+
+                /* sort system sources by source_id (from the oldest to the newest) */
+
+                gtk_tree_model_get(model, a,
+                                   COLUMN_SOURCE_ID, &a_id,
+                                   -1);
+                gtk_tree_model_get(model, b,
+                                   COLUMN_SOURCE_ID, &b_id,
+                                   -1);
+                return a_id-b_id;
+        } else {
+                int retval;
+                char *a_label, *b_label;
+
+                /* sort user sources by label */
+                gtk_tree_model_get(model, a,
+                                   COLUMN_LABEL, &a_label,
+                                   -1);
+                gtk_tree_model_get(model, b,
+                                   COLUMN_LABEL, &b_label,
+                                   -1);
+
+
+                retval = g_utf8_collate(a_label, b_label);
+
+                g_free(a_label);
+                g_free(b_label);
+                return retval;
+        }
 }
