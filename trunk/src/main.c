@@ -2,7 +2,7 @@
 #include "querywin.h"
 #include "result_queue.h"
 #include "queryrunner.h"
-#include "mock_queryrunner.h"
+#include "catalog_queryrunner.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
@@ -215,7 +215,8 @@ int main(int argc, char *argv[])
    result_queue=result_queue_new(NULL/*default context*/,
                                  result_handler_cb,
                                  NULL/*userdata*/);
-   queryrunner = mock_queryrunner_new(result_queue);
+   queryrunner = catalog_queryrunner_new("/home/stephane/.ocha/catalog",
+                                         result_queue);
    init_ui();
    querywin_start();
 
