@@ -22,6 +22,7 @@ AC_PROG_LIBTOOL
 dnl Checks for libraries.
 AM_PATH_CHECK()
 AM_PATH_GLIB_2_0(, , exit 10, "gthread")
+AC_CHECK_LIB(dmallocth, dmalloc_debug_setup)
 
 dnl Checks for header files.
 AC_HEADER_STDC
@@ -32,10 +33,14 @@ dnl Checks for typedefs, structures, and compiler characteristics.
 dnl Checks for library functions.
 
 dnl Configuration
-CFLAGS="-std=c99 $GLIB_CFLAGS $CFLAGS"
+CFLAGS="-std=c99 $GLIB_CFLAGS -O"
 LIBS="$GLIB_LIBS $LIBS"
-AC_SUBST(CFLAGS)
-AC_SUBST(LIBS)
+
+TEST_CFLAGS="-g -Ddmalloc $CHECK_CFLAGS"
+TEST_LIBS="-ldmallocth $CHECK_LIBS"
+AC_SUBST([TEST_CFLAGS])
+AC_SUBST([TEST_LIBS])
+
 
 dnl Output
 AC_OUTPUT( Makefile src/Makefile )

@@ -6,16 +6,16 @@ noinst_PROGRAMS=mempool_check target_check target_pool_check
 TESTS=mempool_check target_check target_pool_check
 
 mempool_check_SOURCES=mempool_check.c mempool.c mempool.h
-mempool_check_INCLUDES=@CHECK_CFLAGS@ 
-mempool_check_LDADD=@CHECK_LIBS@ 
+mempool_check_CFLAGS=$(TEST_CFLAGS) 
+mempool_check_LDADD=$(TEST_LIBS) 
 
 target_check_SOURCES=target_check.c target.c target.h mempool.c mempool.h
-target_check_INCLUDES=@CHECK_CFLAGS@ 
-target_check_LDADD=@CHECK_LIBS@ 
+target_check_CFLAGS=$(TEST_CFLAGS) 
+target_check_LDADD=$(TEST_LIBS) 
 
 target_pool_check_SOURCES=target_pool_check.c target_pool.c target.h 
-target_pool_check_INCLUDES=@CHECK_CFLAGS@ 
-target_pool_check_LDADD=@CHECK_LIBS@ 
+target_pool_check_CFLAGS=$(TEST_CFLAGS) 
+target_pool_check_LDADD=$(TEST_LIBS) 
 
 
 #lint:
