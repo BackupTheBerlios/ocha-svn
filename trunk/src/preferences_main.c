@@ -7,6 +7,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static void destroy_cb( GtkWidget *widget, gpointer userdata)
+{
+    gtk_main_quit();
+}
+
 static void create_window(struct catalog *catalog)
 {
    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -20,6 +25,12 @@ static void create_window(struct catalog *catalog)
    GtkWidget *catalog_widget = preferences_catalog_get_widget(prefs);
    gtk_widget_show(catalog_widget);
    gtk_box_pack_start(GTK_BOX(vbox1), catalog_widget, TRUE, TRUE, 0);
+
+   gtk_window_set_default_size(GTK_WINDOW(window),
+                               250, 300);
+   g_signal_connect (G_OBJECT (window), "destroy",
+                     G_CALLBACK (destroy_cb),
+                     NULL);
 
    gtk_widget_show(window);
 }
