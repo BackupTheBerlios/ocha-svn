@@ -22,19 +22,19 @@ static struct catalog *catalog;
 static int command_id;
 struct entry_definition
 {
-   const char *directory;
+   const char *path;
    const char *filename;
    int id;
 };
 struct entry_definition entries[] = {
-   { "/tmp", "toto.c"},
-   { "/tmp", "toto.h"},
-   { "/tmp", "total.h"},
-   { "/tmp", "etalma.c"},
-   { "/tmp", "talm.c"},
-   { "/tmp", "talm.h"},
-   { "/tmp", "hello.txt"},
-   { "/tmp", "hullo.txt"}
+   { "/tmp/toto.c", "toto.c"},
+   { "/tmp/toto.h", "toto.h"},
+   { "/tmp/total.h", "total.h"},
+   { "/tmp/etalma.c", "etalma.c"},
+   { "/tmp/talm.c", "talm.c"},
+   { "/tmp/talm.h", "talm.h"},
+   { "/tmp/hello.txt", "hello.txt"},
+   { "/tmp/hullo.txt", "hullo.txt"}
 };
 #define entries_length (sizeof(entries)/sizeof(struct entry_definition))
 
@@ -91,8 +91,7 @@ static void setup_query()
    for(int i=0; i<entries_length; i++)
       {
          fail_unless(catalog_addentry(catalog,
-                                      entries[i].directory,
-                                      entries[i].filename,
+                                      entries[i].path,
                                       entries[i].filename,
                                       command_id,
                                       &entries[i].id),
@@ -125,8 +124,7 @@ static void setup_execute()
                "command could not be created");
 
    fail_unless(catalog_addentry(catalog,
-                                "/tmp",
-                                "hello.c",
+                                "/tmp/hello.c",
                                 "hello.c",
                                 command_id,
                                 NULL),
@@ -203,7 +201,7 @@ START_TEST(test_addentry)
    int entry_id=-1;
    catalog_cmd(catalog,
                "1st addentry(/tmp/toto.txt)",
-               catalog_addentry(catalog, "/tmp", "toto.txt", "Toto", command_id, &entry_id));
+               catalog_addentry(catalog, "/tmp/toto.txt", "Toto", command_id, &entry_id));
 
    catalog_disconnect(catalog);
 }
@@ -218,10 +216,10 @@ START_TEST(test_addentry_noduplicate)
    catalog_addcommand(catalog, "edit", "edit %s", &command_id);
 
    int entry_id_1=-1;
-   fail_unless(catalog_addentry(catalog, "/tmp", "toto.txt", "Toto", command_id, &entry_id_1),
+   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", command_id, &entry_id_1),
                "1st addentry failed");
    int entry_id_2=-1;
-   fail_unless(catalog_addentry(catalog, "/tmp", "toto.txt", "Toto", command_id, &entry_id_2),
+   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", command_id, &entry_id_2),
                "2nd addentry failed");
 
    catalog_disconnect(catalog);
@@ -491,7 +489,7 @@ static gpointer execute_query_thread(void *userdata)
    g_mutex_lock(execute_query_mutex);
    printf("execute_query_thread: lock\n");
    sqlite_exec(db,
-               "BEGIN; INSERT INTO entries VALUES (NULL, '', '', '', '', '', '');",
+               "BEGIN; INSERT INTO entries VALUES (NULL, '', '', '', '');",
                NULL/*no callback*/,
                NULL/*userdata*/,
                &errmsg);

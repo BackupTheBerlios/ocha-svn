@@ -6,6 +6,7 @@
 #include <check.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <string.h>
 #include "catalog_index.h"
 #include "mock_catalog.h"
 
@@ -354,6 +355,128 @@ START_TEST(test_index_applications_skip_withargs)
 }
 END_TEST
 
+/* ------------------------- index bookmarks */
+static void setup_index_bookmarks()
+{
+   setup();
+
+}
+
+static void teardown_index_bookmarks()
+{
+
+   teardown();
+}
+
+START_TEST(test_index_bookmarks)
+{
+   printf("---test_index_bookmarks\n");
+   createfile(TEMPDIR "/bookmarks.html",
+              "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n"
+              "<!-- This is an automatically generated file.\n"
+              "     It will be read and overwritten.\n"
+              "     DO NOT EDIT! -->\n"
+              "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n"
+              "<TITLE>Bookmarks</TITLE>\n"
+              "<H1>Bookmarks</H1>\n"
+              "\n"
+              "<DL><p>\n"
+              "    <DT><H3 LAST_MODIFIED=\"1092503470\" PERSONAL_TOOLBAR_FOLDER=\"true\" ID=\"rdf:#$0GJ1m2\">Bookmarks Toolbar Folder</H3>\n"
+              "<DD>Add bookmarks to this folder to see them displayed on the Bookmarks Toolbar\n"
+              "    <DL><p>\n"
+              "        <DT><A HREF=\"http://slashdot.org/\" ADD_DATE=\"1084121070\" LAST_VISIT=\"1105484124\" LAST_MODIFIED=\"1084121093\" SHORTCUTURL=\"/.\" ICON=\"data:image/x-icon;base64,AAABAAEAEBAQAAAAAAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIAAAP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAREAAAERAAABEQAAEREQAAAREAARERAAABEQABEREAAAAREAAREAAAABEQAAAAAAAAAREAAAAAAAABEQAAAAAAAAAREAAAAAAAABEQAAAAAAAAAREAAAAAAAABEQAAAAAAAAAAAAAAAAAAAAAAAAD//wAA5+cAAMPDAADDgQAA4YEAAOGDAADwxwAA8P8AAPh/AAD4fwAA/D8AAPw/AAD+HwAA/j8AAP//AAD//wAA\" LAST_CHARSET=\"ISO-8859-1\" ID=\"rdf:#$iwElo2\">slashdot</A>\n"
+              "        <DT><A HREF=\"http://www.groklaw.net/\" ADD_DATE=\"1084121165\" LAST_VISIT=\"1100344903\" ICON=\"data:image/x-icon;base64,AAABAAEAEBAQAAAAAABoAwAAFgAAACgAAAAQAAAAIAAAAAEAGAAAAAAAAAMAABILAAASCwAAAAAAAAAAAAD////////////X3t5eYmEzOjdMWVJ3i4B8kYVBS0U5PDxBS0UpLSvMzMz////////////////f5uZLTk5FT0p0iH18kYV8kYVxhHozOjczOjdqfXJMWVJeYmH///////////////9GSklGSkl8kYV8kYV8kYV8kYVFT0pXWlozOjd8kYV0iH0zOje/xcX///////90eXkzOjd3i4B8kYV8kYV8kYV0iH0eIB90eXlBS0V8kYV8kYVHUkxtcnH////X3t4cIB50iH18kYV8kYV8kYV8kYVBS0VXWlpBRURoeW98kYV8kYVxhHopLSvo7+9tcnFHUkx8kYV8kYV8kYV8kYV0iH0iJiSxt7czOjd6j4N8kYV8kYV8kYU5QDy1u7s7RUBtgHV8kYV8kYV8kYV8kYVHUkxeYmGAhIRFT0p8kYV8kYV8kYV8kYU7RUCZmZkzMzN8kYV8kYV8kYV8kYVxhHo5QDzMzMwzOjdjdGp8kYV8kYV8kYV8kYU7RUCJjo47RUB8kYV8kYV8kYV8kYVHUkxmZmbX3t4iJiR6j4N8kYV8kYV8kYV8kYU7RUCZmZlBS0V8kYV8kYV8kYV3i4AzMzPDycmHi4tFT0p8kYV8kYV8kYV8kYV8kYUzMzO/xcU5QDx8kYV8kYV8kYVSWlJeYmH///85QDxaaWB8kYV8kYV8kYV8kYVoeW8zMzPo7+85QDx8kYV8kYV8kYUiJiS/xcXf5uYKCwt6j4N8kYV8kYV8kYV3i4AnKymZmZn///87RUBaaWB8kYVMWVJeYmH///+Ok5M5QDx8kYV8kYV8kYV8kYU5QDxWWVn///////+orq4pLSt3i4AcIB61u7v///9NUFBaaWB8kYV8kYVqfXIzMzNeYmHo7+/////////o7+9eYmEzMzNBRUT////o7+8UFRV6j4NoeW9BS0U5QDyOk5Po7+/////////////////o7+9tcnHMzMz///+orq4cIB4zOjcpLSuHi4vX3t7////////////////////gAwAAwAMAAMABAACAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAwAAAAMAAAgHAACIHwAA\" LAST_CHARSET=\"ISO-8859-1\" ID=\"rdf:#$jwElo2\">GROKLAW</A>\n"
+              "    </DL><p>\n"
+              "</DL><p>\n"
+              "<DL><p>\n"
+              "    <DT><H3 ID=\"rdf:#$5GJ1m2\">Firefox &amp; Mozilla Information</H3>\n"
+              "<DD>Information about Firefox and Mozilla\n"
+              "    <DL><p>\n"
+              "        <DT><A HREF=\"http://texturizer.net/firefox/extensions/\" LAST_VISIT=\"1086291939\" ICON=\"http://www.mozilla.org/products/firefox/ffico.png\" LAST_CHARSET=\"ISO-8859-1\" ID=\"rdf:#$6GJ1m2\">Firefox Extensions</A>\n"
+              "<DD>Firefox add-ons and extensions\n"
+              "        <DT><A HREF=\"http://texturizer.net/firefox/themes/\" LAST_VISIT=\"1086535629\" ICON=\"http://www.mozilla.org/products/firefox/ffico.png\" LAST_CHARSET=\"ISO-8859-1\" ID=\"rdf:#$7GJ1m2\">Firefox Themes</A>\n"
+              "<DD>Firefox themes\n"
+              "    </DL><p>\n"
+              "</DL><p> \n");
+
+   int run_id=2;
+   mock_catalog_expect_addcommand(catalog,
+                                  "gnome-moz-remote",
+                                  "gnome-moz-remote '%f'",
+                                  run_id);
+   mock_catalog_expect_addentry(catalog,
+                                "http://slashdot.org/",
+                                "slashdot",
+                                run_id,
+                                1);
+   mock_catalog_expect_addentry(catalog,
+                                "http://www.groklaw.net/",
+                                "GROKLAW",
+                                run_id,
+                                2);
+   mock_catalog_expect_addentry(catalog,
+                                "http://texturizer.net/firefox/extensions/",
+                                "Firefox Extensions",
+                                run_id,
+                                3);
+   mock_catalog_expect_addentry(catalog,
+                                "http://texturizer.net/firefox/themes/",
+                                "Firefox Themes",
+                                run_id,
+                                4);
+
+   fail_unless(catalog_index_bookmarks(catalog,
+                                       TEMPDIR "/bookmarks.html"),
+               "indexing failed");
+
+   mock_catalog_assert_expectations_met(catalog);
+
+   printf("---test_index_bookmarks OK\n");
+}
+END_TEST
+
+START_TEST(test_index_bookmarks_escape)
+{
+   printf("---test_index_bookmarks_escape\n");
+
+   createfile(TEMPDIR "/bookmarks.html",
+              "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n"
+              "<!-- This is an automatically generated file.\n"
+              "     It will be read and overwritten.\n"
+              "     DO NOT EDIT! -->\n"
+              "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n"
+              "<TITLE>Bookmarks</TITLE>\n"
+              "<H1>Bookmarks</H1>\n"
+              "    <DT><H3 ID=\"rdf:#$5GJ1m2\">Firefox &amp; Mozilla Information</H3>\n"
+              "<DD>Information about Firefox and Mozilla\n"
+              "    <DL><p>\n"
+              "        <DT><A HREF=\"http://texturizer.net/firefox/extensions/\" LAST_VISIT=\"1086291939\" ICON=\"http://www.mozilla.org/products/firefox/ffico.png\" LAST_CHARSET=\"ISO-8859-1\" ID=\"rdf:#$6GJ1m2\">&lt;Firefox&gt; add-ons &amp; &#40;Extensions&#41;</A>\n"
+              "<DD>Firefox add-ons and extensions\n"
+              "    </DL><p>\n"
+              "</DL><p> \n");
+
+   int run_id=2;
+   mock_catalog_expect_addcommand(catalog,
+                                  "gnome-moz-remote",
+                                  "gnome-moz-remote '%f'",
+                                  run_id);
+   mock_catalog_expect_addentry(catalog,
+                                "http://texturizer.net/firefox/extensions/",
+                                "<Firefox> add-ons & (Extensions)",
+                                run_id,
+                                3);
+
+   fail_unless(catalog_index_bookmarks(catalog,
+                                       TEMPDIR "/bookmarks.html"),
+               "indexing failed");
+
+   mock_catalog_assert_expectations_met(catalog);
+
+
+   printf("---test_index_bookmarks_escape OK\n");
+}
+END_TEST
+
 /* ------------------------- mock gnome_vfs functions */
 void gnome_vfs_init() {}
 gchar *gnome_vfs_get_mime_type(const gchar *uri)
@@ -407,6 +530,12 @@ Suite *catalog_index_check_suite(void)
    tcase_add_test(tc_applications, test_index_applications_depth);
    tcase_add_test(tc_applications, test_index_applications_skip_terminal);
    tcase_add_test(tc_applications, test_index_applications_skip_withargs);
+
+   TCase *tc_bookmarks = tcase_create("catalog_index_bookmarks");
+   suite_add_tcase(s, tc_bookmarks);
+   tcase_add_checked_fixture(tc_bookmarks, setup_index_bookmarks, teardown_index_bookmarks);
+   tcase_add_test(tc_bookmarks, test_index_bookmarks);
+   tcase_add_test(tc_bookmarks, test_index_bookmarks_escape);
 
    return s;
 }

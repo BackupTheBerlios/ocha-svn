@@ -136,14 +136,13 @@ bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out);
 /**
  * Add an entry into the catalog.
  * @param catalog
- * @param directory directory the file can be found in
- * @param filename
+ * @param path local path or URI
  * @param display_name
  * @param command_id id of a command to use to execute the file
  * @param id_out if non-null, this variable will be set to the generated ID of the entry
  * @return true if the entry was added, false otherwise
  */
-bool catalog_addentry(struct catalog *catalog, const char *directory, const char *filename, const char *display_name, int command_id, int *id_out);
+bool catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out);
 
 /**
  * Get a pointer on the last error that happened with

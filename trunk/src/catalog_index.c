@@ -29,6 +29,9 @@ static GPatternSpec **create_patterns(const char **patterns);
 static void free_patterns(GPatternSpec **);
 
 static bool has_gnome_mime_command(const char *path);
+static bool bookmarks_read_line(FILE *, GString *);
+
+static char *html_expand_common_entities(const char *orig);
 
 /* ------------------------- public functions */
 
@@ -85,7 +88,59 @@ bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file)
 {
    g_return_val_if_fail(catalog!=NULL, false);
    g_return_val_if_fail(bookmark_file!=NULL, false);
-   return false;
+
+   int cmd = -1;
+   if(!catalog_addcommand(catalog, "gnome-moz-remote", "gnome-moz-remote '%f'", &cmd))
+      return false;
+
+   bool retval=true;
+   FILE *fh = fopen(bookmark_file, "r");
+   if(fh)
+      {
+         GString *line = g_string_new("");
+         while( bookmarks_read_line(fh, line) )
+            {
+               char *a_open = strstr(line->str, "<A");
+               if(a_open)
+                  {
+                     char *href = strstr(a_open, "HREF=\"");
+                     if(href)
+                        {
+                           char *quote_start = href+strlen("HREF=\"");
+                           char *quote_end = strstr(quote_start, "\"");
+                           if(quote_end)
+                              {
+                                 char *a_end = strstr(a_open, ">");
+                                 if(a_end)
+                                    {
+                                       char *a_close = strstr(a_end, "</A>");
+                                       if(a_close)
+                                          {
+                                             *quote_end='\0';
+                                             *a_close='\0';
+                                             char *unescaped_label = html_expand_common_entities(a_end+1);
+                                             if(!catalog_addentry(catalog,
+                                                                  quote_start,
+                                                                  unescaped_label,
+                                                                  cmd,
+                                                                  NULL/*id_out*/))
+                                                {
+                                                   retval=false;
+                                                }
+                                             g_free(unescaped_label);
+                                          }
+                                    }
+                              }
+                        }
+                  }
+            }
+         fclose(fh);
+      }
+   else
+      {
+         retval=false;
+      }
+   return retval;
 }
 
 /* ------------------------- private functions */
@@ -136,8 +191,7 @@ static bool catalog_index_directory_recursive(struct catalog *catalog, const cha
                   {
                      if(has_gnome_mime_command(buffer))
                         catalog_addentry(catalog,
-                                         directory,
-                                         filename,
+                                         buffer,
                                          filename,
                                          cmd,
                                          NULL/*id_out*/);
@@ -217,8 +271,7 @@ static bool catalog_index_applications_recursive(struct catalog *catalog, const 
                                  if(!terminal && exec!=NULL && strstr(exec, "%")==NULL)
                                     {
                                        catalog_addentry(catalog,
-                                                        directory,
-                                                        filename,
+                                                        buffer,
                                                         name==NULL ? filename:name,
                                                         cmd,
                                                         NULL/*id_out*/);
@@ -342,4 +395,80 @@ static bool has_gnome_mime_command(const char *path)
       }
 
    return retval;
+}
+
+static bool bookmarks_read_line(FILE *fh, GString *line)
+{
+   int buffer_len=256;
+   char buffer[buffer_len];
+   g_string_truncate(line, 0);
+   while(fgets(buffer, buffer_len, fh)!=NULL)
+      {
+         char *nl = strchr(buffer, '\n');
+         if(nl)
+            *nl='\0';
+         g_string_append(line, buffer);
+         if(nl)
+            return true;
+      }
+   return line->len>0;
+}
+
+static char *html_expand_common_entities(const char *str)
+{
+   GString *retval = g_string_new("");
+   for(const char *c=str; *c!='\0'; c++)
+      {
+         if(*c=='&')
+            {
+               bool writec=false;
+               const char *start=c+1;
+               const char *end=strchr(start, ';');
+               if(end)
+                  {
+                     if(*start=='#')
+                        {
+                           /* character entity */
+                           gunichar unichar = (gunichar)g_strtod(start+1, NULL/*endptr*/);
+                           if(g_unichar_validate(unichar))
+                              {
+                                 char buffer[6];
+                                 int len = g_unichar_to_utf8(unichar, buffer);
+                                 g_string_append_len(retval, buffer, len);
+                              }
+                           else
+                              writec=true;
+                        }
+                     else if(strncmp("amp", start, end-start)==0)
+                        {
+                           g_string_append_c(retval, '&');
+                        }
+                     else if(strncmp("gt", start, end-start)==0)
+                        {
+                           g_string_append_c(retval, '>');
+                        }
+                     else if(strncmp("lt", start, end-start)==0)
+                        {
+                           g_string_append_c(retval, '<');
+                        }
+                     else if(strncmp("nbsp", start, end-start)==0)
+                        {
+                           g_string_append_c(retval, ' ');
+                        }
+                     else
+                        writec=true;
+                     if(!writec)
+                        c=end;
+                  }
+               else
+                  writec=true;
+               if(writec)
+                  g_string_append_c(retval, *c);
+            }
+         else
+            g_string_append_c(retval, *c);
+      }
+   char *retval_str = retval->str;
+   g_string_free(retval, false/*don't free retval_str*/);
+   return retval_str;
 }

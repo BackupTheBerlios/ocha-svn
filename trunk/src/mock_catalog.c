@@ -109,10 +109,8 @@ void mock_catalog_assert_expectations_met(struct catalog *catalog)
 }
 
 /* ------------------------- catalog */
-bool catalog_addentry(struct catalog *catalog, const char *directory, const char *filename, const char *display_name, int command_id, int *id_out)
+bool catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
 {
-   char *path=g_strdup_printf("%s/%s", directory, filename);
-
    struct addentry_args *args =
       (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,
                                                   path);
@@ -138,7 +136,6 @@ bool catalog_addentry(struct catalog *catalog, const char *directory, const char
    expectation_call(&args->expect);
    if(id_out)
       *id_out=args->id;
-   g_free(path);
    return true;
 }
 

@@ -149,8 +149,6 @@ static bool create_tables(sqlite *db, char **errmsg)
    int ret = execute_update_nocatalog(db,
                                       "BEGIN; "
                                       "CREATE TABLE entries (id INTEGER PRIMARY KEY, "
-                                      "filename VARCHAR NOT NULL, "
-                                      "directory VARCHAR, "
                                       "path VARCHAR UNIQUE NOT NULL, "
                                       "display_name VARCHAR NOT NULL, "
                                       "command_id INTEGER, "
@@ -555,18 +553,11 @@ bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out)
    return false;
 }
 
-bool catalog_addentry(struct catalog *catalog, const char *directory, const char *filename, const char *display_name, int command_id, int *id_out)
+bool catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
 {
    g_return_val_if_fail(catalog!=NULL, false);
-   g_return_val_if_fail(directory!=NULL, false);
-   g_return_val_if_fail(filename!=NULL, false);
+   g_return_val_if_fail(path!=NULL, false);
    g_return_val_if_fail(display_name!=NULL, false);
-
-   char path[strlen(directory)+1+strlen(filename)+1];
-   strcpy(path, directory);
-   if(directory[strlen(directory)-1]!='/')
-      strcat(path, "/");
-   strcat(path, filename);
 
    int old_id=-1;
    if(catalog_findentry(catalog, path, &old_id))
@@ -581,9 +572,7 @@ bool catalog_addentry(struct catalog *catalog, const char *directory, const char
    else
       {
          g_string_printf(catalog->sql,
-                         "INSERT INTO entries (id, directory, filename, path, display_name, command_id) VALUES (NULL, '%s', '%s', '%s', '%s', %d);",
-                         directory,
-                         filename,
+                         "INSERT INTO entries (id, path, display_name, command_id) VALUES (NULL, '%s', '%s', %d);",
                          path,
                          display_name,
                          command_id);

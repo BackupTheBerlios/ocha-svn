@@ -22,8 +22,8 @@ catalog_check_CFLAGS=$(TEST_CFLAGS) $(SQLITE_CFLAGS)
 catalog_check_LDADD=$(TEST_LIBS) $(SQLITE_LIBS)
 
 catalog_index_check_SOURCES=catalog_index_check.c catalog_index.c mock_catalog.c catalog_index.h catalog.h mock_catalog.h desktop_file.c desktop_file.h
-catalog_index_check_CFLAGS=$(TEST_CFLAGS) $(GNOME_CFLAGS)
-catalog_index_check_LDADD=$(TEST_LIBS) 
+catalog_index_check_CFLAGS=$(TEST_CFLAGS) $(GNOME_CFLAGS) $(LIBXML2_CFLAGS)
+catalog_index_check_LDADD=$(TEST_LIBS) $(LIBXML2_LIBS)
 
 ocha_SOURCES=main.c result_queue.c result_queue.h querywin.h querywin.c \
 querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h \
