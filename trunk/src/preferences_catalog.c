@@ -111,7 +111,7 @@ static void add_source(GtkTreeStore *model,
                        GtkTreeIter *iter_out)
 {
     GtkTreeIter iter;
-    struct indexer_source *source = indexer->load_source(indexer, catalog, source_id);
+    struct indexer_source *source = indexer_load_source(indexer, catalog, source_id);
     if(source!=NULL)
         {
             gtk_tree_store_append(model, &iter, parent);
@@ -124,7 +124,7 @@ static void add_source(GtkTreeStore *model,
                                -1);
 
             update_entry_count(model, &iter, source_id, catalog);
-            source->release(source);
+            indexer_source_release(source);
         }
 }
 static void update_entry_count(GtkTreeStore *model, GtkTreeIter *iter, unsigned int source_id, struct catalog *catalog)
@@ -214,13 +214,13 @@ static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current)
                     struct indexer *indexer = indexers_get(type);
                     if(indexer)
                         {
-                            struct indexer_source *source = indexer->load_source(indexer,
-                                                                                 prefs->catalog,
-                                                                                 source_id);
+                            struct indexer_source *source = indexer_load_source(indexer,
+                                                                                prefs->catalog,
+                                                                                source_id);
                             if(source)
                                 {
-                                    source->index(source, prefs->catalog, NULL/*err*/);
-                                    source->release(source);
+                                    indexer_source_index(source, prefs->catalog, NULL/*err*/);
+                                    indexer_source_release(source);
                                     update_entry_count(prefs->model,
                                                        current,
                                                        source_id,
@@ -278,15 +278,15 @@ static void update_properties(struct preferences_catalog  *prefs)
                 if(source_id>0)
                 {
                     struct indexer_source *source;
-                    source=indexer->load_source(indexer,
-                                                prefs->catalog,
-                                                source_id);
+                    source=indexer_load_source(indexer,
+                                               prefs->catalog,
+                                               source_id);
                     if(source)
                     {
                         indexer_view_attach_source(prefs->properties,
                                                    indexer,
                                                    source);
-                        source->release(source);
+                        indexer_source_release(source);
                     }
                 }
                 else
@@ -372,7 +372,7 @@ static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer use
     struct preferences_catalog *prefs = pai->prefs;
     struct indexer *indexer = pai->indexer;
 
-    struct indexer_source *source=indexer->new_source(indexer, prefs->catalog, NULL/*err*/);
+    struct indexer_source *source=indexer_new_source(indexer, prefs->catalog, NULL/*err*/);
     if(source)
     {
         GtkTreeIter indexer_iter;
@@ -389,7 +389,7 @@ static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer use
 
             select_row(prefs, &source_iter);
         }
-        source->release(source);
+        indexer_source_release(source);
     }
 }
 static void new_source_popup_cb(GtkButton *button, gpointer userdata)
@@ -404,6 +404,49 @@ static void new_source_popup_cb(GtkButton *button, gpointer userdata)
                   NULL/*userdata*/,
                   0/*button*/,
                   gtk_get_current_event_time());
+}
+
+static void delete_cb(GtkButton *button, gpointer userdata)
+{
+    struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
+    g_return_if_fail(prefs);
+    GtkTreeIter iter;
+
+    if(gtk_tree_selection_get_selected(prefs->selection, NULL, &iter))
+    {
+        char *type=NULL;
+        int source_id=0;
+        gtk_tree_model_get(GTK_TREE_MODEL(prefs->model),
+                           &iter,
+                           COLUMN_INDEXER_TYPE, &type,
+                           COLUMN_SOURCE_ID, &source_id,
+                           -1);
+        if(type && source_id>0)
+        {
+            struct indexer *indexer=indexers_get(type);
+            if(indexer)
+            {
+                struct indexer_source *source;
+                source=indexer_load_source(indexer,
+                                           prefs->catalog,
+                                           source_id);
+                if(source)
+                {
+                    GtkTreeIter parent_iter;
+                    gtk_tree_model_iter_parent(GTK_TREE_MODEL(prefs->model),
+                                               &parent_iter,
+                                               &iter);
+                    if(gtk_tree_store_remove(prefs->model, &iter))
+                        gtk_tree_selection_select_iter(prefs->selection, &iter);
+                    else
+                        gtk_tree_selection_select_iter(prefs->selection, &parent_iter);
+                    indexer_source_destroy(source, prefs->catalog);
+                }
+            }
+        }
+        if(type)
+            g_free(type);
+    }
 }
 
 /* ------------------------- public functions */
@@ -455,6 +498,8 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
 {
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_widget_show(scroll);
+    gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(scroll),
+                                        GTK_SHADOW_IN);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
                                    GTK_POLICY_AUTOMATIC,
                                    GTK_POLICY_AUTOMATIC);
@@ -518,6 +563,14 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
                                popup);
            }
     }
+
+    GtkWidget *del = gtk_button_new_from_stock(GTK_STOCK_DELETE);
+    gtk_widget_show(del);
+    gtk_container_add(GTK_CONTAINER(buttons), del);
+    g_signal_connect(del,
+                     "clicked",
+                     G_CALLBACK(delete_cb),
+                     prefs);
 
     GtkWidget *reload = gtk_button_new_from_stock(GTK_STOCK_REFRESH);
     gtk_widget_show(reload);

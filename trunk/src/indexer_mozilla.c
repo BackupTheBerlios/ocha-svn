@@ -60,6 +60,7 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
 {
    struct indexer_source *retval = g_new(struct indexer_source, 1);
    retval->id=id;
+   retval->indexer=self;
    retval->index=index;
    retval->release=release;
    retval->display_name=display_name(catalog, id);

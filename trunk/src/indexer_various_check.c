@@ -92,14 +92,14 @@ static char *to_path(const char *filename)
 static void index(struct indexer *indexer)
 {
    mark_point();
-   struct indexer_source *source=indexer->load_source(indexer, catalog, SOURCE_ID);
+   struct indexer_source *source=indexer_load_source(indexer, catalog, SOURCE_ID);
    fail_unless(source!=NULL, "no indexer_source");
    fail_unless(source->id==SOURCE_ID, "wrong source id");
    fail_unless(source->index!=NULL, "no index function in indexer_source");
 
    mark_point();
    GError *err=NULL;
-   gboolean ret=source->index(source, catalog, &err);
+   gboolean ret=indexer_source_index(source, catalog, &err);
    if(!ret)
       {
          mark_point();

@@ -85,10 +85,10 @@ static gboolean catalog_result_validate(struct result *_self)
    g_return_val_if_fail(self, FALSE);
    g_return_val_if_fail(self->indexer, FALSE);
 
-   return self->indexer->validate(self->indexer,
-                                  self->base.name,
-                                  self->base.long_name,
-                                  self->base.path);
+   return indexer_validate(self->indexer,
+                           self->base.name,
+                           self->base.long_name,
+                           self->base.path);
 }
 
 static void update_entry_timestamp(const char *catalog_path, int entry_id)
@@ -112,11 +112,11 @@ static gboolean catalog_result_execute(struct result *_self, GError **err)
    g_return_val_if_fail(self, FALSE);
    g_return_val_if_fail(self->indexer, FALSE);
 
-   if(self->indexer->execute(self->indexer,
-                             self->base.name,
-                             self->base.long_name,
-                             self->base.path,
-                             err))
+   if(indexer_execute(self->indexer,
+                      self->base.name,
+                      self->base.long_name,
+                      self->base.path,
+                      err))
       {
          update_entry_timestamp(self->catalog_path, self->entry_id);
          return TRUE;

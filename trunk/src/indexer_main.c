@@ -100,9 +100,9 @@ int main(int argc, char *argv[])
          for(int i=0; i<source_ids_len; i++)
          {
              int source_id = source_ids[i];
-             struct indexer_source *source = indexer->load_source(indexer,
-                                                                  catalog,
-                                                                  source_id);
+             struct indexer_source *source = indexer_load_source(indexer,
+                                                                 catalog,
+                                                                 source_id);
              if(source)
              {
                  if(verbose)
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
                             source->display_name);
 
                  GError *err = NULL;
-                 if(!source->index(source, catalog, &err))
+                 if(!indexer_source_index(source, catalog, &err))
                  {
                      fprintf(stderr,
                              "error indexing list for %s (ID %d): %s\n",
@@ -163,7 +163,7 @@ static gboolean first_time(gboolean verbose, struct catalog *catalog)
          if(verbose)
             printf("First-time configuration of module %s...\n",
                    indexer->name);
-         if(!indexer->discover(indexer, catalog))
+         if(!indexer_discover(indexer, catalog))
             {
                fprintf(stderr,
                        "error: first-time configuration of module '%s' failed : %s\n",

@@ -270,6 +270,35 @@ START_TEST(test_get_source_content)
 }
 END_TEST
 
+START_TEST(test_remove_source)
+{
+   printf("--- test_remove_source\n");
+
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+   int source1_id = -1;
+   catalog_cmd(catalog,
+               "add_source(edit)",
+               catalog_add_source(catalog, "test", &source1_id));
+   addentries(catalog, source1_id, 5, "source1-entry-%d");
+
+   mark_point();
+   catalog_cmd(catalog,
+               "remove_source",
+               catalog_remove_source(catalog, source1_id));
+   mark_point();
+
+   guint source1_count=-1;
+   catalog_cmd(catalog,
+               "get count",
+               catalog_get_source_content_count(catalog, source1_id, &source1_count));
+   fail_unless(source1_count==0, "content not deleted");
+
+   printf("--- test_remove_source OK\n");
+}
+END_TEST
+
+
+
 /**
  * Add the result name into a GArray
  * @param catalog ignored
@@ -704,6 +733,7 @@ Suite *catalog_check_suite(void)
    tcase_add_test(tc_core, test_addentry_escape);
    tcase_add_test(tc_core, test_get_source_content_size);
    tcase_add_test(tc_core, test_get_source_content);
+   tcase_add_test(tc_core, test_remove_source);
 
    tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
    suite_add_tcase(s, tc_query);

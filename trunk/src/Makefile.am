@@ -40,7 +40,7 @@ ocha_LDADD=$(GTK_LIBS) $(SQLITE_LIBS) $(GNOME_LIBS)
 
 
 
-ocha_preferences_SOURCES=preferences_main.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c preferences_catalog.h preferences_catalog.c indexer_view.h indexer_view.c ocha_gconf.h ocha_gconf.c
+ocha_preferences_SOURCES=preferences_main.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c preferences_catalog.h preferences_catalog.c indexer_view.h indexer_view.c ocha_gconf.h ocha_gconf.c indexer.c
 ocha_preferences_CFLAGS=$(GNOME_CFLAGS) $(SQLITE_CFLAGS)
 ocha_preferences_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 

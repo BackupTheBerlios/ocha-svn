@@ -110,3 +110,12 @@ gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const 
     g_free(key);
     return retval;
 }
+
+gchar *ocha_gconf_get_source_path(const char *type, int id)
+{
+    g_return_val_if_fail(type, NULL);
+    return g_strdup_printf("%s/%s/%d",
+                           OCHA_GCONF_INDEXERS,
+                           type,
+                           id);
+}

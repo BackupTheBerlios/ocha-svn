@@ -234,6 +234,15 @@ gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_o
    return FALSE;
 }
 
+gboolean catalog_remove_source(struct catalog *catalog, int source_id)
+{
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+
+   return execute_update_printf(catalog, TRUE/*autocommit*/,
+                                "DELETE FROM sources where id=%d; DELETE FROM entries where source_id=%d",
+                                source_id,
+                                source_id);
+}
 
 static gboolean catalog_findentry(struct catalog *catalog, const char *path, int source_id, int *id_out)
 {

@@ -56,4 +56,13 @@ char *ocha_gconf_get_source_attribute(const char *type, int source_id, const cha
  */
 gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const char *attribute, const char *value);
 
+/**
+ * Get the gconf key to the directory of the given source.
+ *
+ * This function doesn't check whether the directory actually exists.
+ * @param type indexer name
+ * @param source_id
+ * @return a key to be freed with g_free().
+ */
+gchar *ocha_gconf_get_source_path(const char *type, int source_id);
 #endif /*OCHA_GCONF_H*/

@@ -158,7 +158,7 @@ static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct 
     g_return_val_if_fail(indexer!=NULL, NULL);
     g_return_val_if_fail(source!=NULL, NULL);
 
-    GtkWidget *widget = source->editor_widget(source);
+    GtkWidget *widget = indexer_source_editor_widget(source);
     gtk_widget_show(widget);
     return widget;
 }

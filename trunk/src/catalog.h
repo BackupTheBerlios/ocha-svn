@@ -175,6 +175,13 @@ void catalog_restart(struct catalog *catalog);
 gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_out);
 
 /**
+ * Get rid of a source and of all of its entries
+ * @param catalog
+ * @param id source id
+ */
+gboolean catalog_remove_source(struct catalog *catalog, int source_id);
+
+/**
  * Add an entry into the catalog.
  * @param catalog
  * @param path local path or URI

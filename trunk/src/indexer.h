@@ -142,6 +142,116 @@ struct indexer
 };
 
 /**
+ * Examine the current environment and try to figure out
+ * what to index.
+ *
+ * This function is called on all indexers the first time
+ * ocha is started, with an empty catalog. The goal is to
+ * look at directories, user configuration files and
+ * the environment and create the sources that would be
+ * the most appropriate in this environment and add
+ * them into the catalog.
+ *
+ * The new sources should be ready to be indexed, but
+ * they should still be empty when this call ends.
+ *
+ * This is a shortcut for indexer->discover()
+ *
+ * @param catalog catalog to add new sources into
+ * @return FALSE if something went wrong accessing
+ * the catalog. The error will be found in the catalog
+ * itself. Everything else should not be considered
+ * an error; the sources whose creation failed for
+ * some other reason should simply be skipped. They
+ * probably were not appropriate.
+ */
+static inline gboolean indexer_discover(struct indexer *indexer, struct catalog *catalog)
+{
+   g_return_val_if_fail(indexer, FALSE);
+   return indexer->discover(indexer, catalog);
+}
+
+/**
+ * Load a indexer_source from the catalog.
+ *
+ * This is a shortcut for indexer->load_source()
+ * @param indexer
+ * @param catalog catalog to load the indexer_source from.
+ * don't keep references to this catalog, because it'll
+ * be closed just after this function returns
+ * @param id unique id of the indexer_source
+ * @return a indexer_source structure, even if the catalog
+ * did not contain everything that was needed for
+ * the indexer_source to be complete (it might be completed
+ * later.
+ */
+static inline struct indexer_source *indexer_load_source(struct indexer *self, struct catalog *catalog, int id)
+{
+   g_return_val_if_fail(self, NULL);
+   return self->load_source(self, catalog, id);
+}
+
+/**
+ * Execute an entry added by a indexer_source of this indexer.
+ *
+ * This is a shortcut for indexer->execute()
+ *
+ * @param indexer
+ * @param name entry name
+ * @param long_name long entry name
+ * @param path entry path or uri
+ * @param err if non-NULL, any indexing errors
+ * will be added into this object iff this function
+ * returns FALSE. The errors types and domain are
+ * the same as those returned by the function
+ * execute in the struct result
+ * @return TRUE for success, FALSE for failure
+ * @see result
+ */
+static inline gboolean indexer_execute(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err)
+{
+   g_return_val_if_fail(self, FALSE);
+   return self->execute(self, name, long_name, path, err);
+}
+
+/**
+ * Execute an entry added by a indexer_source of this indexer.
+ *
+ * This is a shortcut for indexer->validate()
+ * @param name entry name
+ * @param long_name long entry name
+ * @param path entry path or uri
+ * @return true if the entry is valid and execute
+ * has a chance of working, false otherwise
+ * @see result
+ */
+static inline gboolean indexer_validate(struct indexer *self , const char *name, const char *long_name, const char *path)
+{
+   g_return_val_if_fail(self, FALSE);
+   return self->validate(self, name, long_name, path);
+}
+
+/**
+ * Create a new source.
+ *
+ * Some indexers will not allow the creation of
+ * new sources, in which case this function may
+ * be null.
+ *
+ * This is a shortcut for indexer->new_source()
+ * @param indexer
+ * @param catalog catalog to register the source in
+ * @param err error structure (may be null)
+ * @return a new, uninitialized source, to be freed the usual way or
+ * NULL if there was an error
+ */
+static inline struct indexer_source *indexer_new_source(struct indexer *self, struct catalog *catalog, GError **err)
+{
+   g_return_val_if_fail(self, NULL);
+   return self->new_source(self, catalog, err);
+}
+
+/**
  * A indexer_source is an instance of an indexer
  * that manages a subset of catalog entries.
  */
@@ -152,6 +262,9 @@ struct indexer_source
 
    /** Name to be displayed to the user */
    const char *display_name;
+
+   /** the indexer that created the source */
+   struct indexer *indexer;
 
    /**
     * (re)-index the entries in this indexer_source.
@@ -187,6 +300,72 @@ struct indexer_source
    void (*release)(struct indexer_source *source);
 };
 #define INDEXER_ERROR_DOMAIN_NAME "INDEXER"
+
+/**
+ * (Re)-index the entries in this indexer_source.
+ *
+ * This is a shortcut for source->index(source, dest, err)
+ *
+ * @param dest catalog to add the entries into
+ * @param err if non-NULL, any indexing errors
+ * will be added into this object iff this function
+ * returns FALSE
+ * @return TRUE for success, FALSE for failure
+ */
+static inline gboolean indexer_source_index(struct indexer_source *self, struct catalog *dest, GError **err)
+{
+   g_return_val_if_fail(self, FALSE);
+   return self->index(self, dest, err);
+}
+
+/**
+ * Create a widget to edit source properties.
+ *
+ * The source must not be released until this widget
+ * is not in use anymore.
+ *
+ * This is a shortcut for source->editor_widget(source)
+ *
+ * @param source
+ * @param catalog a catalog that must be kept open for
+ * as long as the widget is in use
+ * @return a new widget that can be added into
+ * a window to edit the source
+ */
+static inline GtkWidget *indexer_source_editor_widget(struct indexer_source *self)
+{
+   g_return_val_if_fail(self, NULL);
+   return self->editor_widget(self);
+}
+
+/**
+ * Release the source structure.
+ *
+ * After this call, the source must not be used
+ * any more.
+ *
+ * This is a shortcut for source->editor_widget(source)
+ *
+ * @param source
+ */
+static inline void indexer_source_release(struct indexer_source *source)
+{
+   g_return_if_fail(source);
+   source->release(source);
+}
+
+/**
+ * Destroy everything that forms the source from
+ * the database and the configuration and release it.
+ *
+ * @param source the source to destroy
+ * @param catalog catalog to remove the source from
+ * @return true if everything was destroyed, false
+ * otherwise. whatever happens, indexer_source_release
+ * will have been called on the source object passed
+ * to this function
+ */
+gboolean indexer_source_destroy(struct indexer_source *source, struct catalog *);
 
 /** Error codes */
 typedef enum
