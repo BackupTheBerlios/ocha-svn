@@ -42,7 +42,8 @@ static void indexer_applications_source_view_detach(struct indexer_source_view *
 static void indexer_applications_source_view_release(struct indexer_source_view *view);
 
 /* ------------------------- prototypes: other */
-static GSList *maybe_add_directory(GSList *path, char *directory);
+static GSList *maybe_add_directory(GSList *path, const char *directory);
+static GSList *maybe_add_directories(GSList *path, const char * const *directories);
 
 /* ------------------------- definitions */
 
@@ -81,29 +82,10 @@ static gboolean indexer_application_discover(struct indexer *indexer, struct cat
 {
         int source_id;
         gboolean retval = FALSE;
-        char *home = gnome_util_prepend_user_home(".local/share");
-        char *possibilities[] =
-                {
-                        "/usr/share",
-                        "/opt/gnome/share",
-                        "/opt/gnome2/share",
-                        "/opt/kde/share",
-                        "/opt/kde2/share",
-                        "/opt/kde3/share",
-                        "/usr/local/share",
-                        NULL,
-                        NULL
-                };
-        char **ptr;
         GSList *paths = NULL;
 
-        possibilities[7]=home;
-        for(ptr=possibilities; *ptr; ptr++) {
-                char *possibility = *ptr;
-                paths=maybe_add_directory(paths, possibility);
-        }
-
-
+        paths=maybe_add_directory(paths, g_get_user_data_dir());
+        paths=maybe_add_directories(paths, g_get_system_data_dirs());
 
         if(catalog_add_source(catalog, INDEXER_NAME, &source_id)) {
                 char *paths_key = ocha_gconf_get_source_attribute_key(INDEXER_NAME,
@@ -122,7 +104,6 @@ static gboolean indexer_application_discover(struct indexer *indexer, struct cat
         }
 
         g_slist_free(paths);
-        g_free(home);
         return retval;
 }
 
@@ -168,8 +149,7 @@ static gboolean indexer_application_source_index(struct indexer_source *self, st
         char *paths_key;
         GSList *paths;
         GError *gconf_err = NULL;
-        guint paths_len;
-        gint i;
+        GSList *item;
         struct string_set *visited;
 
         g_return_val_if_fail(self!=NULL, FALSE);
@@ -209,13 +189,12 @@ static gboolean indexer_application_source_index(struct indexer_source *self, st
 
         visited=string_set_new();
 
-        paths_len = g_slist_length(paths);
-        for(i=paths_len-1; i>=0 && success; i--) {
+        for(item=paths; item!=NULL; item=g_slist_next(item)) {
                 const char *directory;
-                directory = (const char *)g_slist_nth_data(paths, i);
+                directory = (const char *)item->data;
 
                 if(directory==NULL) {
-                        g_warning("found NULL directory is item %d of path list for source %d", i, self->id);
+                        g_warning("found NULL directory in item of path list for source %d", self->id);
                         continue;
                 }
                 success=recurse(catalog,
@@ -383,16 +362,24 @@ static gboolean index_application_cb(struct catalog *catalog,
         return retval;
 }
 
-static GSList *maybe_add_directory(GSList *path, char *directory)
+static GSList *maybe_add_directory(GSList *path, const char *directory)
 {
         if(g_file_test(directory, G_FILE_TEST_EXISTS)
                         && g_file_test(directory, G_FILE_TEST_IS_DIR))
         {
-/*                 GConfValue *value; */
-
-/*                 value=gconf_value_new(GCONF_VALUE_STRING); */
-/*                 gconf_value_set_string(value, directory); */
-                path=g_slist_append(path, directory);
+                path=g_slist_append(path, (gpointer)directory);
         }
         return path;
 }
+
+static GSList *maybe_add_directories(GSList *path, const char * const *directories)
+{
+        const char * const *current;
+
+        for(current=directories; *current!=NULL; current++) {
+                path=maybe_add_directory(path, *current);
+        }
+
+        return path;
+}
+

@@ -186,7 +186,7 @@ static void setup_two_application_path(void)
         mock_catalog_set_source_attribute_list("test",
                                                SOURCE_ID,
                                                "paths",
-                                               g_strdup_printf("%s/%s/d1:%s/%s/d2",
+                                               g_strdup_printf("%s/%s/d2:%s/%s/d1",
                                                                current_dir,
                                                                TEMPDIR,
                                                                current_dir,
