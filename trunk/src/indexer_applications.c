@@ -72,6 +72,7 @@ static struct indexer_source *indexer_application_load_source(struct indexer *se
         retval->id=id;
         retval->indexer=self;
         retval->index=indexer_application_source_index;
+        retval->system=ocha_gconf_is_system(INDEXER_NAME, id);
         retval->release=indexer_application_source_release;
         retval->display_name="Applications";
         retval->notify_display_name_change=indexer_application_source_notify_add;
@@ -102,6 +103,8 @@ static gboolean indexer_application_discover(struct indexer *indexer, struct cat
                 }
 
                 g_free(paths_key);
+
+                ocha_gconf_set_system(INDEXER_NAME, source_id, TRUE);
         }
 
         g_slist_foreach(paths, (GFunc)g_free, NULL/*no userdata*/);

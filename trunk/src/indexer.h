@@ -309,6 +309,14 @@ struct indexer_source
         struct indexer *indexer;
 
         /**
+         * If TRUE, this is a system source that
+         * users cannot delete and often cannot
+         * edit.
+         */
+        gboolean system;
+
+
+        /**
          * (re)-index the entries in this indexer_source.
          * @param dest catalog to add the entries into
          * @param err if non-NULL, any indexing errors

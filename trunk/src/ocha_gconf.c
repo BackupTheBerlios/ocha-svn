@@ -126,6 +126,36 @@ gboolean ocha_gconf_set_source_attribute(const char *type,
         return retval;
 }
 
+void ocha_gconf_set_system(const char *type, int source_id, gboolean system)
+{
+        char *key;
+
+        g_return_if_fail(type);
+
+        ocha_gconf_get_client();
+        key =  ocha_gconf_get_source_attribute_key(type,
+                                                   source_id,
+                                                   "system");
+        gconf_client_set_bool(client, key, system, NULL/*err*/);
+        g_free(key);
+}
+
+gboolean ocha_gconf_is_system(const char *type, int source_id)
+{
+        char *key;
+        gboolean retval;
+
+        g_return_val_if_fail(type, FALSE);
+
+        ocha_gconf_get_client();
+        key =  ocha_gconf_get_source_attribute_key(type,
+                                                   source_id,
+                                                   "system");
+        retval = gconf_client_get_bool(client, key, NULL/*err*/);
+        g_free(key);
+        return retval;
+}
+
 gchar *ocha_gconf_get_source_key(const char *type, int id)
 {
         g_return_val_if_fail(type, NULL);

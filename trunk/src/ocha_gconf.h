@@ -48,6 +48,18 @@ void ocha_gconf_get_sources(const char *type, int **ids_out, int *ids_len_out);
 char *ocha_gconf_get_source_attribute(const char *type, int source_id, const char *attribute);
 
 /**
+ * Set the special 'system' flag that marks a source as
+ * being read-only.
+ */
+void ocha_gconf_set_system(const char *type, int source_id, gboolean system);
+
+/**
+ * Get the special 'system' flag for a source
+ * @return TRUE if it's a system source, FALSE otherwise
+ */
+gboolean ocha_gconf_is_system(const char *type, int source_id);
+
+/**
  * Set the value of a source attribute as a string.
  * @param source_id
  * @param attribute attribute name

@@ -19,6 +19,9 @@ typedef enum {
         COLUMN_SOURCE_ID,
         /** # of entries in the source (or in the indexer) */
         COLUMN_COUNT,
+        /** TRUE if the row can be deleted */
+        COLUMN_CAN_DELETE,
+
         NUMBER_OF_COLUMNS
 } TreeViewColumns;
 
@@ -33,6 +36,8 @@ struct preferences_catalog
         GtkListStore *model;
         GtkTreeView *view;
         GtkTreeSelection *selection;
+        GtkWidget *delete_button;
+        GtkWidget *refresh_button;
         /** root widget, retured by get_widget */
         GtkWidget *widget;
         GtkLabel *properties_title;
@@ -122,7 +127,9 @@ static GtkListStore *createModel(struct catalog *catalog)
                                    G_TYPE_STRING/*COLUMN_LABEL*/,
                                    G_TYPE_STRING/*COLUMN_INDEXER_TYPE*/,
                                    G_TYPE_INT/*COLUMN_SOURCE_ID*/,
-                                   G_TYPE_UINT/*COLUMN_COUNT*/);
+                                   G_TYPE_UINT/*COLUMN_COUNT*/,
+                                   G_TYPE_BOOLEAN/*COLUMN_CAN_DELETE*/);
+        g_assert(NUMBER_OF_COLUMNS==5);
 
         for(indexers = indexers_list();
             *indexers;
@@ -207,6 +214,7 @@ static void add_source(GtkListStore *model,
                                    COLUMN_LABEL, source->display_name,
                                    COLUMN_INDEXER_TYPE, indexer->name,
                                    COLUMN_SOURCE_ID, source_id,
+                                   COLUMN_CAN_DELETE, !source->system,
                                    -1);
 
                 indexer_source_notify_display_name_change(source,
@@ -383,10 +391,23 @@ static void update_properties(struct preferences_catalog  *prefs)
 /** Selection has been modified */
 static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userdata)
 {
+        gboolean can_delete;
+        GtkTreeIter iter;
         struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
         g_return_if_fail(prefs);
 
         update_properties(prefs);
+
+        if(gtk_tree_selection_get_selected(selection, NULL/*model_ptr*/, &iter)) {
+                gtk_tree_model_get(GTK_TREE_MODEL(prefs->model), &iter,
+                                   COLUMN_CAN_DELETE, &can_delete,
+                                   -1);
+                gtk_widget_set_sensitive(prefs->delete_button, can_delete);
+                gtk_widget_set_sensitive(prefs->refresh_button, TRUE);
+        } else {
+                gtk_widget_set_sensitive(prefs->delete_button, FALSE);
+                gtk_widget_set_sensitive(prefs->refresh_button, FALSE);
+        }
 }
 
 
@@ -582,6 +603,8 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
                          "clicked",
                          G_CALLBACK(delete_cb),
                          prefs);
+        prefs->delete_button = del;
+        gtk_widget_set_sensitive(del, FALSE);
 
         reload =  gtk_button_new_from_stock(GTK_STOCK_REFRESH);
         gtk_widget_show(reload);
@@ -590,6 +613,8 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
                          "clicked",
                          G_CALLBACK(reload_cb),
                          prefs/*userdata*/);
+        prefs->refresh_button = reload;
+        gtk_widget_set_sensitive(reload, FALSE);
 
 
         vbox =  gtk_vbox_new(FALSE/*not homogeneous*/,

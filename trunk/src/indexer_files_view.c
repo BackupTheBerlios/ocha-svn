@@ -378,6 +378,8 @@ static void update_widgets(struct indexer_files_view *view)
         char *current_ignore;
         int current_depth_i;
         int source_id;
+        gboolean system;
+        gboolean readonly;
 
         indexer_name=view->base.indexer->name;
         source_id=view->base.source_id;
@@ -386,6 +388,8 @@ static void update_widgets(struct indexer_files_view *view)
                 current_path = NULL;
                 current_ignore = NULL;
                 current_depth = NULL;
+                system = FALSE;
+                readonly = TRUE;
         } else {
                 current_path = ocha_gconf_get_source_attribute(indexer_name,
                                                                source_id,
@@ -397,8 +401,9 @@ static void update_widgets(struct indexer_files_view *view)
                 current_depth = ocha_gconf_get_source_attribute(indexer_name,
                                                                 source_id,
                                                                 "depth");
+                system = ocha_gconf_is_system(indexer_name, source_id);
+                readonly = system;
         }
-
 
         current_depth_i =  current_depth ? atoi(current_depth):1;
         if(current_depth_i==-1) {
@@ -421,7 +426,7 @@ static void update_widgets(struct indexer_files_view *view)
                 g_free(current_ignore);
         }
 
-        if(source_id<=0) {
+        if(readonly) {
                 gtk_widget_set_sensitive(GTK_WIDGET(view->base.widget), FALSE);
         } else {
                 gtk_widget_set_sensitive(GTK_WIDGET(view->base.widget), TRUE);

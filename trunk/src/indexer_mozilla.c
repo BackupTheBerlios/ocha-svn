@@ -84,6 +84,7 @@ static struct indexer_source *indexer_mozilla_load(struct indexer *self,
         retval->id=id;
         retval->indexer=self;
         retval->index=indexer_mozilla_source_index;
+        retval->system=ocha_gconf_is_system(INDEXER_NAME, id);
         retval->release=indexer_mozilla_source_release;
         retval->display_name=display_name(catalog, id);
         retval->notify_display_name_change=indexer_mozilla_source_notify_add;
@@ -124,6 +125,7 @@ static gboolean indexer_mozilla_discover(struct indexer *indexer,
                 for(current=start; current<end; current++) {
                         int id;
                         if(catalog_add_source(catalog, INDEXER_NAME, &id)) {
+                                ocha_gconf_set_system(INDEXER_NAME, id, TRUE);
                                 if(ocha_gconf_set_source_attribute(INDEXER_NAME,
                                                                    id,
                                                                    "path",

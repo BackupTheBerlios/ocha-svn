@@ -39,7 +39,7 @@ static guint indexer_files_source_notify_add(struct indexer_source *source, stru
 static void indexer_files_source_notify_remove(struct indexer_source *source, guint id);
 
 /* ------------------------- prototypes: other */
-static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore, int *id_ptr);
+static gboolean add_source(struct catalog *catalog, const char *path, gboolean system, int depth, char *ignore, int *id_ptr);
 static gboolean index_file_cb(struct catalog *catalog, int source_id, const char *path, const char *filename, GError **err, gpointer userdata);
 static gboolean has_gnome_mime_command(const char *path);
 static char *display_name(struct catalog *catalog, int id);
@@ -86,6 +86,7 @@ static struct indexer_source *indexer_files_load_source(struct indexer *self,
         retval =  g_new(struct indexer_source, 1);
         retval->id=id;
         retval->indexer=self;
+        retval->system=ocha_gconf_is_system(INDEXER_NAME, id);
         retval->index=indexer_files_source_index;
         retval->release=indexer_files_source_release;
         retval->display_name=display_name(catalog, id);
@@ -106,7 +107,7 @@ static gboolean indexer_files_discover(struct indexer *indexer,
         if(g_file_test(home_Desktop, G_FILE_TEST_EXISTS)
                         && g_file_test(home_Desktop, G_FILE_TEST_IS_DIR))
         {
-                if(!add_source(catalog, home_Desktop, 2/*depth*/, NULL/*ignore*/, NULL/*id_ptr*/))
+                if(!add_source(catalog, home_Desktop, TRUE/*system*/, 2/*depth*/, NULL/*ignore*/, NULL/*id_ptr*/))
                         goto error;
                 has_desktop=TRUE;
         }
@@ -114,7 +115,7 @@ static gboolean indexer_files_discover(struct indexer *indexer,
         if(g_file_test(home_dot_gnome_desktop, G_FILE_TEST_EXISTS)
                         && g_file_test(home_dot_gnome_desktop, G_FILE_TEST_IS_DIR))
         {
-                if(!add_source(catalog, home_dot_gnome_desktop, 2/*depth*/, NULL/*ignore*/, NULL/*id_ptr*/))
+                if(!add_source(catalog, home_dot_gnome_desktop, TRUE/*system*/, 2/*depth*/, NULL/*ignore*/, NULL/*id_ptr*/))
                         goto error;
                 has_desktop=TRUE;
         }
@@ -124,7 +125,7 @@ static gboolean indexer_files_discover(struct indexer *indexer,
                 /* yes, I'm paranoid... */
                 if(g_file_test(home, G_FILE_TEST_EXISTS)
                                 && g_file_test(home, G_FILE_TEST_IS_DIR)) {
-                        if(!add_source(catalog, home, 2/*depth*/, "Desktop", NULL/*id_ptr*/))
+                        if(!add_source(catalog, home, TRUE/*system*/, 2/*depth*/, "Desktop", NULL/*id_ptr*/))
                                 goto error;
                 }
         }
@@ -147,7 +148,7 @@ static struct indexer_source *indexer_files_new_source(struct indexer *indexer,
         g_return_val_if_fail(err==NULL || (*err==NULL), NULL);
 
         if(add_source(catalog,
-                      NULL/*no path*/,
+                      NULL/*no path*/, FALSE/*not system*/,
                       0/*ignore content*/,
                       NULL/*default ignore*/,
                       &id)) {
@@ -215,6 +216,7 @@ static void indexer_files_source_notify_remove(struct indexer_source *source,
 
 static gboolean add_source(struct catalog *catalog,
                            const char *path,
+                           gboolean system,
                            int depth,
                            char *ignore,
                            int *id_ptr)
@@ -238,6 +240,9 @@ static gboolean add_source(struct catalog *catalog,
         if(ignore) {
                 if(!ocha_gconf_set_source_attribute(INDEXER_NAME, id, "ignore", ignore))
                         return FALSE;
+        }
+        if(system) {
+                ocha_gconf_set_system(INDEXER_NAME, id, TRUE);
         }
         return TRUE;
 }
