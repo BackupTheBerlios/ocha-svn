@@ -34,11 +34,12 @@ class QueryResult:
     def getPath(self):
         return self.path
 
-    def execute(self):
+    def execute(self, query):
         command_id=self.result.command_id
         catalog=self.query.openCatalog()
         command=catalog.loadCommand(command_id)
         command.executeWithEntry(self.result)
+        catalog.remember(query, self.result, command)
 
 class Query:
     def __init__(self, catalog_path):
@@ -206,7 +207,7 @@ class QueryWin(QueryObserver):
 
     def execute(self):
         if self.selectedResult:
-            self.selectedResult.execute()
+            self.selectedResult.execute(self.query.getQueryString())
 
     def findResult(self, id):
         return self.__results[id]

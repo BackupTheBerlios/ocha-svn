@@ -69,11 +69,19 @@ class Catalog:
         self.__c=sqlite.connect(path, encoding="utf-8", mode=0700)
         if createdb:
             self.__createdb()
-        self.__query_base="SELECT id,filename,directory,display_name,command_id FROM entries"
+        self.__query_base="SELECT a.id,a.filename,a.directory,a.display_name,a.command_id FROM entries a"
         self.__like_query=self.__query_base+" WHERE display_name LIKE %s ORDER BY lastuse DESC, id ASC"
+        self.__history_query=self.__query_base+", history h WHERE h.query=%s and h.entry_id=a.id ORDER BY h.frequence DESC"
         self.__loadcommand_query="SELECT id,display_name,execute FROM command WHERE id=%s"
         self.__cursor=self.__c.cursor()
         self.__closed=False
+
+    def dumpHistory(self):
+        self.__cursor.execute("SELECT * FROM history")
+        for row in self.__cursor:
+            for element in row:
+                sys.stdout.write(str(element)+" ")
+            sys.stdout.write("\n")
 
     def commit(self):
         self.__c.commit()
@@ -147,6 +155,27 @@ class Catalog:
         self.__parse_results(cursor, collect)
         return retval
 
+    def remember(self, query, entry, command):
+        """Remember that for the given query the command with the
+        given entry"""
+        cursor=self.__cursor
+        cursor.execute("UPDATE history SET frequence=frequence*0.8 where query=%s",
+                       query)
+        cursor.execute("SELECT frequence FROM history WHERE "
+                       +"entry_id=%s and command_id=%s and query=%s",
+                       entry.id, command.id, query)
+        row=cursor.fetchone()
+        if row:
+            cursor.execute("UPDATE history SET frequence=frequence+1.0, lastuse=%s WHERE "
+                           +"entry_id=%s and command_id=%s and query=%s",
+                           now(), entry.id, command.id, query)
+
+        else:
+            cursor.execute("INSERT INTO history ( entry_id, command_id, query, frequence, lastuse ) "
+                           +" VALUES (%s, %s, %s, %s, %s)",
+                           entry.id, command.id, query, 1.0, now())
+        self.__c.commit()
+
 
     def removeStaleEntries(self):
         """go through all the entries and remove those with no corresponding file"""
@@ -175,6 +204,11 @@ class Catalog:
         cursor=self.__c.cursor()
         try:
             sofar=[]
+            cursor.execute(self.__history_query, query)
+            ret=self.__parse_results(cursor,callback, sofar=sofar)
+            if not ret:
+                return False
+
             cursor.execute(self.__like_query, (query+"%"))
             ret=self.__parse_results(cursor,callback, sofar=sofar)
             if not ret:
@@ -218,7 +252,8 @@ class Catalog:
                                                   +"display_name VARCHAR NOT NULL, "
                                                   +"execute VARCHAR NOT NULL, "
                                                   +"lastuse TIMESTAMP)")
-            cursor.execute("CREATE TABLE history (entry_id INTEGER NOT NULL, "
+            cursor.execute("CREATE TABLE history (query VARCHAR NOT NULL, "
+                                                  +"entry_id INTEGER NOT NULL, "
                                                   +"command_id INTEGER NOT NULL, "
                                                   +"lastuse TIMESTAMP NOT NULL, "
                                                   +"frequence FLOAT NOT NULL)")

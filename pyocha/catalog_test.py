@@ -145,5 +145,30 @@ class TestQuery(unittest.TestCase):
     def testStop(self):
         self.assertEquals([ self.toto_c, self.toto_h ], self.queryUntil("to", self.toto_h))
 
+    def testRemember(self):
+        catalog=self.catalog
+        catalog.remember("xw", self.toto_c, self.emacs)
+        self.assertEquals([ self.toto_c ], self.query("xw"))
+
+    def testRememberFirst(self):
+        catalog=self.catalog
+        catalog.remember("to", self.total_h, self.emacs)
+        self.assertEquals([ self.total_h, self.toto_c, self.toto_h ], self.query("to"))
+
+    def testRememberFrequence(self):
+        catalog=self.catalog
+        catalog.remember("xw", self.toto_c, self.emacs)
+        catalog.remember("xw", self.toto_c, self.emacs)
+        catalog.remember("xw", self.toto_h, self.emacs)
+        catalog.dumpHistory()
+        self.assertEquals([ self.toto_c, self.toto_h ], self.query("xw"))
+        catalog.remember("xw", self.toto_h, self.emacs)
+        catalog.remember("xw", self.toto_h, self.emacs)
+        catalog.remember("xw", self.toto_h, self.emacs)
+        catalog.remember("xw", self.toto_h, self.emacs)
+        catalog.dumpHistory()
+        self.assertEquals([ self.toto_h, self.toto_c ], self.query("xw"))
+
+
 if __name__ == '__main__':
     unittest.main()
