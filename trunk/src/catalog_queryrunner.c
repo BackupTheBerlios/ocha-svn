@@ -221,8 +221,9 @@ static void catalog_queryrunner_run_query(struct queryrunner *_self, const char 
                        __FILE__, __LINE__, query);
 #endif
 
-                if(self->query->len>0)
+                if(self->query->len>0) {
                         g_cond_broadcast(self->cond);
+                }
         }
         unlock(self->mutex);
 #ifdef DEBUG
@@ -279,97 +280,113 @@ static gboolean query_has_changed(struct catalog_queryrunner *queryrunner)
         return strcmp(queryrunner->query->str, queryrunner->running_query->str)!=0;
 }
 
+static void runquery_thread_open_catalog(struct catalog_queryrunner  *queryrunner)
+{
+        struct catalog *catalog;
+
+        catalog=catalog_connect(queryrunner->path, NULL/*errmsg*/);
+        if(catalog) {
+                queryrunner->catalog=catalog;
+        } else {
+#ifdef DEBUG
+                printf("%s:%d connection to catalog %s failed\n",
+                       __FILE__,
+                       __LINE__,
+                       queryrunner->path);
+#endif
+                ;
+        }
+}
+
+static void runquery_thread_close_catalog(struct catalog_queryrunner  *queryrunner)
+{
+        struct catalog *catalog = queryrunner->catalog;
+        queryrunner->catalog=NULL;
+        catalog_disconnect(catalog);
+}
+
+static void runquery_thread_execute_query(struct catalog_queryrunner  *queryrunner)
+{
+        g_string_assign(queryrunner->running_query,
+                        queryrunner->query->str);
+
+        catalog_restart(queryrunner->catalog);
+        queryrunner->count=0;
+        unlock(queryrunner->mutex);
+#ifdef DEBUG
+
+        printf("%s:%d execute query: %s\n",
+               __FILE__,
+               __LINE__,
+               queryrunner->running_query->str);
+#endif
+
+        if(!catalog_executequery(queryrunner->catalog,
+                                 queryrunner->running_query->str,
+                                 result_callback,
+                                 queryrunner/*userdata*/)) {
+                fprintf(stderr,
+                        "%s:%d run_query(%s,%s) failed: %s\n",
+                        __FILE__,
+                        __LINE__,
+                        queryrunner->path,
+                        queryrunner->running_query->str,
+                        catalog_error(queryrunner->catalog));
+        }
+#ifdef DEBUG
+        printf("%s:%d finished executing query: %s\n",
+               __FILE__,
+               __LINE__,
+               queryrunner->running_query->str);
+#endif
+
+        lock(queryrunner->mutex);
+}
+
+static void runquery_thread_wait(struct catalog_queryrunner  *queryrunner)
+{
+#ifdef DEBUG
+                printf("%s:%d thread: waiting on condition\n", __FILE__, __LINE__);
+#endif
+        g_cond_wait(queryrunner->cond,
+                    queryrunner->mutex);
+#ifdef DEBUG
+                printf("%s:%d thread: woke up\n", __FILE__, __LINE__);
+#endif
+}
+
 static gpointer runquery_thread(gpointer userdata)
 {
         struct catalog_queryrunner *queryrunner
                                 = (struct catalog_queryrunner *)userdata;
 
 #ifdef DEBUG
-
         printf("%s:%d thread started\n", __FILE__, __LINE__);
 #endif
 
-        lock(queryrunner->mutex)
-                ;
-while(!queryrunner->stopping) {
+        lock(queryrunner->mutex);
+        while(!queryrunner->stopping) {
                 if(queryrunner->started) {
-                        if(!queryrunner->catalog) {
-                                struct catalog *catalog;
-
-                                unlock(queryrunner->mutex);
-                                catalog=catalog_connect(queryrunner->path, NULL/*errmsg*/);
-                                if(!catalog) {
+                        runquery_thread_open_catalog(queryrunner);
 #ifdef DEBUG
-                                        printf("%s:%d connection to catalog %s failed\n",
-                                               __FILE__,
-                                               __LINE__,
-                                               queryrunner->path);
+                        printf("%s:%d thread catalog opened\n", __FILE__, __LINE__);
 #endif
 
-                                        lock(queryrunner->mutex)
-                                                ;
-                                        continue;
+                        while(queryrunner->started) {
+                                if(query_has_changed(queryrunner) && queryrunner->query->len>0) {
+                                        runquery_thread_execute_query(queryrunner);
+                                } else {
+                                        runquery_thread_wait(queryrunner);
                                 }
-                                lock(queryrunner->mutex)
-                                        ;
-                                queryrunner->catalog=catalog;
-                                continue; /*recheck without waiting */
                         }
-
-                        if(query_has_changed(queryrunner) && queryrunner->query->len>0) {
-                                g_string_assign(queryrunner->running_query,
-                                                queryrunner->query->str);
-
-                                catalog_restart(queryrunner->catalog);
-                                queryrunner->count=0;
-                                unlock(queryrunner->mutex);
+                        runquery_thread_close_catalog(queryrunner);
 #ifdef DEBUG
-
-                                printf("%s:%d execute query: %s\n",
-                                       __FILE__,
-                                       __LINE__,
-                                       queryrunner->running_query->str);
+                        printf("%s:%d thread catalog closed\n", __FILE__, __LINE__);
 #endif
 
-                                if(!catalog_executequery(queryrunner->catalog,
-                                                         queryrunner->running_query->str,
-                                                         result_callback,
-                                                         queryrunner/*userdata*/)) {
-                                        fprintf(stderr,
-                                                "%s:%d run_query(%s,%s) failed: %s\n",
-                                                __FILE__,
-                                                __LINE__,
-                                                queryrunner->path,
-                                                queryrunner->running_query->str,
-                                                catalog_error(queryrunner->catalog));
-                                }
-#ifdef DEBUG
-                                printf("%s:%d finished executing query: %s\n",
-                                       __FILE__,
-                                       __LINE__,
-                                       queryrunner->running_query->str);
-#endif
-
-                                lock(queryrunner->mutex)
-                                        ;
-                                continue; /*recheck without waiting */
-                        }
-                } else if(queryrunner->catalog) {
-                        struct catalog *catalog = queryrunner->catalog;
-                        queryrunner->catalog=NULL;
-                        unlock(queryrunner->mutex);
-                        catalog_disconnect(catalog);
-                        lock(queryrunner->mutex)
-                                ;
-                        continue; /*recheck without waiting */
+                } else {
+                        runquery_thread_wait(queryrunner);
                 }
-
-#ifdef DEBUG
-                printf("%s:%d thread: waiting on condition\n", __FILE__, __LINE__);
-#endif
-
-                g_cond_wait(queryrunner->cond,
-                            queryrunner->mutex);
         }
         unlock(queryrunner->mutex);
 
