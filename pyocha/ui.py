@@ -216,7 +216,7 @@ class QueryWin(QueryObserver):
             self.stop()
         elif event.keyval in ( gtk.keysyms.Delete, gtk.keysyms.BackSpace):
             self.query.backspace()
-        elif event.keyval==gtk.keysyms.Return:
+        elif event.keyval in ( gtk.keysyms.Return, gtk.keysyms.space, gtk.keysyms.KP_Space ):
             self.execute()
             self.stop()
         elif event.string:
