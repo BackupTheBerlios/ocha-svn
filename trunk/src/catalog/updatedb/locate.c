@@ -69,9 +69,19 @@ struct locate *locate_new_cmd(const char *command[])
    }
 }
 
+static inline bool locate_sanity_check(struct full_locate *locate)
+{
+   return locate!=NULL
+      && locate->locate.fd>=0
+      && locate->locate.child_pid>0
+      && ( locate->cur>=locate->buffer && locate->cur<=locate->end )
+      && locate->end<=(locate->buffer+BUFFER_LEN);
+}
+
 void locate_delete(struct locate *locate)
 {
    g_return_if_fail(locate!=NULL);
+   g_return_val_if_fail(locate_sanity_check((struct full_locate *)locate), true);
    close(locate->fd);
    waitpid(locate->child_pid, NULL, 0);
    g_free(locate);
@@ -81,6 +91,7 @@ bool locate_has_more(struct locate *_locate)
 {
    g_return_val_if_fail(_locate!=NULL, true);
    struct full_locate *locate = (struct full_locate *)_locate;
+   g_return_val_if_fail(locate_sanity_check(locate), true);
    if(locate->eof)
       return true;
    if(locate->cur<locate->end)
@@ -101,6 +112,10 @@ bool locate_next(struct locate *_locate, GString* dest)
 {
    g_return_val_if_fail(_locate!=NULL, false);
    struct full_locate *locate = (struct full_locate *)_locate;
+   g_return_val_if_fail(locate_sanity_check(locate), false);
+
+   if(locate->eof)
+      return false;
 
    bool eof = false;
 
