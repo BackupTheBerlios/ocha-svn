@@ -25,6 +25,8 @@ struct catalog_queryrunner
    GString *query;
    /** query being run, used only on the thread */
    GString *running_query;
+   /** number of results found so far, used only on the thread */
+   int count;
 
    GThread *thread;
    GMutex *mutex;
@@ -149,6 +151,7 @@ static gpointer runquery_thread(gpointer userdata)
                            catalog_restart(queryrunner->catalog);
                            printf("execute query: %s\n",
                                   queryrunner->running_query->str);
+                           queryrunner->count=0;
                            g_mutex_unlock(queryrunner->mutex);
                            if(!catalog_executequery(queryrunner->catalog,
                                                     queryrunner->running_query->str,
@@ -208,7 +211,8 @@ static bool result_callback(struct catalog *catalog, float pertinence, struct re
                     self->running_query->str,
                     pertinence,
                     result);
-   return true;
+   self->count++;
+   return self->count<MAX_RESULT_COUNT;
 }
 
 static void run_query(struct queryrunner *_self, const char *query)
