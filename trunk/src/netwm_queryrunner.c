@@ -4,6 +4,7 @@
 #include "netwm.h"
 #include <glib.h>
 #include <gdk/gdk.h>
+#include <stdio.h>
 
 /** \file Implementation of the API defined in netwm_queryrunner.h */
 
@@ -114,6 +115,7 @@ static void start(struct queryrunner *_self)
                gdk_error_trap_push();
                self->titles[i]=netwm_get_window_title(self->display,
                                                       self->windows[i]);
+               gdk_flush();
                if(gdk_error_trap_pop())
                   {
                      self->titles[i]=NULL;
@@ -188,9 +190,21 @@ static bool result_execute(struct result *_self)
    struct window_result *self = TO_WINDOW_RESULT(_self);
    g_return_val_if_fail(self, false);
 
-   return netwm_activate_window(self->display,
+   printf("activate window %s '%s'\n",
+          self->base.path,
+          self->base.name);
+   bool retval;
+   gdk_error_trap_push();
+   retval=netwm_activate_window(self->display,
                                 self->win,
                                 true/*switch desktop*/);
+   gdk_flush();
+   if(gdk_error_trap_pop())
+      {
+         fprintf(stderr, "window activation failed (X error)\n");
+         return false;
+      }
+   return retval;
 }
 static void result_release(struct result *_self)
 {
