@@ -37,6 +37,23 @@ size_t mempool_size();
 void *mempool_alloc(struct mempool *, size_t size);
 
 /**
+ * Method used to free a resource.
+ *
+ */
+typedef void (*mempool_freer_f)(void *);
+
+/**
+ * Add some resource to the pool so that it'll be freed
+ * when the pool is destroyed.
+ *
+ * @param mempool
+ * @param pointer pointer to the resource 
+ * @param freer function that will free the resource, usually
+ * some flavour of free()
+ */
+void mempool_enlist(struct mempool *, void *resource, mempool_freer_f freer);
+
+/**
  * Discard a memory pool and all the memory allocated
  * for it.
  *
