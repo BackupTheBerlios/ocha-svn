@@ -234,5 +234,5 @@ import signal
 def sighndl(sig, stack):
     win.show()
 signal.signal(signal.SIGUSR1, sighndl)
-
+win.show()
 gtk.main()
