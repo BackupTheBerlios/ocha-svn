@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <libgnome/gnome-exec.h>
+#include <libgnome/gnome-util.h>
 #include "desktop_file.h"
 
 
@@ -21,13 +22,16 @@ static gboolean execute(struct indexer *self, const char *name, const char *long
 static gboolean validate(struct indexer *, const char *name, const char *long_name, const char *path);
 static gboolean index(struct indexer_source *, struct catalog *, GError **);
 static void release(struct indexer_source *);
+static gboolean discover(struct indexer *, struct catalog *catalog);
 
+#define INDEXER_NAME "applications"
 struct indexer indexer_applications =
 {
-   .name="applications",
-   .load_indexer_source=load,
+   .name=INDEXER_NAME,
+   .load_source=load,
    .execute=execute,
-   .validate=validate
+   .validate=validate,
+   .discover=discover,
 };
 
 static struct indexer_source *load(struct indexer *self, struct catalog *catalog, int id)
@@ -244,4 +248,62 @@ static gboolean index(struct indexer_source *self, struct catalog *catalog, GErr
                             index_application_cb,
                             self/*userdata*/,
                             err);
+}
+
+static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore)
+{
+   int id;
+   if(!catalog_add_source(catalog, INDEXER_NAME, &id))
+      return FALSE;
+   if(!catalog_set_source_attribute(catalog, id, "path", path))
+      return FALSE;
+   if(depth!=-1)
+      {
+         char *depth_str = g_strdup_printf("%d", depth);
+         gboolean ret = catalog_set_source_attribute(catalog, id, "depth", depth_str);
+         g_free(depth_str);
+         return ret;
+      }
+   if(ignore)
+      {
+         if(catalog_set_source_attribute(catalog, id, "ignore", ignore))
+            return FALSE;
+      }
+   return TRUE;
+}
+
+static gboolean discover(struct indexer *indexer, struct catalog *catalog)
+{
+   gboolean retval = FALSE;
+   char *home = gnome_util_prepend_user_home(".local/share");
+   char *possibilities[] =
+      {
+         home,
+         "/usr/share",
+         "/usr/local/share",
+         "/opt/gnome/share",
+         "/opt/kde/share",
+         "/opt/kde2/share",
+         "/opt/kde3/share",
+         NULL
+      };
+
+   for(char **ptr=possibilities; *ptr; ptr++)
+      {
+         char *possibility = *ptr;
+         if(g_file_test(possibility, G_FILE_TEST_EXISTS)
+            && g_file_test(possibility, G_FILE_TEST_IS_DIR))
+            {
+               if(!add_source(catalog,
+                              possibility,
+                              10/*depth*/,
+                              "locale:man:themes:doc:fonts:perl:pixmaps"))
+                  goto error;
+
+            }
+      }
+   retval=TRUE;
+ error:
+   g_free(home);
+   return retval;
 }

@@ -4,6 +4,7 @@
 #include "querywin.h"
 #include "result_queue.h"
 #include "queryrunner.h"
+#include "catalog.h"
 #include "catalog_queryrunner.h"
 #include "netwm_queryrunner.h"
 #include "compound_queryrunner.h"
@@ -23,11 +24,14 @@
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
 #include <libgnome/gnome-init.h>
+#include <libgnome/gnome-program.h>
 
 static struct result_queue *result_queue;
 
 #define PROGRAM_NAME "ocha"
 #define PROGRAM_VERSION "0.1"
+
+static char *get_catalog_path(void);
 
 static GdkFilterReturn filter_keygrab (GdkXEvent *xevent,
                                        GdkEvent *gdk_event_unused,
@@ -72,6 +76,7 @@ static void install_keygrab()
       }
 }
 
+
 int main(int argc, char *argv[])
 {
    g_thread_init(NULL/*vtable*/);
@@ -109,17 +114,20 @@ int main(int argc, char *argv[])
 
    querywin_init();
 
-   GString *catalog_path = g_string_new(getenv("HOME"));
-   g_string_append(catalog_path, "/.ocha");
-   mkdir(catalog_path->str, 0600);
-   g_string_append(catalog_path, "/catalog");
+   char *catalog_path = get_catalog_path();
+
+   if(!g_file_test(catalog_path, G_FILE_TEST_EXISTS))
+      {
+         fprintf(stderr, "No catalog: please start the indexer first\n");
+         exit(10);
+      }
 
    struct result_queue *queue = querywin_get_result_queue();
    struct queryrunner *runners[] =
       {
          netwm_queryrunner_create(GDK_DISPLAY(),
                                   queue),
-         catalog_queryrunner_new(catalog_path->str,
+         catalog_queryrunner_new(catalog_path,
                                  queue),
       };
    struct queryrunner *compound = compound_queryrunner_new(runners, sizeof(runners)/sizeof(struct queryrunner *));
@@ -133,3 +141,13 @@ int main(int argc, char *argv[])
    return 0;
 }
 
+static char *get_catalog_path(void)
+{
+   GString *catalog_path = g_string_new(getenv("HOME"));
+   g_string_append(catalog_path, "/.ocha");
+   mkdir(catalog_path->str, 0700);
+   g_string_append(catalog_path, "/catalog");
+   char *retval = catalog_path->str;
+   g_string_free(catalog_path, FALSE);
+   return retval;
+}

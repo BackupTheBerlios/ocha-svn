@@ -29,6 +29,30 @@ struct indexer
    const char *name;
 
    /**
+    * Examine the current environment and try to figure out
+    * what to index.
+    *
+    * This function is called on all indexers the first time
+    * ocha is started, with an empty catalog. The goal is to
+    * look at directories, user configuration files and
+    * the environment and create the sources that would be
+    * the most appropriate in this environment and add
+    * them into the catalog.
+    *
+    * The new sources should be ready to be indexed, but
+    * they should still be empty when this call ends.
+    *
+    * @param catalog catalog to add new sources into
+    * @return FALSE if something went wrong accessing
+    * the catalog. The error will be found in the catalog
+    * itself. Everything else should not be considered
+    * an error; the sources whose creation failed for
+    * some other reason should simply be skipped. They
+    * probably were not appropriate.
+    */
+   gboolean (*discover)(struct indexer *, struct catalog *catalog);
+
+   /**
     * Load a indexer_source from the catalog.
     * @param indexer
     * @param catalog catalog to load the indexer_source from.
@@ -40,8 +64,7 @@ struct indexer
     * the indexer_source to be complete (it might be completed
     * later.
     */
-   struct indexer_source *(*load_indexer_source)(struct indexer *self, struct catalog *catalog, int id);
-
+   struct indexer_source *(*load_source)(struct indexer *self, struct catalog *catalog, int id);
 
    /**
     * Execute an entry added by a indexer_source of this indexer.

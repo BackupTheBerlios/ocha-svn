@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <libgnome/gnome-url.h>
+#include <libgnome/gnome-util.h>
 #include <libgnomevfs/gnome-vfs.h>
 
 /** index files that can be executed by gnome, using gnome_vfs.
@@ -24,15 +25,19 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
 static gboolean execute(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err);
 static gboolean validate(struct indexer *self, const char *name, const char *long_name, const char *path);
 static gboolean index(struct indexer_source *self, struct catalog *catalog, GError **err);
+static gboolean discover(struct indexer *, struct catalog *catalog);
 static gboolean has_gnome_mime_command(const char *path);
+
+#define INDEXER_NAME "files"
 
 /** Definition of the indexer */
 struct indexer indexer_files =
 {
-   .name = "files",
+   .name = INDEXER_NAME,
    .execute = execute,
    .validate = validate,
-   .load_indexer_source = load,
+   .load_source = load,
+   .discover = discover,
 };
 
 /* ------------------------- private functions */
@@ -56,6 +61,68 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
    return retval;
 }
 
+static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore)
+{
+   int id;
+   if(!catalog_add_source(catalog, INDEXER_NAME, &id))
+      return FALSE;
+   if(!catalog_set_source_attribute(catalog, id, "path", path))
+      return FALSE;
+   if(depth!=-1)
+      {
+         char *depth_str = g_strdup_printf("%d", depth);
+         gboolean ret = catalog_set_source_attribute(catalog, id, "depth", depth_str);
+         g_free(depth_str);
+         return ret;
+      }
+   if(ignore)
+      {
+         if(catalog_set_source_attribute(catalog, id, "ignore", ignore))
+            return FALSE;
+      }
+   return TRUE;
+}
+static gboolean discover(struct indexer *indexer, struct catalog *catalog)
+{
+   char *home_Desktop = gnome_util_prepend_user_home("Desktop");
+   char *home_dot_gnome_desktop = gnome_util_prepend_user_home(".gnome-desktop");
+   const char *home = g_get_home_dir();
+   gboolean has_desktop = FALSE;
+   gboolean retval = FALSE;
+
+   if(g_file_test(home_Desktop, G_FILE_TEST_EXISTS)
+      && g_file_test(home_Desktop, G_FILE_TEST_IS_DIR))
+      {
+         if(!add_source(catalog, home_Desktop, 2/*depth*/, NULL/*ignore*/))
+            goto error;
+         has_desktop=TRUE;
+      }
+
+   if(g_file_test(home_dot_gnome_desktop, G_FILE_TEST_EXISTS)
+      && g_file_test(home_dot_gnome_desktop, G_FILE_TEST_IS_DIR))
+      {
+         if(!add_source(catalog, home_dot_gnome_desktop, 2/*depth*/, NULL/*ignore*/))
+            goto error;
+         has_desktop=TRUE;
+      }
+
+   if(!has_desktop)
+      {
+         /* yes, I'm paranoid... */
+         if(g_file_test(home, G_FILE_TEST_EXISTS)
+            && g_file_test(home, G_FILE_TEST_IS_DIR))
+            {
+               if(!add_source(catalog, home, 2/*depth*/, "Desktop"))
+                  goto error;
+            }
+      }
+   retval=TRUE;
+ error:
+   g_free(home_Desktop);
+   g_free(home_dot_gnome_desktop);
+   /* not: g_free(home); */
+   return retval;
+}
 static gboolean index_file_cb(struct catalog *catalog,
                               int source_id,
                               const char *path,

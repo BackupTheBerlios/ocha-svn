@@ -181,15 +181,15 @@ static gboolean _recurse(struct catalog *catalog,
       }
    return !error;
 }
-static gboolean recurse(struct catalog *catalog,
-                        const char *directory,
-                        GPatternSpec **ignore_patterns,
-                        int maxdepth,
-                        gboolean slow,
-                        int cmd,
-                        handle_file_f callback,
-                        gpointer userdata,
-                        GError **err)
+gboolean recurse(struct catalog *catalog,
+                 const char *directory,
+                 GPatternSpec **ignore_patterns,
+                 int maxdepth,
+                 gboolean slow,
+                 int cmd,
+                 handle_file_f callback,
+                 gpointer userdata,
+                 GError **err)
 {
    catalog_index_init();
 

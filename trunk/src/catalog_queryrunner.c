@@ -98,8 +98,8 @@ struct catalog_queryrunner
 static struct indexer *indexers[] =
    {
       &indexer_files,
-      &indexer_applications,
       &indexer_mozilla,
+      &indexer_applications,
       NULL
    };
 

@@ -91,7 +91,7 @@ static char *to_path(const char *filename)
 static void index(struct indexer *indexer)
 {
    mark_point();
-   struct indexer_source *source=indexer->load_indexer_source(indexer, catalog, SOURCE_ID);
+   struct indexer_source *source=indexer->load_source(indexer, catalog, SOURCE_ID);
    fail_unless(source!=NULL, "no indexer_source");
    fail_unless(source->id==SOURCE_ID, "wrong source id");
    fail_unless(source->index!=NULL, "no index function in indexer_source");
@@ -493,7 +493,7 @@ gboolean gnome_execute_async(char *dir, int argc, char *const argv[])
 
 Suite *indexer_files_check_suite(void)
 {
-   Suite *s = suite_create("indexer_files");
+   Suite *s = suite_create("indexer_various");
 
    TCase *tc_files = tcase_create("tc_files");
    suite_add_tcase(s, tc_files);

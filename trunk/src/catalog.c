@@ -516,11 +516,11 @@ static gboolean create_tables(sqlite *db, char **errmsg)
    int ret = execute_update_nocatalog_printf(db,
                                              "BEGIN; "
                                              "CREATE TABLE entries (id INTEGER PRIMARY KEY, "
-                                             "path VARCHAR UNIQUE NOT NULL, "
+                                             "path VARCHAR NOT NULL, "
                                              "name VARCHAR NOT NULL, "
                                              "long_name VARCHAR NOT NULL, "
                                              "source_id INTEGER, "
-                                             "lastuse TIMESTAMP);"
+                                             "lastuse TIMESTAMP, UNIQUE (id, path));"
                                              "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
                                              "CREATE INDEX path_idx ON entries (path);"
                                              "CREATE INDEX source_idx ON entries (source_id);"

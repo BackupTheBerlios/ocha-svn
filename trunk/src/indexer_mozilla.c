@@ -2,6 +2,7 @@
 #include "indexer_utils.h"
 #include <libgnome/gnome-url.h>
 #include <libgnome/gnome-exec.h>
+#include <libgnome/gnome-util.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -17,13 +18,16 @@ static void release(struct indexer_source *);
 static gboolean bookmarks_read_line(FILE *, GString *, GError **err);
 static char *html_expand_common_entities(const char *orig);
 static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, const char *bookmark_file, GError **err);
+static gboolean discover(struct indexer *, struct catalog *catalog);
 
+#define INDEXER_NAME "mozilla"
 struct indexer indexer_mozilla =
 {
-   .name="mozilla",
-   .load_indexer_source=load,
+   .name=INDEXER_NAME,
+   .load_source=load,
    .execute=execute,
-   .validate=validate
+   .validate=validate,
+   .discover=discover,
 };
 
 static struct indexer_source *load(struct indexer *self, struct catalog *catalog, int id)
@@ -242,4 +246,46 @@ static char *html_expand_common_entities(const char *str)
    char *retval_str = retval->str;
    g_string_free(retval, FALSE/*don't free retval_str*/);
    return retval_str;
+}
+
+gboolean discover_callback(struct catalog *catalog,
+                           int ignored,
+                           const char *path,
+                           const char *filename,
+                           GError **err,
+                           gpointer userdata)
+{
+   if(strcmp("bookmarks.html", filename)!=0)
+      return TRUE;
+   int id=0;
+   if(!catalog_add_source(catalog, INDEXER_NAME, &id))
+      return FALSE;
+   if(!catalog_set_source_attribute(catalog, id, "path", path))
+      return FALSE;
+   return TRUE;
+}
+
+static gboolean discover(struct indexer *indexer, struct catalog *catalog)
+{
+   gboolean retval = TRUE;
+   char *directories[] = { ".mozilla", ".firefox", ".phoenix", NULL };
+   for(int i=0; retval && directories[i]; i++)
+      {
+         char *path = gnome_util_prepend_user_home(directories[i]);
+         if(g_file_test(path, G_FILE_TEST_EXISTS)
+            && g_file_test(path, G_FILE_TEST_IS_DIR))
+            {
+               retval=recurse(catalog,
+                              path,
+                              NULL/*ignore*/,
+                              4/*depth*/,
+                              FALSE/*not slow*/,
+                              0/*source_id, ignored*/,
+                              discover_callback,
+                              NULL/*userdata*/,
+                              NULL/*err*/);
+            }
+         g_free(path);
+      }
+   return retval;
 }

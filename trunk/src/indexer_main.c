@@ -1,20 +1,38 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "catalog.h"
 #include "indexer.h"
 #include "catalog_queryrunner.h"
 #include <libgnome/gnome-init.h>
+#include <libgnome/gnome-program.h>
+#include <libgnome/libgnome.h>
 
 /** \file run the indexer
  */
+
+static void usage(FILE *out);
+static gboolean first_time(gboolean verbose, struct catalog *catalog);
 
 static void usage(FILE *out)
 {
    fprintf(out,
            "USAGE: indexer [--quiet]\n");
+}
+
+
+static char *get_catalog_path(void)
+{
+   GString *catalog_path = g_string_new(getenv("HOME"));
+   g_string_append(catalog_path, "/.ocha");
+   mkdir(catalog_path->str, 0700);
+   g_string_append(catalog_path, "/catalog");
+   char *retval = catalog_path->str;
+   g_string_free(catalog_path, FALSE);
+   return retval;
 }
 
 int main(int argc, char *argv[])
@@ -24,12 +42,13 @@ int main(int argc, char *argv[])
    int maxdepth=-1;
 
 
-   gnome_program_init ("ocha_indexer",
+   gnome_program_init ("ocha",
                        "0.1",
                        LIBGNOME_MODULE,
                        argc,
                        argv,
-                       NULL);
+                       GNOME_PARAM_CREATE_DIRECTORIES, TRUE,
+                       GNOME_PARAM_NONE);
 
 
    int curarg;
@@ -63,20 +82,28 @@ int main(int argc, char *argv[])
          usage(stderr);
          exit(111);
       }
-
-   GString *catalog_path = g_string_new(getenv("HOME"));
-   g_string_append(catalog_path, "/.ocha");
-   mkdir(catalog_path->str, 0600);
-   g_string_append(catalog_path, "/catalog");
-
+   char *catalog_path = get_catalog_path();
 
    int retval=0;
-   struct catalog *catalog = catalog_connect(catalog_path->str, NULL/*errors*/);
+   gboolean catalog_existed = g_file_test(catalog_path, G_FILE_TEST_EXISTS);
+   GError *err = NULL;
+   struct catalog *catalog = catalog_connect(catalog_path, &err);
    if(catalog==NULL)
       {
-         fprintf(stderr, "error: could not open catalog at '%s'\n",
-                 catalog_path->str);
+         fprintf(stderr, "error: could not open or create create catalog at '%s': %s\n",
+                 catalog_path,
+                 err->message);
          exit(114);
+      }
+
+   if(!catalog_existed)
+      {
+         if(!first_time(verbose, catalog))
+            {
+               catalog_disconnect(catalog);
+               unlink(catalog_path);
+               exit(123);
+            }
       }
 
    for(struct indexer **indexer_ptr = catalog_queryrunner_get_indexers();
@@ -94,7 +121,7 @@ int main(int argc, char *argv[])
                for(int i=0; i<source_ids_len; i++)
                   {
                      int source_id = source_ids[i];
-                     struct indexer_source *source = indexer->load_indexer_source(indexer,
+                     struct indexer_source *source = indexer->load_source(indexer,
                                                                                   catalog,
                                                                                   source_id);
                      if(source)
@@ -131,4 +158,37 @@ int main(int argc, char *argv[])
       }
 
    return retval;
+}
+
+static gboolean first_time(gboolean verbose, struct catalog *catalog)
+{
+   if(verbose)
+      {
+         printf("First time startup. I'll need to create the catalog and index your files.\n");
+         printf("This could take a while, please be patient.\n");
+
+         printf("Configuring catalog...\n");
+      }
+
+   for(struct indexer **indexer_ptr = catalog_queryrunner_get_indexers();
+       *indexer_ptr;
+       indexer_ptr++)
+      {
+         struct indexer *indexer = *indexer_ptr;
+         if(verbose)
+            printf("First-time configuration of module %s...\n",
+                   indexer->name);
+         if(!indexer->discover(indexer, catalog))
+            {
+               fprintf(stderr,
+                       "error: first-time configuration of module '%s' failed : %s\n",
+                       indexer->name,
+                       catalog_error(catalog));
+               return FALSE;
+            }
+      }
+
+   if(verbose)
+      printf("First time configuration done. Now indexing.\n");
+   return TRUE;
 }

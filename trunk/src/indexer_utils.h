@@ -45,6 +45,16 @@ gboolean index_recursively(struct catalog *catalog,
                            gpointer userdata,
                            GError **err);
 
+gboolean recurse(struct catalog *catalog,
+                 const char *directory,
+                 GPatternSpec **ignore_patterns,
+                 int maxdepth,
+                 gboolean slow,
+                 int cmd,
+                 handle_file_f callback,
+                 gpointer userdata,
+                 GError **err);
+
 /**
  * Add an entry, with error handling
  * @param catalog
