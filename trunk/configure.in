@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(src/hello.c)
+AC_INIT(src/target.h)
 dnl Every other copy of the package version number gets its value from here
 AM_INIT_AUTOMAKE(ocha, 0.1.0)
 
@@ -32,9 +32,10 @@ dnl Checks for typedefs, structures, and compiler characteristics.
 dnl Checks for library functions.
 
 dnl Configuration
-CFLAGS=-std=c99 
+CFLAGS="-std=c99 $GLIB_CFLAGS $CFLAGS"
+LIBS="$GLIB_LIBS $LIBS"
 AC_SUBST(CFLAGS)
-AC_SUBST(LDFLAGS)
+AC_SUBST(LIBS)
 
 dnl Output
 AC_OUTPUT( Makefile src/Makefile )

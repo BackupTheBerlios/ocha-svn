@@ -425,7 +425,7 @@ PACKAGE_VERSION=
 PACKAGE_STRING=
 PACKAGE_BUGREPORT=
 
-ac_unique_file="src/hello.c"
+ac_unique_file="src/target.h"
 # Factoring default headers for most tests.
 ac_includes_default="\
 #include <stdio.h>
@@ -19551,7 +19551,8 @@ done
 
 
 
-CFLAGS=-std=c99
+CFLAGS="-std=c99 $GLIB_CFLAGS $CFLAGS"
+LIBS="$GLIB_LIBS $LIBS"
 
 
 

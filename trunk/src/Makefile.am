@@ -1,18 +1,17 @@
-
+noinst_HEADERS=target.h mempool.h
 bin_PROGRAMS=
 
-noinst_PROGRAMS=hello_check
+noinst_PROGRAMS=mempool_check
 
-TESTS=hello_check
+TESTS=mempool_check
 
-hello_check_SOURCES=hello.c
-hello_check_INCLUDES=@CHECK_CFLAGS@
-hello_check_LDADD=@CHECK_LIBS@
+mempool_check_SOURCES=mempool_check.c mempool.c mempool.h
+mempool_check_INCLUDES=@CHECK_CFLAGS@ 
+mempool_check_LDADD=@CHECK_LIBS@ 
 
 #lint:
 #	flags="+posixlib -booltype bool" ;\
-#	lclint $$flags vpsdecoder.c stationcode.c vpsdecode.c vpsdata.c  ;\
-#	lclint $$flags vpsdecode_stub.c
+#	splint $$flags target.h hello.c
 
 xref:
 	if [ -d @top_srcdir@/Xrefs ] ; then xref -update @top_srcdir@; else xref -create @top_srcdir@; fi
