@@ -203,7 +203,8 @@ static void init_source_attrs()
 char *ocha_gconf_get_source_attribute(const char *type, int source_id, const char *attribute)
 {
     init_source_attrs();
-    return g_hash_table_lookup(source_attrs, attribute);
+    char *retval=g_hash_table_lookup(source_attrs, attribute);
+    return retval ? g_strdup(retval):NULL;
 }
 gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const char *attribute, const char *value)
 {
@@ -212,12 +213,42 @@ gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const 
     return TRUE;
 }
 
+gchar *ocha_gconf_get_source_attribute_key(const char *type, int source_id, const char *attribute)
+{
+    return "fake_key";
+}
+GConfClient *ocha_gconf_get_client()
+{
+    return NULL;
+}
+
+guint        gconf_client_notify_add(GConfClient* client,
+                                     const gchar* namespace_section, /* dir or key to listen to */
+                                     GConfClientNotifyFunc func,
+                                     gpointer user_data,
+                                     GFreeFunc destroy_notify,
+                                     GError** err)
+{
+    return 9;
+}
+
+void gconf_client_notify_remove(GConfClient *client, guint num)
+{
+}
 gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id)
 {
    fail("unexpected call");
    return FALSE;
 }
 
+gboolean catalog_remove_entry(struct catalog *catalog, int source_id, const char *path)
+{
+    return TRUE;
+}
+gboolean catalog_get_source_content(struct catalog *catalog, int source_id, catalog_callback_f callback, void *userdata)
+{
+    return TRUE;
+}
 /* ------------------------- static */
 static void expectation_init(struct expectation *ex, const char *description)
 {

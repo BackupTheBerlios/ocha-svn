@@ -86,7 +86,7 @@ gboolean uri_exists(const char *uri);
 
 /**
  * Get told when a particular source attribute is modified.
- * @param type
+ * @param indexer
  * @param id
  * @param attribute
  * @param catalog a catalog that will exist for as long as the
@@ -95,7 +95,7 @@ gboolean uri_exists(const char *uri);
  * @param userdata
  * @return an ID to pass to _source_attribute_change_notify_remove()
  */
-guint source_attribute_change_notify_add(const char *type,
+guint source_attribute_change_notify_add(struct indexer *,
                                          int source_id,
                                          const char *attribute,
                                          struct catalog *catalog,

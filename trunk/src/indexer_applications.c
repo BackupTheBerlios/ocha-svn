@@ -18,6 +18,8 @@
  * \file index applications with a .desktop file
  */
 
+#define DESKTOP_SECTION "Desktop Entry"
+
 static struct indexer_source *load(struct indexer *self, struct catalog *catalog, int id);
 static gboolean execute(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err);
 static gboolean validate(struct indexer *, const char *name, const char *long_name, const char *path);
@@ -55,7 +57,7 @@ static guint notify_display_name_change(struct indexer_source *source,
 {
     g_return_val_if_fail(source, 0);
     g_return_val_if_fail(notify, 0);
-    return source_attribute_change_notify_add(INDEXER_NAME,
+    return source_attribute_change_notify_add(&indexer_applications,
                                               source->id,
                                               "path",
                                               catalog,
@@ -87,6 +89,8 @@ static void release(struct indexer_source *source)
    g_free(source);
 }
 
+
+
 static gboolean execute(struct indexer *self, const char *name, const char *long_name, const char *uri, GError **err)
 {
    g_return_val_if_fail(self!=NULL, FALSE);
@@ -116,12 +120,12 @@ static gboolean execute(struct indexer *self, const char *name, const char *long
       {
          char *exec = NULL;
          gnome_desktop_file_get_string(desktopfile,
-                                       "Desktop Entry",
+                                       DESKTOP_SECTION,
                                        "Exec",
                                        &exec);
          gboolean terminal = FALSE;
          gnome_desktop_file_get_boolean(desktopfile,
-                                        "Desktop Entry",
+                                        DESKTOP_SECTION,
                                         "Terminal",
                                         &terminal);
 
@@ -167,8 +171,10 @@ static gboolean execute(struct indexer *self, const char *name, const char *long
             g_free(exec);
          gnome_desktop_file_free(desktopfile);
       }
+
    return retval;
 }
+
 
 static gboolean validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri)
 {
@@ -199,40 +205,40 @@ static gboolean index_application_cb(struct catalog *catalog,
 
    char *type = NULL;
    gnome_desktop_file_get_string(desktopfile,
-                                 "Desktop Entry",
+                                 DESKTOP_SECTION,
                                  "Type",
                                  &type);
    char *name = NULL;
    gnome_desktop_file_get_string(desktopfile,
-                                 "Desktop Entry",
+                                 DESKTOP_SECTION,
                                  "Name",
                                  &name);
    char *comment = NULL;
    gnome_desktop_file_get_string(desktopfile,
-                                 "Desktop Entry",
+                                 DESKTOP_SECTION,
                                  "Comment",
                                  &comment);
 
    char *generic_name = NULL;
    gnome_desktop_file_get_string(desktopfile,
-                                 "Desktop Entry",
+                                 DESKTOP_SECTION,
                                  "GenericName",
                                  &generic_name);
    gboolean nodisplay = FALSE;
    gnome_desktop_file_get_boolean(desktopfile,
-                                  "Desktop Entry",
+                                  DESKTOP_SECTION,
                                   "NoDisplay",
                                   &nodisplay);
 
    gboolean hidden = FALSE;
    gnome_desktop_file_get_boolean(desktopfile,
-                                  "Desktop Entry",
+                                  DESKTOP_SECTION,
                                   "Hidden",
                                   &hidden);
 
    char *exec = NULL;
    gnome_desktop_file_get_string(desktopfile,
-                                 "Desktop Entry",
+                                 DESKTOP_SECTION,
                                  "Exec",
                                  &exec);
 

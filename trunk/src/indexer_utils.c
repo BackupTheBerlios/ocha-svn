@@ -375,21 +375,21 @@ void attribute_change_notify_cb(GConfClient *client, guint id, GConfEntry *entry
     }
 }
 
-guint source_attribute_change_notify_add(const char *type,
+guint source_attribute_change_notify_add(struct indexer *indexer,
                                          int source_id,
                                          const char *attribute,
                                          struct catalog *catalog,
                                          indexer_source_notify_f callback,
                                          gpointer callback_userdata)
 {
-    char *key = ocha_gconf_get_source_attribute_key(type, source_id, attribute);
+    char *key = ocha_gconf_get_source_attribute_key(indexer->name, source_id, attribute);
 
 
     struct attribute_change_notify_userdata *userdata;
     userdata=g_new(struct attribute_change_notify_userdata, 1);
     userdata->callback=callback;
     userdata->userdata=callback_userdata;
-    userdata->indexer=indexers_get(type);
+    userdata->indexer=indexer;
     userdata->source_id=source_id;
     userdata->catalog=catalog;
 

@@ -121,8 +121,13 @@ static void teardown_query()
 START_TEST(test_create)
 {
    printf("--- test_create\n");
-   struct catalog *catalog=catalog_connect(PATH, NULL);
-   fail_unless(catalog!=NULL, "NULL catalog");
+   GError *err = NULL;
+   struct catalog *catalog=catalog_connect(PATH, &err);
+   if(!catalog)
+   {
+       fail_unless(err!=NULL, "no catalog and no error message");
+       fail(err->message);
+   }
    fail_unless(exists(PATH), "catalog file not created in " PATH);
    catalog_disconnect(catalog);
 }

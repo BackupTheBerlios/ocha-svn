@@ -66,7 +66,7 @@ static guint notify_display_name_change(struct indexer_source *source,
 {
     g_return_val_if_fail(source, 0);
     g_return_val_if_fail(notify, 0);
-    return source_attribute_change_notify_add(INDEXER_NAME,
+    return source_attribute_change_notify_add(&indexer_files,
                                               source->id,
                                               "path",
                                               catalog,
