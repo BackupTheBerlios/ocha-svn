@@ -22,12 +22,12 @@ static gboolean execute_cb(struct result *, GError **);
 static void release_cb(struct result *);
 static struct mock_result results[] =
    {
-      { { "result1", "/x/result1", execute_cb, release_cb }, },
-      { { "result2", "/x/result2", execute_cb, release_cb }, },
-      { { "result3", "/x/result3", execute_cb, release_cb }, },
-      { { "result4", "/x/result4", execute_cb, release_cb }, },
-      { { "result5", "/x/result5", execute_cb, release_cb }, },
-      { { "result6", "/x/result6", execute_cb, release_cb }, },
+      { { "result1", "Result 1", "/x/result1", execute_cb, release_cb }, },
+      { { "result2", "Result 2", "/x/result2", execute_cb, release_cb }, },
+      { { "result3", "Result 3", "/x/result3", execute_cb, release_cb }, },
+      { { "result4", "Result 4", "/x/result4", execute_cb, release_cb }, },
+      { { "result5", "Result 5", "/x/result5", execute_cb, release_cb }, },
+      { { "result6", "Result 6", "/x/result6", execute_cb, release_cb }, },
    };
 #define RESULTS_LEN (sizeof(results)/sizeof(struct mock_result))
 
@@ -219,6 +219,7 @@ static gpointer producer_thread(gpointer mocks)
    for(int i=0; i<PRODUCER_THREAD_RESULT_COUNT; i++)
       {
          mock[i].result.name="resultx";
+         mock[i].result.long_name="resultx (long)";
          mock[i].result.path="resultx/path";
          mock[i].result.release=release_cb;
          mock[i].result.execute=execute_cb;

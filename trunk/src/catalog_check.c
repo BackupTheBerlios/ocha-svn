@@ -264,6 +264,9 @@ static gboolean collect_results_callback(struct catalog *catalog, float pertinen
    g_return_val_if_fail(results, FALSE);
    *results=g_list_append(*results,
                           result);
+   fail_unless(result->name!=NULL, "missing name");
+   fail_unless(result->long_name!=NULL, "missing long name");
+   fail_unless(result->path!=NULL, "missing long path/uri");
    printf("result %d: %s\n", g_list_length(*results), result->name);
    return TRUE;/*continue*/
 }

@@ -590,6 +590,7 @@ static struct result *create_result(struct catalog *catalog, const char *path, c
    result->base.path=buf;
    strcpy(buf, path);
    buf+=strlen(path)+1;
+   result->base.long_name=result->base.path;
 
    result->base.name=buf;
    strcpy(buf, display_name);

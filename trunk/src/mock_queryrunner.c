@@ -80,6 +80,7 @@ static struct result *result_new(const char *query, int index)
    GString* name = g_string_new("");
    g_string_printf(name, "%s%d", query, index);
    retval->name=name->str;
+   retval->long_name=name->str;
    retval->path=name->str;
    g_string_free(name, FALSE/*not free_segment*/);
    retval->execute=result_execute;

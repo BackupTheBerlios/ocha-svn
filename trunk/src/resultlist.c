@@ -205,7 +205,7 @@ static const char *create_highlighted_label_markup(struct result  *result)
    g_string_append(full, "<big><b>");
    g_string_append_query_pango_highlight(full, query, name, "<u>", "</u>");
    g_string_append(full, "</b></big>\n<small>");
-   g_string_append_markup_escaped(full, result->path);
+   g_string_append_markup_escaped(full, result->long_name);
    g_string_append(full, "</small>");
 
    const char *markup = full->str;

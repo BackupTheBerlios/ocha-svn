@@ -1,6 +1,4 @@
-- get rid of mempool
 - canonize file paths
 - replace paths with URI
-- add long_name to result
 - check result validity 
 - display errors when using invalid result (how?)

@@ -19,7 +19,10 @@ struct result
 {
    /** User-friently name for this result (UTF-8). */
    const char *name;
-   /** Full path to this result, which might be a file, an URL or NULL (UTF-8). */
+   /** Long user-friendly name for this result (UTF-8). */
+   const char *long_name;
+
+   /** An URI that uniquely identifies the result (UTF-8). */
    const char *path;
 
    /**

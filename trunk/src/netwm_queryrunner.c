@@ -176,6 +176,7 @@ static struct result *result_new(Display *display, Window win, const char *title
    struct window_result *retval = g_new(struct window_result, 1);
 
    retval->base.name=g_strdup(title);
+   retval->base.long_name=g_strdup_printf("Window \"%s\" (0x%lx)", title, (unsigned long)win);
    retval->base.path=g_strdup_printf("x-win:0x%lx", (unsigned long)win);
    retval->base.execute=result_execute;
    retval->base.release=result_release;
@@ -218,6 +219,7 @@ static void result_release(struct result *_self)
    g_return_if_fail(self);
 
    g_free((void *)self->base.name);
+   g_free((void *)self->base.long_name);
    g_free((void *)self->base.path);
    g_free(self);
 }
