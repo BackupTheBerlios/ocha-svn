@@ -11,7 +11,6 @@
 #include <string.h>
 #include <errno.h>
 #include <stdarg.h>
-#include "mempool.h"
 
 /** Hidden catalog structure */
 struct catalog
@@ -27,8 +26,6 @@ struct catalog
    void *callback_userdata;
    GCond *busy_wait_cond;
    GMutex *busy_wait_mutex;
-
-   struct mempool *escape_mempool;
 
    char path[];
 };
@@ -53,21 +50,20 @@ struct catalog_result
 /* ------------------------- prototypes */
 static gboolean exists(const char *path);
 static gboolean handle_sqlite_retval(struct catalog *catalog, int retval, char *errmsg);
-static int execute_update_nocatalog(sqlite *db, const char *sql, char **errmsg);
-static gboolean execute_update(struct catalog *catalog);
+static int execute_update_nocatalog_printf(sqlite *db, const char *sql, char **errmsg, ...);
+static int execute_update_nocatalog_vprintf(sqlite *db, const char *sql, char **errmsg, va_list ap);
+static gboolean execute_update_printf(struct catalog *catalog, const char *sql, ...);
 static int progress_callback(void *userdata);
-static gboolean execute_query(struct catalog *catalog, sqlite_callback callback, void *userdata);
+static gboolean execute_query_printf(struct catalog *catalog, sqlite_callback callback, void *userdata, const char *sql, ...);
 static gboolean create_tables(sqlite *db, char **errmsg);
 static int count(const char *str, char c);
-static const char *escape(struct catalog *catalog, const char *orig);
-static void escape_free(struct catalog *catalog);
 static void execute_parse(GString *gstr, const char *pattern, const char *path);
 static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id);
 static gboolean execute_result(struct result *_self, GError **);
 static void free_result(struct result *self);
 static struct result *create_result(struct catalog *catalog, const char *path, const char *display_name, const char *execute, int entry_id);
 static int result_sqlite_callback(void *userdata, int col_count, char **col_data, char **col_names);
-static gboolean insert_and_get_id(struct catalog  *catalog, int *id_out);
+static void get_id(struct catalog  *catalog, int *id_out);
 static int findid_callback(void *userdata, int column_count, char **result, char **names);
 
 
@@ -129,11 +125,9 @@ struct catalog *catalog_connect(const char *path, GError **err)
    struct catalog *catalog = (struct catalog *)g_malloc(sizeof(struct catalog)+strlen(path)+1);
    catalog->stop=FALSE;
    catalog->db=db;
-   catalog->sql=g_string_new("");
    catalog->error=g_string_new("");
    catalog->busy_wait_cond=g_cond_new();
    catalog->busy_wait_mutex=g_mutex_new();
-   catalog->escape_mempool=NULL;
    strcpy(catalog->path, path);
    return catalog;
 }
@@ -151,9 +145,7 @@ void catalog_disconnect(struct catalog *catalog)
    sqlite_close(catalog->db);
    g_cond_free(catalog->busy_wait_cond);
    g_mutex_free(catalog->busy_wait_mutex);
-   g_string_free(catalog->sql, TRUE/*free_segment*/);
    g_string_free(catalog->error, TRUE/*free_segment*/);
-   escape_free(catalog);
    g_free(catalog);
 }
 
@@ -186,11 +178,9 @@ gboolean catalog_executequery(struct catalog *catalog,
    if(catalog->stop)
       return TRUE;
 
-
-   g_string_assign(catalog->sql,
-                   "SELECT e.id, e.path, e.display_name, c.execute, e.lastuse "
-                   "FROM entries e, command c "
-                   "WHERE e.display_name LIKE '%");
+   GString *sql = g_string_new("SELECT e.id, e.path, e.display_name, c.execute, e.lastuse "
+                               "FROM entries e, command c "
+                               "WHERE e.display_name LIKE '%%");
    gboolean has_space=FALSE;
    for(const char *cptr=query; *cptr!='\0'; cptr++)
       {
@@ -208,22 +198,24 @@ gboolean catalog_executequery(struct catalog *catalog,
             default:
                if(has_space)
                   {
-                     g_string_append(catalog->sql,
-                                     "%' AND e.display_name LIKE '%");
+                     g_string_append(sql,
+                                     "%%' AND e.display_name LIKE '%%");
                      has_space=FALSE;
                   }
-               g_string_append_c(catalog->sql,
-                               c);
+               g_string_append_c(sql, c);
             }
       }
-   g_string_append(catalog->sql,
-                   "%' AND e.command_id=c.id "
-                   "ORDER BY e.lastuse DESC;");
+   g_string_append(sql,
+                   "%%' AND e.command_id=c.id "
+                   "ORDER BY e.lastuse DESC");
    catalog->callback=callback;
    catalog->callback_userdata=userdata;
-   gboolean ret = execute_query(catalog,
-                            result_sqlite_callback,
-                            catalog/*userdata*/);
+   gboolean ret = execute_query_printf(catalog,
+                                       result_sqlite_callback,
+                                       catalog/*userdata*/,
+                                       sql->str);
+   g_string_free(sql, TRUE/*free content*/);
+
    /* the catalog was probably called from two threads
     * at the same time: this is forbidden
     */
@@ -247,23 +239,24 @@ gboolean catalog_addcommand(struct catalog *catalog, const char *name, const cha
    int old_id = -1;
    if(catalog_findcommand(catalog, name, &old_id))
       {
-         g_string_printf(catalog->sql,
-                         "UPDATE command SET execute='%s' WHERE id=%d;",
-                         escape(catalog, execute),
-                         old_id);
-         escape_free(catalog);
          if(id_out)
             *id_out=old_id;
-         return execute_update(catalog);
+         return execute_update_printf(catalog,
+                                      "UPDATE command SET execute='%q' WHERE id=%d",
+                                      execute,
+                                      old_id);
       }
    else
       {
-         g_string_printf(catalog->sql,
-                         "INSERT INTO command (id, display_name, execute) VALUES (NULL, '%s', '%s');",
-                         escape(catalog, name),
-                         escape(catalog, execute));
-         escape_free(catalog);
-         return insert_and_get_id(catalog, id_out);
+         if(execute_update_printf(catalog,
+                                  "INSERT INTO command (id, display_name, execute) VALUES (NULL, '%q', '%q')",
+                                  name,
+                                  execute))
+            {
+               get_id(catalog, id_out);
+               return TRUE;
+            }
+         return FALSE;
       }
 }
 
@@ -273,13 +266,13 @@ gboolean catalog_findcommand(struct catalog *catalog, const char *name, int *id_
    g_return_val_if_fail(catalog!=NULL, FALSE);
    g_return_val_if_fail(name!=NULL, FALSE);
 
-   g_string_printf(catalog->sql,
-                   "SELECT id FROM command where display_name='%s';",
-                   escape(catalog, name));
-   escape_free(catalog);
    int id=-1;
-
-   if( execute_query(catalog, findid_callback, &id) && id!=-1)
+   if( execute_query_printf(catalog,
+                            findid_callback,
+                            &id,
+                            "SELECT id FROM command where display_name='%q'",
+                            name)
+       && id!=-1)
       {
          if(id_out)
             *id_out=id;
@@ -293,13 +286,13 @@ gboolean catalog_findentry(struct catalog *catalog, const char *path, int *id_ou
    g_return_val_if_fail(catalog!=NULL, FALSE);
    g_return_val_if_fail(path!=NULL, FALSE);
 
-   g_string_printf(catalog->sql,
-                   "SELECT id FROM entries WHERE path='%s';",
-                   escape(catalog, path));
-   escape_free(catalog);
    int id=-1;
-
-   if(execute_query(catalog, findid_callback, &id) && id!=-1)
+   if(execute_query_printf(catalog,
+                           findid_callback,
+                           &id,
+                           "SELECT id FROM entries WHERE path='%q'",
+                           path)
+      && id!=-1)
       {
          if(id_out)
             *id_out=id;
@@ -317,23 +310,24 @@ gboolean catalog_addentry(struct catalog *catalog, const char *path, const char 
    int old_id=-1;
    if(catalog_findentry(catalog, path, &old_id))
       {
-         g_string_printf(catalog->sql,
-                         "UPDATE entries SET display_name='%s', command_id=%d WHERE id=%d;",
-                         escape(catalog, display_name),
-                         command_id,
-                         old_id);
-         escape_free(catalog);
-         return execute_update(catalog);
+         return execute_update_printf(catalog,
+                                      "UPDATE entries SET display_name='%q', command_id=%d WHERE id=%d",
+                                      display_name,
+                                      command_id,
+                                      old_id);
       }
    else
       {
-         g_string_printf(catalog->sql,
-                         "INSERT INTO entries (id, path, display_name, command_id) VALUES (NULL, '%s', '%s', %d);",
-                         escape(catalog, path),
-                         escape(catalog, display_name),
-                         command_id);
-         escape_free(catalog);
-         return insert_and_get_id(catalog, id_out);
+         if(execute_update_printf(catalog,
+                                  "INSERT INTO entries (id, path, display_name, command_id) VALUES (NULL, '%q', '%q', %d)",
+                                  path,
+                                  display_name,
+                                  command_id))
+            {
+               get_id(catalog, id_out);
+               return TRUE;
+            }
+         return FALSE;
       }
 }
 
@@ -364,38 +358,47 @@ static gboolean handle_sqlite_retval(struct catalog *catalog, int retval, char *
          g_string_append(catalog->error, errmsg);
          sqlite_freemem(errmsg);
       }
-   g_string_append_printf(catalog->error,
-                          " (SQL statement: %s)",
-                          catalog->sql->str);
    return FALSE;
 }
 
-static int execute_update_nocatalog(sqlite *db, const char *sql, char **errmsg)
+static int execute_update_nocatalog_printf(sqlite *db, const char *sql, char **errmsg, ...)
+{
+   va_list ap;
+   va_start(ap, errmsg);
+   return execute_update_nocatalog_vprintf(db, sql, errmsg, ap);
+}
+static int execute_update_nocatalog_vprintf(sqlite *db, const char *sql, char **errmsg, va_list ap)
 {
    sqlite_busy_timeout(db, 30000/*30 seconds timout, for updates*/);
 
-   int ret = sqlite_exec(db,
-                         sql,
-                         NULL/*no callback*/,
-                         NULL/*no userdata*/,
-                         errmsg);
+   int ret = sqlite_exec_vprintf(db,
+                                 sql,
+                                 NULL/*no callback*/,
+                                 NULL/*no userdata*/,
+                                 errmsg,
+                                 ap);
    if(ret!=0)
-      sqlite_exec(db, "ROLLBACK;", NULL, NULL, NULL);
+      sqlite_exec(db, "ROLLBACK", NULL, NULL, NULL);
 
    sqlite_busy_timeout(db, -1/*disable, for queries*/);
 
    return ret;
 }
-static gboolean execute_update(struct catalog *catalog)
+static gboolean execute_update_printf(struct catalog *catalog, const char *sql, ...)
 {
+   va_list ap;
+   va_start(ap, sql);
+
    char *errmsg=NULL;
-   g_string_prepend(catalog->sql, "BEGIN;");
-   if(catalog->sql->str[catalog->sql->len-1]!=';')
-      g_string_append_c(catalog->sql, ';');
-   g_string_append(catalog->sql, "COMMIT;");
-   int ret = execute_update_nocatalog(catalog->db,
-                                      catalog->sql->str,
-                                      &errmsg);
+   int sql_len = strlen(sql);
+   char buffer[strlen("BEGIN;")+sql_len+strlen(";COMMIT;")+1];
+   strcpy(buffer, "BEGIN;");
+   strcat(buffer, sql);
+   strcat(buffer, ";COMMIT;");
+   int ret = execute_update_nocatalog_vprintf(catalog->db,
+                                              buffer,
+                                              &errmsg,
+                                              ap);
    return handle_sqlite_retval(catalog, ret, errmsg);
 }
 
@@ -405,8 +408,10 @@ static int progress_callback(void *userdata)
    return catalog->stop ? 1:0;
 }
 
-static gboolean execute_query(struct catalog *catalog, sqlite_callback callback, void *userdata)
+static gboolean execute_query_printf(struct catalog *catalog, sqlite_callback callback, void *userdata, const char *sql, ...)
 {
+   va_list ap;
+   va_start(ap, sql);
    char *errmsg=NULL;
 
    sqlite_progress_handler(catalog->db, 1, progress_callback, catalog);
@@ -418,11 +423,12 @@ static gboolean execute_query(struct catalog *catalog, sqlite_callback callback,
                ret=SQLITE_ABORT;
                break;
             }
-         ret = sqlite_exec(catalog->db,
-                           catalog->sql->str,
-                           callback,
-                           userdata,
-                           &errmsg);
+         ret = sqlite_exec_vprintf(catalog->db,
+                                   sql,
+                                   callback,
+                                   userdata,
+                                   &errmsg,
+                                   ap);
          if(ret==SQLITE_BUSY)
             {
                g_mutex_lock(catalog->busy_wait_mutex);
@@ -444,27 +450,27 @@ static gboolean execute_query(struct catalog *catalog, sqlite_callback callback,
 
 static gboolean create_tables(sqlite *db, char **errmsg)
 {
-   int ret = execute_update_nocatalog(db,
-                                      "BEGIN; "
-                                      "CREATE TABLE entries (id INTEGER PRIMARY KEY, "
-                                      "path VARCHAR UNIQUE NOT NULL, "
-                                      "display_name VARCHAR NOT NULL, "
-                                      "command_id INTEGER, "
-                                      "lastuse TIMESTAMP);"
-                                      "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
-                                      "CREATE INDEX path_idx ON entries (path);"
-                                      "CREATE TABLE command (id INTEGER PRIMARY KEY , "
-                                      "display_name VARCHAR NOT NULL, "
-                                      "execute VARCHAR NOT NULL, "
-                                      "lastuse TIMESTAMP);"
-                                      "CREATE INDEX command_idx ON command (display_name);"
-                                      "CREATE TABLE history (query VARCHAR NOT NULL, "
-                                      "entry_id INTEGER NOT NULL, "
-                                      "command_id INTEGER NOT NULL, "
-                                      "lastuse TIMESTAMP NOT NULL, "
-                                      "frequence FLOAT NOT NULL);"
-                                      "COMMIT;",
-                                      errmsg);
+   int ret = execute_update_nocatalog_printf(db,
+                                             "BEGIN; "
+                                             "CREATE TABLE entries (id INTEGER PRIMARY KEY, "
+                                             "path VARCHAR UNIQUE NOT NULL, "
+                                             "display_name VARCHAR NOT NULL, "
+                                             "command_id INTEGER, "
+                                             "lastuse TIMESTAMP);"
+                                             "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
+                                             "CREATE INDEX path_idx ON entries (path);"
+                                             "CREATE TABLE command (id INTEGER PRIMARY KEY , "
+                                             "display_name VARCHAR NOT NULL, "
+                                             "execute VARCHAR NOT NULL, "
+                                             "lastuse TIMESTAMP);"
+                                             "CREATE INDEX command_idx ON command (display_name);"
+                                             "CREATE TABLE history (query VARCHAR NOT NULL, "
+                                             "entry_id INTEGER NOT NULL, "
+                                             "command_id INTEGER NOT NULL, "
+                                             "lastuse TIMESTAMP NOT NULL, "
+                                             "frequence FLOAT NOT NULL);"
+                                             "COMMIT;",
+                                             errmsg);
    return ret==SQLITE_OK;
 }
 
@@ -477,38 +483,6 @@ static int count(const char *str, char c)
             count++;
       }
    return count;
-}
-static const char *escape(struct catalog *catalog, const char *orig)
-{
-   int quotes = count(orig, '\'');
-   if(quotes==0)
-      return orig;
-   if(!catalog->escape_mempool)
-      catalog->escape_mempool=mempool_new();
-   char *retval = (char *)mempool_alloc(catalog->escape_mempool, strlen(orig)+quotes+1);
-   char *retval_ptr = retval;
-   const char *orig_ptr = orig;
-   while(*orig_ptr!='\0')
-      {
-         *retval_ptr=*orig_ptr;
-         retval_ptr++;
-         if(*orig_ptr=='\'')
-            {
-               *retval_ptr='\'';
-               retval_ptr++;
-            }
-         orig_ptr++;
-      }
-   *retval_ptr='\0';
-   return retval;
-}
-static void escape_free(struct catalog *catalog)
-{
-   if(catalog->escape_mempool)
-      {
-         mempool_delete(catalog->escape_mempool);
-         catalog->escape_mempool=NULL;
-      }
 }
 
 /**
@@ -540,12 +514,11 @@ static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id)
    GTimeVal timeval;
    g_get_current_time(&timeval);
 
-   g_string_printf(catalog->sql,
-                   "UPDATE entries SET lastuse='%16.16lx.%6.6lu' WHERE id=%d;",
-                   (unsigned long)timeval.tv_sec,
-                   (unsigned long)timeval.tv_usec,
-                   entry_id);
-   return execute_update(catalog);
+   return execute_update_printf(catalog,
+                                "UPDATE entries SET lastuse='%16.16lx.%6.6lu' WHERE id=%d",
+                                (unsigned long)timeval.tv_sec,
+                                (unsigned long)timeval.tv_usec,
+                                entry_id);
 }
 
 static gboolean execute_result(struct result *_self, GError **err)
@@ -663,15 +636,10 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
    return go_on && !catalog->stop ? 0:1;
 }
 
-static gboolean insert_and_get_id(struct catalog  *catalog, int *id_out)
+static void get_id(struct catalog  *catalog, int *id_out)
 {
-   if(execute_update(catalog))
-      {
-         if(id_out!=NULL)
-            *id_out=sqlite_last_insert_rowid(catalog->db);
-         return TRUE;
-      }
-   return FALSE;
+   if(id_out!=NULL)
+      *id_out=sqlite_last_insert_rowid(catalog->db);
 }
 
 /**
