@@ -14,7 +14,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define QUERY_TIMEOUT 800
+#define QUERY_TIMEOUT 3000
 
 static struct querywin win_data;
 static struct result_queue *result_queue;
