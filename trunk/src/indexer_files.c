@@ -414,6 +414,26 @@ static void include_content_reset_depth_cb(GtkToggleButton *toggle, gpointer use
         }
 }
 
+static void change_path_cb(GtkFileChooser *chooser, gpointer userdata)
+{
+    int id = GPOINTER_TO_INT(userdata);
+
+    gchar *filename = gtk_file_chooser_get_filename(chooser);
+    ocha_gconf_set_source_attribute(INDEXER_NAME, id, "path", filename);
+    if(filename)
+        g_free(filename);
+}
+static void update_path_label_cb(GtkFileChooser *chooser, gpointer userdata)
+{
+    GtkLabel *label = GTK_LABEL(userdata);
+    g_return_if_fail(label);
+
+    gchar *uri = gtk_file_chooser_get_uri(chooser);
+    gtk_label_set_text(label, uri ? uri:"");
+    if(uri)
+        g_free(uri);
+}
+
 static GtkWidget *editor_widget(struct indexer_source *source)
 {
     g_return_val_if_fail(source, NULL);
@@ -449,7 +469,7 @@ static GtkWidget *editor_widget(struct indexer_source *source)
     gtk_container_add(GTK_CONTAINER(frame_top), align);
     gtk_alignment_set_padding(GTK_ALIGNMENT(align), 0, 0, 12, 0);
 
-    GtkWidget *top_table = gtk_table_new(1/*rows*/,
+    GtkWidget *top_table = gtk_table_new(2/*rows*/,
                                          2/*columns*/,
                                          FALSE);
     gtk_widget_show(top_table);
@@ -469,6 +489,25 @@ static GtkWidget *editor_widget(struct indexer_source *source)
                      GTK_EXPAND | GTK_FILL, 0, 0, 0);
     gtk_misc_set_alignment(GTK_MISC(path), 0, 0.5);
     gtk_misc_set_padding(GTK_MISC(path), 4, 0);
+
+    GtkWidget *choose = gtk_file_chooser_button_new("Path",
+                                                    GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+    gtk_widget_show(choose);
+    gtk_table_attach(GTK_TABLE(top_table), choose, 1, 2, 1, 2,
+                     GTK_EXPAND | GTK_FILL, 0, 0, 0);
+    gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(choose),
+                                  current_path? current_path:"/");
+
+    g_signal_connect(choose,
+                     "selection-changed",
+                     G_CALLBACK(update_path_label_cb),
+                     path);
+    g_signal_connect(choose,
+                     "selection-changed",
+                     G_CALLBACK(change_path_cb),
+                     GINT_TO_POINTER(source_id));
+
+
 
     /* --- Bottom frame: Indexing */
 
