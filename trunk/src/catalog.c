@@ -61,7 +61,7 @@ static void execute_parse(GString *gstr, const char *pattern, const char *path);
 static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id);
 static gboolean execute_result(struct result *_self, GError **);
 static void free_result(struct result *self);
-static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *execute, int entry_id);
+static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *long_name, const char *execute, int entry_id);
 static int result_sqlite_callback(void *userdata, int col_count, char **col_data, char **col_names);
 static void get_id(struct catalog  *catalog, int *id_out);
 static int findid_callback(void *userdata, int column_count, char **result, char **names);
@@ -178,7 +178,7 @@ gboolean catalog_executequery(struct catalog *catalog,
    if(catalog->stop)
       return TRUE;
 
-   GString *sql = g_string_new("SELECT e.id, e.path, e.name, c.execute, e.lastuse "
+   GString *sql = g_string_new("SELECT e.id, e.path, e.name, e.long_name, c.execute, e.lastuse "
                                "FROM entries e, command c "
                                "WHERE e.name LIKE '%%");
    gboolean has_space=FALSE;
@@ -571,7 +571,7 @@ static void free_result(struct result *self)
    g_return_if_fail(self);
    g_free(self);
 }
-static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *execute, int entry_id)
+static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *long_name, const char *execute, int entry_id)
 {
    g_return_val_if_fail(catalog, NULL);
    g_return_val_if_fail(path, NULL);
@@ -581,6 +581,7 @@ static struct result *create_result(struct catalog *catalog, const char *path, c
    struct catalog_result *result = g_malloc(sizeof(struct catalog_result)
                                             +strlen(path)+1
                                             +strlen(name)+1
+                                            +strlen(long_name)+1
                                             +strlen(execute)+1
                                             +strlen(catalog->path)+1);
    result->entry_id=entry_id;
@@ -589,11 +590,14 @@ static struct result *create_result(struct catalog *catalog, const char *path, c
    result->base.path=buf;
    strcpy(buf, path);
    buf+=strlen(path)+1;
-   result->base.long_name=result->base.path;
 
    result->base.name=buf;
    strcpy(buf, name);
    buf+=strlen(name)+1;
+
+   result->base.long_name=buf;
+   strcpy(buf, long_name);
+   buf+=strlen(long_name)+1;
 
    result->execute=buf;
    strcpy(buf, execute);
@@ -619,7 +623,8 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
    const int entry_id = atoi(col_data[0]);
    const char *path = col_data[1];
    const char *name = col_data[2];
-   const char *execute = col_data[3];
+   const char *long_name = col_data[3];
+   const char *execute = col_data[4];
 
    if(catalog->stop)
       return 1;
@@ -627,6 +632,7 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
    struct result *result = create_result(catalog,
                                          path,
                                          name,
+                                         long_name,
                                          execute,
                                          entry_id);
    gboolean go_on = catalog->callback(catalog,

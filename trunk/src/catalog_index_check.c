@@ -54,10 +54,10 @@ START_TEST(test_index_directory)
    printf("---test_index_directory\n");
    int gnome_open_id=8;
    mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", gnome_open_id, 4);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", TEMPDIR "/x1.txt", gnome_open_id, 1);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", TEMPDIR "/x2.gif", gnome_open_id, 2);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", TEMPDIR "/d1/x3.txt", gnome_open_id, 3);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", TEMPDIR "/d1/d2/x4.txt", gnome_open_id, 4);
 
    fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
@@ -73,8 +73,8 @@ START_TEST(test_index_directory_maxdepth_1)
    printf("---test_index_directory_maxdepth_1\n");
    int gnome_open_id=8;
    mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", TEMPDIR "/x1.txt", gnome_open_id, 1);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", TEMPDIR "/x2.gif", gnome_open_id, 2);
 
    fail_unless(catalog_index_directory(catalog, TEMPDIR, 1, NULL/*ignore*/, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
@@ -89,9 +89,9 @@ START_TEST(test_index_directory_maxdepth_2)
    printf("---test_index_directory_maxdepth_2\n");
    int gnome_open_id=8;
    mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", TEMPDIR "/x1.txt", gnome_open_id, 1);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", TEMPDIR "/x2.gif", gnome_open_id, 2);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", TEMPDIR "/d1/x3.txt", gnome_open_id, 3);
 
    fail_unless(catalog_index_directory(catalog, TEMPDIR, 2, NULL/*ignore*/, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
@@ -115,10 +115,10 @@ START_TEST(test_index_directory_default_ignore)
 
    int gnome_open_id=8;
    mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", gnome_open_id, 4);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", TEMPDIR "/x1.txt", gnome_open_id, 1);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", TEMPDIR "/x2.gif", gnome_open_id, 2);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", TEMPDIR "/d1/x3.txt", gnome_open_id, 3);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", TEMPDIR "/d1/d2/x4.txt", gnome_open_id, 4);
 
    fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
@@ -136,7 +136,7 @@ START_TEST(test_index_directory_ignore_others)
 
    int gnome_open_id=8;
    mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
-   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
+   mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", TEMPDIR "/x2.gif", gnome_open_id, 2);
 
    fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, ignore, FALSE/*not slow*/, NULL/*err*/),
                "indexing failed");
@@ -221,16 +221,19 @@ START_TEST(test_index_applications)
    mock_catalog_expect_addentry(catalog,
                                 TEMPDIR "/xmms.desktop",
                                 "XMMS",
+                                "X Multimedia System",
                                 run_id,
                                 1);
    mock_catalog_expect_addentry(catalog,
                                 TEMPDIR "/d1/xman.desktop",
                                 "Xman",
+                                "Xman: manual page browser for X",
                                 run_id,
                                 2);
    mock_catalog_expect_addentry(catalog,
                                 TEMPDIR "/d1/d2/xpdf.desktop",
                                 "Xpdf",
+                                "Xpdf: Portable Document Format (PDF) file viewer for X",
                                 run_id,
                                 3);
 
@@ -260,6 +263,7 @@ START_TEST(test_index_applications_depth)
    mock_catalog_expect_addentry(catalog,
                                 TEMPDIR "/xmms.desktop",
                                 "XMMS",
+                                "X Multimedia System",
                                 run_id,
                                 1);
 
@@ -411,21 +415,25 @@ START_TEST(test_index_bookmarks)
    mock_catalog_expect_addentry(catalog,
                                 "http://slashdot.org/",
                                 "slashdot",
+                                "http://slashdot.org/",
                                 run_id,
                                 1);
    mock_catalog_expect_addentry(catalog,
                                 "http://www.groklaw.net/",
                                 "GROKLAW",
+                                "http://www.groklaw.net/",
                                 run_id,
                                 2);
    mock_catalog_expect_addentry(catalog,
                                 "http://texturizer.net/firefox/extensions/",
                                 "Firefox Extensions",
+                                "http://texturizer.net/firefox/extensions/",
                                 run_id,
                                 3);
    mock_catalog_expect_addentry(catalog,
                                 "http://texturizer.net/firefox/themes/",
                                 "Firefox Themes",
+                                "http://texturizer.net/firefox/themes/",
                                 run_id,
                                 4);
 
@@ -468,6 +476,7 @@ START_TEST(test_index_bookmarks_escape)
    mock_catalog_expect_addentry(catalog,
                                 "http://texturizer.net/firefox/extensions/",
                                 "<Firefox> add-ons & (Extensions)",
+                                "http://texturizer.net/firefox/extensions/",
                                 run_id,
                                 3);
 

@@ -21,11 +21,12 @@ void mock_catalog_expect_addcommand(struct catalog *catalog, const char *name, c
  * Expect catalog_addentry() calls.
  * @param catalog
  * @param path path or URI, unique id of the entry
- * @param display_name display name of the entry
+ * @param name display name of the entry
+ * @param long_name description or full name of the entry
  * @param command_id command to link the entry to
  * @param id id to assign to the entry
  */
-void mock_catalog_expect_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int id);
+void mock_catalog_expect_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int command_id, int id);
 
 /**
  * Fail unless all calls have been made as expected.

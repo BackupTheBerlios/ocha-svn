@@ -42,7 +42,7 @@ static char *html_expand_common_entities(const char *orig);
 static void doze_off(gboolean really);
 
 static gboolean catalog_addcommand_witherrors(struct catalog *catalog, const char *name, const char *execute, int *cmd, GError **err);
-static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, int cmd_id, GError **err);
+static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, const char *long_name, int cmd_id, GError **err);
 static DIR *opendir_witherrors(const char *path, GError **err);
 
 typedef gboolean (*handle_file_f)(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
@@ -163,9 +163,9 @@ gboolean catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_f
                char *href = strstr(a_open, "HREF=\"");
                if(href)
                   {
-                     char *quote_start = href+strlen("HREF=\"");
-                     char *quote_end = strstr(quote_start, "\"");
-                     if(quote_end)
+                     char *href_start = href+strlen("HREF=\"");
+                     char *href_end = strstr(href_start, "\"");
+                     if(href_end)
                         {
                            char *a_end = strstr(a_open, ">");
                            if(a_end)
@@ -173,18 +173,19 @@ gboolean catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_f
                                  char *a_close = strstr(a_end, "</A>");
                                  if(a_close)
                                     {
-                                       *quote_end='\0';
+                                       *href_end='\0';
                                        *a_close='\0';
-                                       char *unescaped_label = html_expand_common_entities(a_end+1);
+                                       char *expanded_label = html_expand_common_entities(a_end+1);
                                        if(!catalog_addentry_witherrors(catalog,
-                                                                       quote_start,
-                                                                       unescaped_label,
+                                                                       href_start,
+                                                                       expanded_label,
+                                                                       href_start,
                                                                        cmd,
                                                                        err))
                                           {
                                              error=TRUE;
                                           }
-                                       g_free(unescaped_label);
+                                       g_free(expanded_label);
                                     }
                               }
                         }
@@ -212,9 +213,9 @@ static gboolean catalog_addcommand_witherrors(struct catalog *catalog, const cha
       }
    return TRUE;
 }
-static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, int cmd_id, GError **err)
+static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, const char *long_name, int cmd_id, GError **err)
 {
-   if(!catalog_addentry(catalog, path, name, path, cmd_id, NULL/*id_out*/))
+   if(!catalog_addentry(catalog, path, name, long_name, cmd_id, NULL/*id_out*/))
       {
          g_set_error(err,
                      CATALOG_INDEX_ERROR,
@@ -225,7 +226,7 @@ static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char 
          return FALSE;
       }
    if(trace_callback)
-      trace_callback(path, name, trace_callback_userdata);
+      trace_callback(path, name, long_name, trace_callback_userdata);
    return TRUE;
 }
 
@@ -354,6 +355,7 @@ static gboolean index_directory_entry(struct catalog *catalog, int cmd, const ch
    return catalog_addentry_witherrors(catalog,
                                       path,
                                       filename,
+                                      path/*long_name*/,
                                       cmd,
                                       err);
 }
@@ -368,31 +370,84 @@ static gboolean index_application_entry(struct catalog *catalog, int cmd, const 
    if(desktopfile==NULL)
       return TRUE;
 
+   char *type = NULL;
+   gnome_desktop_file_get_string(desktopfile,
+                                 "Desktop Entry",
+                                 "Type",
+                                 &type);
    char *name = NULL;
    gnome_desktop_file_get_string(desktopfile,
                                  "Desktop Entry",
                                  "Name",
                                  &name);
+   char *comment = NULL;
+   gnome_desktop_file_get_string(desktopfile,
+                                 "Desktop Entry",
+                                 "Comment",
+                                 &comment);
+
+   char *generic_name = NULL;
+   gnome_desktop_file_get_string(desktopfile,
+                                 "Desktop Entry",
+                                 "GenericName",
+                                 &generic_name);
    gboolean terminal = FALSE;
    gnome_desktop_file_get_boolean(desktopfile,
                                   "Desktop Entry",
                                   "Terminal",
                                   &terminal);
 
+   gboolean nodisplay = FALSE;
+   gnome_desktop_file_get_boolean(desktopfile,
+                                  "Desktop Entry",
+                                  "NoDisplay",
+                                  &nodisplay);
+
+   gboolean hidden = FALSE;
+   gnome_desktop_file_get_boolean(desktopfile,
+                                  "Desktop Entry",
+                                  "Hidden",
+                                  &hidden);
+
    char *exec = NULL;
    gnome_desktop_file_get_string(desktopfile,
                                  "Desktop Entry",
                                  "Exec",
                                  &exec);
+
+   char *description=NULL;
+   if(comment && generic_name)
+      description=g_strdup_printf("%s (%s)", comment, generic_name);
+
    gboolean retval = TRUE;
-   if(!terminal && exec!=NULL && strstr(exec, "%")==NULL)
+   if((type==NULL || g_strcasecmp("Application", type)==0)
+      && !terminal
+      && !hidden
+      && !nodisplay
+      && exec!=NULL
+      && strstr(exec, "%")==NULL)
       {
+         const char *long_name=description;
+         if(!long_name)
+            long_name=comment;
+         if(!long_name)
+            long_name=generic_name;
+         if(!long_name)
+            long_name=path;
          retval=catalog_addentry_witherrors(catalog,
                                             path,
                                             name==NULL ? filename:name,
+                                            long_name,
                                             cmd,
                                             err);
       }
+
+   if(description)
+      g_free(description);
+   if(comment)
+      g_free(comment);
+   if(generic_name)
+      g_free(generic_name);
    if(name)
       g_free(name);
    if(exec)

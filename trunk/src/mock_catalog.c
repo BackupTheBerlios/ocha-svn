@@ -37,7 +37,8 @@ struct addentry_args
 {
    struct expectation expect;
    const char *path;
-   const char *display_name;
+   const char *name;
+   const char *long_name;
    int command_id;
    int id;
 };
@@ -70,17 +71,23 @@ void mock_catalog_expect_addcommand(struct catalog *catalog, const char *name, c
                        (gpointer)expect);
 }
 
-void mock_catalog_expect_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int id)
+void mock_catalog_expect_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int command_id, int id)
 {
+   fail_unless(path!=NULL, "no path");
+   fail_unless(name!=NULL, "no name");
+   fail_unless(long_name!=NULL, "no long_name");
+
    struct addentry_args *expect = g_new(struct addentry_args, 1);
    expectation_init(&expect->expect,
-                    g_strdup_printf("addentry(catalog, '%s', '%s', %d):%d",
+                    g_strdup_printf("addentry(catalog, '%s', '%s', '%s', %d):%d",
                                     path,
-                                    display_name,
+                                    name,
+                                    long_name,
                                     command_id,
                                     id));
    expect->path=g_strdup(path);
-   expect->display_name=g_strdup(display_name);
+   expect->name=g_strdup(name);
+   expect->long_name=g_strdup(long_name);
    expect->command_id=command_id;
    expect->id=id;
    g_hash_table_insert(catalog->expected_addentry,
@@ -113,27 +120,34 @@ const char *catalog_error(struct catalog *catalog)
 {
    return "mock error";
 }
-gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, const char *long_name, int command_id, int *id_out)
+gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int command_id, int *id_out)
 {
    struct addentry_args *args =
       (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,
                                                   path);
 
    fail_unless(long_name!=NULL, "no long_name");
+   fail_unless(name!=NULL, "no display_name");
+   fail_unless(path!=NULL, "no path");
    if(args==NULL)
       {
+
          fail(g_strdup_printf("unexpected call catalog_addentry(catalog, '%s', '%s')\n",
                               path,
-                              display_name));
+                              name));
          expectation_call(NULL);
          return FALSE;
       }
-
-   fail_unless(strcmp(args->display_name, display_name)==0,
-               g_strdup_printf("wrong display name for %s, expected '%s', got '%s'",
+   fail_unless(strcmp(args->name, name)==0,
+               g_strdup_printf("wrong name for %s, expected '%s', got '%s'",
                                args->expect.description,
-                               args->display_name,
-                               display_name));
+                               args->name,
+                               name));
+   fail_unless(strcmp(args->long_name, long_name)==0,
+               g_strdup_printf("wrong long_name for %s, expected '%s', got '%s'",
+                               args->expect.description,
+                               args->long_name,
+                               long_name));
    fail_unless(command_id==args->command_id,
                g_strdup_printf("wrong command id for %s, expected %d, got %d",
                                args->expect.description,

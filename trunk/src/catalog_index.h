@@ -13,7 +13,7 @@
  * @param name display name
  * @param userdata
  */
-typedef void (*catalog_index_trace_callback_f)(const char *path, const char *name, gpointer userdata);
+typedef void (*catalog_index_trace_callback_f)(const char *path, const char *name, const char *long_name, gpointer userdata);
 
 /**
  * Set a callback to be told whenever a new entry is added.

@@ -27,11 +27,11 @@ static void print_indexing_error(const char *type, const char *path, GError **er
    *err=NULL;
 }
 
-static void trace_cb(const char *path, const char *name, gpointer userdata)
+static void trace_cb(const char *path, const char *name, const char *long_name, gpointer userdata)
 {
    gint *entry_count = (gint *)userdata;
    g_return_if_fail(entry_count);
-   printf("added entry: %s \"%s\"\n", path, name);
+   printf("added entry: %s \"%s\" (%s)\n", path, name, long_name);
    (*entry_count)++;
 }
 
