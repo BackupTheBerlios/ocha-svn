@@ -28,14 +28,19 @@ static struct indexer_source *indexer_application_load_source(struct indexer *se
 static gboolean indexer_application_execute(struct indexer *self, const char *name, const char *long_name, const char *uri, GError **err);
 static gboolean indexer_application_validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri);
 static gboolean indexer_application_discover(struct indexer *indexer, struct catalog *catalog);
+static struct indexer_source_view *indexer_applications_new_view(struct indexer *indexer);
 
 /* ------------------------- prototypes: indexer_application_source */
 static void indexer_application_source_release(struct indexer_source *source);
 static gboolean index_application_cb(struct catalog *catalog, int source_id, const char *path, const char *filename, GError **err, gpointer userdata);
 static gboolean indexer_application_source_index(struct indexer_source *self, struct catalog *catalog, GError **err);
-static GtkWidget *indexer_application_source_editor_widget(struct indexer_source *source);
 static guint indexer_application_source_notify_add(struct indexer_source *source, struct catalog *catalog, indexer_source_notify_f notify, gpointer userdata);
 static void indexer_application_source_notify_remove(struct indexer_source *source, guint id);
+
+/* ------------------------- prototypes: indexer_source_view */
+static void indexer_applications_source_view_attach(struct indexer_source_view *view, struct indexer_source *);
+static void indexer_applications_source_view_detach(struct indexer_source_view *view);
+static void indexer_applications_source_view_release(struct indexer_source_view *view);
 
 /* ------------------------- prototypes: other */
 static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore);
@@ -59,7 +64,8 @@ struct indexer indexer_applications = {
         indexer_application_load_source,
         indexer_application_execute,
         indexer_application_validate,
-        NULL/*new_source*/
+        NULL/*new_source*/,
+        indexer_applications_new_view,
 };
 
 /* ------------------------- public functions */
@@ -73,7 +79,6 @@ static struct indexer_source *indexer_application_load_source(struct indexer *se
         retval->index=indexer_application_source_index;
         retval->release=indexer_application_source_release;
         retval->display_name=display_name(catalog, id);
-        retval->editor_widget=indexer_application_source_editor_widget;
         retval->notify_display_name_change=indexer_application_source_notify_add;
         retval->remove_notification=indexer_application_source_notify_remove;
         return retval;
@@ -197,6 +202,22 @@ static gboolean indexer_application_discover(struct indexer *indexer, struct cat
         return retval;
 }
 
+static struct indexer_source_view *indexer_applications_new_view(struct indexer *indexer)
+{
+        struct indexer_source_view *retval;
+
+        retval=g_new(struct indexer_source_view, 1);
+        retval->indexer = indexer;
+        retval->widget = gtk_label_new("");
+        g_object_ref(retval->widget);
+        gtk_widget_show(retval->widget);
+
+        retval->attach=indexer_applications_source_view_attach;
+        retval->detach=indexer_applications_source_view_detach;
+        retval->release=indexer_applications_source_view_release;
+
+        return retval;
+}
 
 /* ------------------------- member functions (indexer_application_source) */
 static guint indexer_application_source_notify_add(struct indexer_source *source,
@@ -240,11 +261,29 @@ static gboolean indexer_application_source_index(struct indexer_source *self, st
                                  err);
 }
 
-static GtkWidget *indexer_application_source_editor_widget(struct indexer_source *source)
+/* ------------------------- member functions (indexer_source_view) */
+static void indexer_applications_source_view_attach(struct indexer_source_view *view, struct indexer_source *source)
 {
-        return gtk_label_new(source->display_name);
+        g_return_if_fail(view!=NULL);
+        g_return_if_fail(source!=NULL);
+
+        view->source_id=source->id;
+        gtk_label_set_text(GTK_LABEL(view->widget),
+                           source->display_name);
 }
 
+static void indexer_applications_source_view_detach(struct indexer_source_view *view)
+{
+        g_return_if_fail(view!=NULL);
+        view->source_id=-1;
+}
+
+static void indexer_applications_source_view_release(struct indexer_source_view *view)
+{
+        g_return_if_fail(view!=NULL);
+        g_object_unref(view->widget);
+        g_free(view);
+}
 
 /* ------------------------- static functions */
 

@@ -139,7 +139,96 @@ struct indexer
          * NULL if there was an error
          */
         struct indexer_source *(*new_source)(struct indexer *, struct catalog *catalog, GError **err);
+
+        /**
+         * Create an indexer view.
+         *
+         * The view can display any source. By default, it
+         * displays no source and is disabled.
+         *
+         * @param indexer
+         * @see indexer_source_view
+         */
+        struct indexer_source_view *(*new_view)(struct indexer *);
 };
+
+/**
+ * View of an indexer source.
+ *
+ * The view can display more than one source.
+ * The source is set using attach and unset using
+ * detach. This structure is not freed automatically
+ * but if the widget is destroyed it becomes unusable.
+ */
+struct indexer_source_view
+{
+        struct indexer *indexer;
+
+        /**
+         * The view's widget. One per view
+         * Never change this directly
+         */
+        GtkWidget *widget;
+
+        /**
+         * Source displayed by the view;
+         * updated by attach() and detach.
+         * Never change this directly
+         */
+        int source_id;
+
+        /**
+         * Set the source displayed by the view
+         */
+        void (*attach)(struct indexer_source_view *view, struct indexer_source *source);
+
+        /**
+         * Unset the source displayed by the view.
+         * After this call, the source displays no view
+         * and is disabled, just like after it's just
+         * been created.
+         */
+        void (*detach)(struct indexer_source_view *view);
+
+        /**
+         * Free all memory used by the view and unreference
+         * the widget
+         */
+        void (*release)(struct indexer_source_view *view);
+};
+
+/**
+ * Set/Change the source displayed by the view.
+ * @param view
+ * @param source source to attach to. The source can be released after this call has been made.
+ */
+static inline void indexer_source_view_attach(struct indexer_source_view *view, struct indexer_source *source)
+{
+        g_return_if_fail(view!=NULL);
+        view->attach(view, source);
+}
+
+/**
+ * Unset the source displayed by the view.
+ * After this call, the source displays no view
+ * and is disabled, just like after it's just
+ * been created.
+ */
+static inline void indexer_source_view_detach(struct indexer_source_view *view)
+{
+        g_return_if_fail(view!=NULL);
+        view->detach(view);
+}
+
+/**
+ * Free all memory used by the view and unreference
+ * the widget
+ */
+static inline void indexer_source_view_release(struct indexer_source_view *view)
+{
+        g_return_if_fail(view!=NULL);
+        view->release(view);
+}
 
 /**
  * Examine the current environment and try to figure out
@@ -252,6 +341,21 @@ static inline struct indexer_source *indexer_new_source(struct indexer *self, st
 }
 
 /**
+ * Create an indexer view.
+ *
+ * The view can display any source. By default, it
+ * displays no source and is disabled.
+ *
+ * @param indexer
+ * @see indexer_source_view
+ */
+static inline struct indexer_source_view *indexer_new_view(struct indexer *self)
+{
+        g_return_val_if_fail(self, NULL);
+        return self->new_view(self);
+}
+
+/**
  * Notify function for whatching indexer sources
  * @param source source that has changed
  * @param userdata
@@ -282,20 +386,6 @@ struct indexer_source
          * @return TRUE for success, FALSE for failure
          */
         gboolean (*index)(struct indexer_source *self, struct catalog *dest, GError **err);
-
-        /**
-         * Create a widget to edit source properties.
-         *
-         * The source must not be released until this widget
-         * is not in use anymore.
-         *
-         * @param source
-         * @param catalog a catalog that must be kept open for
-         * as long as the widget is in use
-         * @return a new widget that can be added into
-         * a window to edit the source
-         */
-        GtkWidget *(*editor_widget)(struct indexer_source *source);
 
         /**
          * Get told when the display name has changed.
@@ -345,26 +435,6 @@ static inline gboolean indexer_source_index(struct indexer_source *self, struct 
 {
         g_return_val_if_fail(self, FALSE);
         return self->index(self, dest, err);
-}
-
-/**
- * Create a widget to edit source properties.
- *
- * The source must not be released until this widget
- * is not in use anymore.
- *
- * This is a shortcut for source->editor_widget(source)
- *
- * @param source
- * @param catalog a catalog that must be kept open for
- * as long as the widget is in use
- * @return a new widget that can be added into
- * a window to edit the source
- */
-static inline GtkWidget *indexer_source_editor_widget(struct indexer_source *self)
-{
-        g_return_val_if_fail(self, NULL);
-        return self->editor_widget(self);
 }
 
 /**

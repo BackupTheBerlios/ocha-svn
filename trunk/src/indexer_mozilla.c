@@ -36,11 +36,11 @@ static struct indexer_source *indexer_mozilla_load(struct indexer *self, struct 
 static gboolean indexer_mozilla_execute(struct indexer *self, const char *name, const char *long_name, const char *url, GError **err);
 static gboolean indexer_mozilla_validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri);
 static gboolean indexer_mozilla_discover(struct indexer *indexer, struct catalog *catalog);
+static struct indexer_source_view *indexer_mozilla_new_view(struct indexer *indexer);
 
 /* ------------------------- prototypes: indexer_mozilla_source */
 static void indexer_mozilla_source_release(struct indexer_source *source);
 static gboolean indexer_mozilla_source_index(struct indexer_source *self, struct catalog *catalog, GError **err);
-static GtkWidget *indexer_mozilla_source_editor_widget(struct indexer_source *source);
 static guint indexer_mozilla_source_notify_add(struct indexer_source *source, struct catalog *catalog, indexer_source_notify_f notify, gpointer userdata);
 static void indexer_mozilla_source_notify_remove(struct indexer_source *source, guint id);
 
@@ -52,6 +52,11 @@ static struct discovered *discover_add_boorkmark_file(GArray *discovereds, const
 static void discover_add_profiles_file(GArray *discovereds, const char *path);
 gboolean discover_callback(struct catalog *catalog, int ignored, const char *path, const char *filename, GError **err, gpointer userdata);
 static char *display_name(struct catalog *catalog, int id);
+
+/* ------------------------- prototypes: indexer_source_view */
+static void indexer_mozilla_source_view_attach(struct indexer_source_view *view, struct indexer_source *);
+static void indexer_mozilla_source_view_detach(struct indexer_source_view *view);
+static void indexer_mozilla_source_view_release(struct indexer_source_view *view);
 
 /* ------------------------- definitions */
 struct indexer indexer_mozilla = {
@@ -67,7 +72,8 @@ struct indexer indexer_mozilla = {
         indexer_mozilla_load,
         indexer_mozilla_execute,
         indexer_mozilla_validate,
-        NULL/*new_source*/
+        NULL/*new_source*/,
+        indexer_mozilla_new_view
 };
 
 /* ------------------------- public functions */
@@ -83,7 +89,6 @@ static struct indexer_source *indexer_mozilla_load(struct indexer *self,
         retval->index=indexer_mozilla_source_index;
         retval->release=indexer_mozilla_source_release;
         retval->display_name=display_name(catalog, id);
-        retval->editor_widget=indexer_mozilla_source_editor_widget;
         retval->notify_display_name_change=indexer_mozilla_source_notify_add;
         retval->remove_notification=indexer_mozilla_source_notify_remove;
         return retval;
@@ -198,6 +203,25 @@ static gboolean indexer_mozilla_discover(struct indexer *indexer,
         return retval;
 }
 
+static struct indexer_source_view *indexer_mozilla_new_view(struct indexer *indexer)
+{
+        struct indexer_source_view *retval;
+        g_return_val_if_fail(indexer!=NULL, NULL);
+
+        retval=g_new(struct indexer_source_view, 1);
+        retval->indexer = indexer;
+        retval->widget = gtk_label_new("");
+        g_object_ref(retval->widget);
+        gtk_widget_show(retval->widget);
+
+        retval->attach=indexer_mozilla_source_view_attach;
+        retval->detach=indexer_mozilla_source_view_detach;
+        retval->release=indexer_mozilla_source_view_release;
+
+        return retval;
+
+}
+
 /* ------------------------- member functions: indexer_mozilla_source */
 static void indexer_mozilla_source_release(struct indexer_source *source)
 {
@@ -232,11 +256,6 @@ static gboolean indexer_mozilla_source_index(struct indexer_source *self, struct
         return retval;
 }
 
-static GtkWidget *indexer_mozilla_source_editor_widget(struct indexer_source *source)
-{
-        return gtk_label_new(source->display_name);
-}
-
 static guint indexer_mozilla_source_notify_add(struct indexer_source *source,
                                                struct catalog *catalog,
                                                indexer_source_notify_f notify,
@@ -258,6 +277,31 @@ static void indexer_mozilla_source_notify_remove(struct indexer_source *source,
         source_attribute_change_notify_remove(id);
 
 }
+
+/* ------------------------- member functions (indexer_source_view) */
+static void indexer_mozilla_source_view_attach(struct indexer_source_view *view, struct indexer_source *source)
+{
+        g_return_if_fail(view!=NULL);
+        g_return_if_fail(source);
+
+        view->source_id=source->id;
+        gtk_label_set_text(GTK_LABEL(view->widget),
+                           source->display_name);
+}
+
+static void indexer_mozilla_source_view_detach(struct indexer_source_view *view)
+{
+        g_return_if_fail(view!=NULL);
+        view->source_id=-1;
+}
+
+static void indexer_mozilla_source_view_release(struct indexer_source_view *view)
+{
+        g_return_if_fail(view!=NULL);
+        g_object_unref(view->widget);
+        g_free(view);
+}
+
 
 /* ------------------------- static functions */
 

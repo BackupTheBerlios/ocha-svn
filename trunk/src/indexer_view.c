@@ -22,11 +22,12 @@ struct indexer_view
         struct indexer *current_indexer;
         /** id of current source or -1 (no source) */
         int current_source_id;
+        struct indexer_source_view *current_view;
 };
 
 /* ------------------------- prototypes */
 static void init_widgets(struct indexer_view *view);
-static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct indexer_source *source);
+static GtkWidget *properties_widget_from_source(struct indexer_view *view, struct indexer *indexer, struct indexer_source *source);
 static GtkWidget *properties_widget_from_indexer(struct indexer *indexer);
 
 /* ------------------------- public functions */
@@ -40,6 +41,7 @@ struct indexer_view *indexer_view_new(struct catalog *catalog)
         memset(view, 0, sizeof(struct indexer_view));
         view->catalog=catalog;
         view->current_source_id=-1;
+        view->current_view=NULL;
         init_widgets(view);
         return view;
 }
@@ -53,6 +55,11 @@ GtkWidget *indexer_view_widget(struct indexer_view *view)
 void indexer_view_destroy(struct indexer_view *view)
 {
         g_return_if_fail(view);
+
+        if(view->current_view) {
+                indexer_source_view_release(view->current_view);
+        }
+
         indexer_view_detach(view);
 
         if(view->root_widget) {
@@ -95,7 +102,7 @@ void indexer_view_attach_source(struct indexer_view *view,
                 view->current_indexer=indexer;
                 if(source) {
                         view->current_source_id=source->id;
-                        widget=properties_widget_from_source(indexer, source);
+                        widget=properties_widget_from_source(view, indexer, source);
                 } else {
                         view->current_source_id=-1;
                         widget=properties_widget_from_indexer(indexer);
@@ -162,7 +169,8 @@ static void init_widgets(struct indexer_view *view)
         }
 }
 
-static GtkWidget *properties_widget_from_source(struct indexer *indexer,
+static GtkWidget *properties_widget_from_source(struct indexer_view *view,
+                                                struct indexer *indexer,
                                                 struct indexer_source *source)
 {
         GtkWidget *widget;
@@ -170,7 +178,18 @@ static GtkWidget *properties_widget_from_source(struct indexer *indexer,
         g_return_val_if_fail(indexer!=NULL, NULL);
         g_return_val_if_fail(source!=NULL, NULL);
 
-        widget =  indexer_source_editor_widget(source);
+        if(view->current_view) {
+                if(view->current_view->indexer!=indexer) {
+                        indexer_source_view_release(view->current_view);
+                        view->current_view=NULL;
+                }
+        }
+        if(!view->current_view) {
+                view->current_view=indexer_new_view(indexer);
+        }
+
+        indexer_source_view_attach(view->current_view, source);
+        widget = view->current_view->widget;
         gtk_widget_show(widget);
         return widget;
 }
