@@ -184,8 +184,8 @@ class Catalog:
         cursor.execute("SELECT path FROM entries")
         for row in cursor:
             path=row[0]
-            if not os.path.exists(path):
-                todelete.add(path)
+            if path.startswith('/') and not os.path.exists(path):
+                todelete.append(path)
         for path in todelete:
             cursor.execute("DELETE FROM entries WHERE path=%s", path)
 

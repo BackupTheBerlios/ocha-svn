@@ -2,6 +2,7 @@ import conf
 import sys, os, os.path
 from catalog import Catalog
 import time
+from HTMLParser import HTMLParser
 from xdg.DesktopEntry import DesktopEntry
 WAIT_UNIT=1
 
@@ -19,6 +20,13 @@ def findOrCreateRun(catalog):
         if command.execute.startswith("run"):
             return command
     return catalog.insertCommand("run", "run-desktop-entry %f")
+
+def findOrCreateUrl(catalog):
+    commands=catalog.commands()
+    for command in commands:
+        if command.execute.startswith("url"):
+            return command
+    return catalog.insertCommand("url", "gnome-moz-remote %f")
 
 def findOrCreateProject(catalog):
     commands=catalog.commands()
@@ -47,6 +55,7 @@ catalog=Catalog(conf.catalog_path())
 xemacs=findOrCreateXEmacs(catalog)
 run=findOrCreateRun(catalog)
 project=findOrCreateProject(catalog)
+url_cmd=findOrCreateUrl(catalog)
 
 args=sys.argv[1:]
 wait=False
@@ -90,6 +99,40 @@ def addProject(projectbase, path):
                         display_name=projectname,
                         command=project)
 
+def extractUrls(htmlfile):
+    class MyHTMLParser(HTMLParser):
+        def __init__(self):
+            HTMLParser.__init__(self)
+            self.urls=[]
+            self.current_href=None
+            self.current_label=None
+
+        def handle_starttag(self, tag, attrs):
+            if "a"==tag:
+                for name, value in attrs:
+                    if "href"==name:
+                        self.current_href=value
+                        self.current_label=""
+
+        def handle_endtag(self, tag):
+            if "a"==tag :
+                if self.current_href and self.current_label:
+                    self.urls.append( ( self.current_href, self.current_label ) )
+                self.current_href=None
+                self.current_label=None
+
+        def handle_data(self, data):
+            if self.current_href:
+                self.current_label+=data
+
+    parser=MyHTMLParser()
+    parser.feed(open(htmlfile).read())
+    parser.close()
+
+    print str(parser.urls)
+
+    return parser.urls
+
 PROJECTPATH=[ "/work/cvsvap",
               "/work/cvsapp",
               "/work/blossom",
@@ -99,7 +142,15 @@ PROJECTPATH=[ "/work/cvsvap",
 SPECIAL=[ "CVS", ".svn" ]
 
 for dir in args:
-    for root, dirs, files in os.walk(dir):
+    if os.path.isfile(dir) and dir.endswith(".html"):
+        for url, label in extractUrls(dir):
+            print "insert entry; %s %s" % (url, label)
+            catalog.insertEntry(path=url,
+                                display_name=label,
+                                command=url_cmd)
+        catalog.commit()
+    else:
+      for root, dirs, files in os.walk(dir):
         if isforbidden(root):
             continue
         for projectpath in PROJECTPATH:
