@@ -241,7 +241,6 @@ static struct resultholder *resultholder_new(float pertinence, struct result *re
    retval->result=result;
    retval->pertinence=pertinence;
    retval->label_markup=create_highlighted_label_markup(result);
-   printf("0x%lx:new\n", retval);
    return retval;
 }
 
@@ -270,5 +269,4 @@ static void resultholder_delete(struct resultholder *self)
    self->result->release(self->result);
    g_free((void *)self->label_markup);
    g_free(self);
-   printf("0x%lx:delete\n", self);
 }

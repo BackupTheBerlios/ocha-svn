@@ -5,6 +5,8 @@
 #include "result_queue.h"
 #include "queryrunner.h"
 #include "catalog_queryrunner.h"
+#include "netwm_queryrunner.h"
+#include "compound_queryrunner.h"
 #include "query.h"
 #include "resultlist.h"
 #include <gtk/gtk.h>
@@ -102,9 +104,17 @@ int main(int argc, char *argv[])
    g_string_append(catalog_path, "/.ocha");
    mkdir(catalog_path->str, 0600);
    g_string_append(catalog_path, "/catalog");
-   struct queryrunner *queryrunner = catalog_queryrunner_new(catalog_path->str,
-                                                             querywin_get_result_queue());
-   querywin_set_queryrunner(queryrunner);
+
+   struct result_queue *queue = querywin_get_result_queue();
+   struct queryrunner *runners[] =
+      {
+         netwm_queryrunner_create(GDK_DISPLAY(),
+                                  queue),
+         catalog_queryrunner_new(catalog_path->str,
+                                 queue),
+      };
+   struct queryrunner *compound = compound_queryrunner_new(runners, sizeof(runners)/sizeof(struct queryrunner *));
+   querywin_set_queryrunner(compound);
    querywin_start();
 
    install_keygrab();
