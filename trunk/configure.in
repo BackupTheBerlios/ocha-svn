@@ -23,6 +23,7 @@ dnl Checks for libraries.
 AM_PATH_CHECK()
 AM_PATH_GLIB_2_0(, , exit 10, "gthread")
 AM_PATH_GTK_2_0(, , exit 10)
+PKG_CHECK_MODULES(SQLITE, sqlite, exit 10)
 
 dnl Checks for header files.
 AC_HEADER_STDC
@@ -33,7 +34,7 @@ dnl Checks for typedefs, structures, and compiler characteristics.
 dnl Checks for library functions.
 
 dnl Configuration
-CFLAGS=" -std=c99 $GLIB_CFLAGS -O -D_REENTRANT "
+CFLAGS=" -std=c99 $GLIB_CFLAGS -O -D_REENTRANT -D_USE_UNIX98"
 LIBS="$GLIB_LIBS $LIBS"
 
 TEST_CFLAGS="$GTK_CFLAGS -g $CHECK_CFLAGS"
