@@ -16,9 +16,9 @@
  */
 struct result
 {
-   /** User-friently name for this result. */
+   /** User-friently name for this result (UTF-8). */
    const char *name;
-   /** Full path to this result, which might be a file, an URL or NULL. */
+   /** Full path to this result, which might be a file, an URL or NULL (UTF-8). */
    const char *path;
 
    /**

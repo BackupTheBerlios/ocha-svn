@@ -5,6 +5,7 @@
 #include "result_queue.h"
 #include "queryrunner.h"
 #include "catalog_queryrunner.h"
+#include "query.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
@@ -157,49 +158,40 @@ static void str_lower(char *dest, const char *from)
    dest[len]='\0';
 }
 
+static void g_string_append_markup_escaped(GString *gstr, const char *str)
+{
+   char *escaped = g_markup_escape_text(str, -1);
+   g_string_append(gstr, escaped);
+   g_free(escaped);
+}
+static void g_string_append_query_pango_highlight(GString *gstr, const char *query, const char *str, const char *on, const char *off)
+{
+   char *markup = query_pango_highlight(query, str, on, off);
+   g_string_append(gstr, markup);
+   g_free(markup);
+}
 static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, GtkTreeModel* model, GtkTreeIter* iter, gpointer userdata)
 {
    struct result *result = NULL;
    gtk_tree_model_get(model, iter, 0, &result, -1);
    g_return_if_fail(result);
 
-   char *query = query_str->str;
-   char query_lower[query_str->len+1];
-   str_lower(query_lower, query);
-   char name_lower[strlen(result->name)+1];
-   str_lower(name_lower, result->name);
-   char *found=strstr(name_lower, query_lower);
-   char *markup;
-   if(found==NULL)
-      {
-         markup=g_markup_printf_escaped("<big>%s</big>\n<small>%s</small>",
-                                        result->name,
-                                        result->path);
-      }
-   else
-      {
-         const char *name=result->name;
-         int index=found-name_lower;
-         int buflen=strlen(name);
-         int querylen=strlen(query);
-         char before[index+1];
-         char middle[querylen+1];
-         strncpy(before, name, index);
-         before[index]='\0';
-         strncpy(middle, &name[index], querylen);
-         middle[querylen]='\0';
+   const char *query = query_str->str;
+   const char *name = result->name;
 
-         markup=g_markup_printf_escaped("<big>%s<u>%s</u>%s</big>\n<small>%s</small>",
-                                        before,
-                                        middle,
-                                        &name[index+querylen],
-                                        result->path);
-      }
+   GString *full = g_string_new("");
+   g_string_append(full, "<big><b>");
+   g_string_append_query_pango_highlight(full, query, name, "<u>", "</u>");
+   g_string_append(full, "</b></big>\n<small>");
+   g_string_append_markup_escaped(full, result->path);
+   g_string_append(full, "</small>");
+
    g_object_set(renderer,
                 "markup",
-                markup,
+                full->str,
                 NULL);
-   g_free(markup);
+
+   g_string_free(full, true/*free content*/);
 }
 
 
