@@ -88,39 +88,11 @@ static gboolean index(struct indexer_source *self, struct catalog *catalog, GErr
    g_return_val_if_fail(catalog!=NULL, FALSE);
    g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-   char *path = NULL;
-   gboolean retval = FALSE;
-
-   if(catalog_get_source_attribute_witherrors(catalog, self->id, "path", &path, TRUE/*required*/, err))
-      {
-         char *depth_str = NULL;
-         if(catalog_get_source_attribute_witherrors(catalog, self->id, "depth", &depth_str, FALSE/*not required*/, err))
-            {
-               int depth = -1;
-               if(depth_str)
-                  {
-                     depth=atoi(depth_str);
-                     g_free(depth_str);
-                  }
-               char *ignore = NULL;
-               if(catalog_get_source_attribute_witherrors(catalog, self->id, "ignore", &ignore, FALSE/*not required*/, err))
-                  {
-                     GPatternSpec **ignore_patterns = create_patterns(ignore);
-                     retval=recurse(catalog,
-                                    path,
-                                    ignore_patterns,
-                                    depth,
-                                    FALSE/*not slow*/,
-                                    self->id,
-                                    index_file_cb,
-                                    self/*userdata*/,
-                                    err);
-                     free_patterns(ignore_patterns);
-                  }
-            }
-         g_free(path);
-      }
-   return retval;
+   return index_recursively(catalog,
+                            self->id,
+                            index_file_cb,
+                            self/*userdata*/,
+                            err);
 }
 
 /**
@@ -176,13 +148,7 @@ static gboolean validate(struct indexer *self, const char *name, const char *lon
    g_return_val_if_fail(text_uri!=NULL, FALSE);
    g_return_val_if_fail(self==&indexer_files, FALSE);
 
-   GnomeVFSURI *uri=gnome_vfs_uri_new(text_uri);
-   if(uri==NULL)
-      return FALSE;
-   gboolean retval = gnome_vfs_uri_exists(uri);
-   gnome_vfs_uri_unref(uri);
-
-   return retval;
+   return uri_exists(text_uri);
 }
 
 static gboolean has_gnome_mime_command(const char *path)

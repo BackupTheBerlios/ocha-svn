@@ -1,10 +1,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <dirent.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <libgnome/gnome-url.h>
+#include <libgnomevfs/gnome-vfs.h>
 
 #include "indexer_utils.h"
 
@@ -98,6 +101,16 @@ DIR *opendir_witherrors(const char *path, GError **err)
    return retval;
 }
 
+gboolean uri_exists(const char *text_uri)
+{
+   g_return_val_if_fail(text_uri!=NULL, FALSE);
+   if(!g_str_has_prefix(text_uri, "file://"))
+      return TRUE;
+   struct stat buf;
+   return stat(&text_uri[strlen("file://")], &buf)==0 && buf.st_size>0;
+}
+
+
 static gboolean _recurse(struct catalog *catalog,
                      const char *directory,
                      DIR *dirhandle,
@@ -168,15 +181,15 @@ static gboolean _recurse(struct catalog *catalog,
       }
    return !error;
 }
-gboolean recurse(struct catalog *catalog,
-                 const char *directory,
-                 GPatternSpec **ignore_patterns,
-                 int maxdepth,
-                 gboolean slow,
-                 int cmd,
-                 handle_file_f callback,
-                 gpointer userdata,
-                 GError **err)
+static gboolean recurse(struct catalog *catalog,
+                        const char *directory,
+                        GPatternSpec **ignore_patterns,
+                        int maxdepth,
+                        gboolean slow,
+                        int cmd,
+                        handle_file_f callback,
+                        gpointer userdata,
+                        GError **err)
 {
    catalog_index_init();
 
@@ -200,6 +213,61 @@ gboolean recurse(struct catalog *catalog,
       {
          return FALSE;
       }
+}
+gboolean index_recursively(struct catalog *catalog,
+                           int source_id,
+                           handle_file_f callback,
+                           gpointer userdata,
+                           GError **err)
+{
+   char *path = NULL;
+   gboolean retval = FALSE;
+
+   if(catalog_get_source_attribute_witherrors(catalog,
+                                              source_id,
+                                              "path",
+                                              &path,
+                                              TRUE/*required*/,
+                                              err))
+      {
+         char *depth_str = NULL;
+         if(catalog_get_source_attribute_witherrors(catalog,
+                                                    source_id,
+                                                    "depth",
+                                                    &depth_str,
+                                                    FALSE/*not required*/,
+                                                    err))
+            {
+               int depth = -1;
+               if(depth_str)
+                  {
+                     depth=atoi(depth_str);
+                     g_free(depth_str);
+                  }
+               char *ignore = NULL;
+               if(catalog_get_source_attribute_witherrors(catalog,
+                                                          source_id,
+                                                          "ignore",
+                                                          &ignore,
+                                                          FALSE/*not required*/,
+                                                          err))
+                  {
+                     GPatternSpec **ignore_patterns = create_patterns(ignore);
+                     retval=recurse(catalog,
+                                    path,
+                                    ignore_patterns,
+                                    depth,
+                                    FALSE/*not slow*/,
+                                    source_id,
+                                    callback,
+                                    userdata,
+                                    err);
+                     free_patterns(ignore_patterns);
+                  }
+            }
+         g_free(path);
+      }
+   return retval;
 }
 
 GPatternSpec **create_patterns(const char *patterns)

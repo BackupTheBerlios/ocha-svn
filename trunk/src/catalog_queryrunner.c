@@ -9,6 +9,8 @@
 #include "result_queue.h"
 #include "indexer.h"
 #include "indexer_files.h"
+#include "indexer_applications.h"
+#include "indexer_mozilla.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -96,6 +98,8 @@ struct catalog_queryrunner
 static struct indexer *indexers[] =
    {
       &indexer_files,
+      &indexer_applications,
+      &indexer_mozilla,
       NULL
    };
 

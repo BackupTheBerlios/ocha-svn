@@ -29,13 +29,9 @@ typedef gboolean (*handle_file_f)(struct catalog *catalog,
  * Go through the files in the given directory and index them.
  *
  * @param catalog catalog to index into
- * @param directory directory to go through
- * @param ignore_patterns patterns to ignore in addition to the hardcoded
- * patterns (null-terminated, may be null)
- * @param maxdepth maximum recursion depth, may be -1 for unlimited
- * @param slow set to true if you want the indexing to
- * be slowed down artificially
  * @param source_id source that will own the new entries
+ * the source attributes 'path', 'depth' and 'ignore' will
+ * be used to find the directory to go through and how
  * @param calllback file handler
  * @param userdata userdata for the file handler callback
  * @param err error to be set by the file handler if something
@@ -43,15 +39,11 @@ typedef gboolean (*handle_file_f)(struct catalog *catalog,
  * @return false if something goes wrong (check err, then), true
  * otherwise
  */
-gboolean recurse(struct catalog *catalog,
-                 const char *directory,
-                 GPatternSpec **ignore_patterns,
-                 int maxdepth,
-                 gboolean slow,
-                 int source_id,
-                 handle_file_f callback,
-                 gpointer userdata,
-                 GError **err);
+gboolean index_recursively(struct catalog *catalog,
+                           int source_id,
+                           handle_file_f callback,
+                           gpointer userdata,
+                           GError **err);
 
 /**
  * Add an entry, with error handling
@@ -79,4 +71,5 @@ GPatternSpec **create_patterns(const char *patterns);
 /** Free a null-terminated array of patterns */
 void free_patterns(GPatternSpec **patterns);
 
+gboolean uri_exists(const char *uri);
 #endif /*INDEXER_UTILS_H*/
