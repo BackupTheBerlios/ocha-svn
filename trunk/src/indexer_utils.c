@@ -77,7 +77,7 @@ gboolean catalog_get_source_attribute_witherrors(const char *indexer,
 }
 gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, const char *long_name, int source_id, GError **err)
 {
-   if(!catalog_addentry(catalog, path, name, long_name, source_id, NULL/*id_out*/))
+   if(!catalog_add_entry(catalog, source_id, path, name, long_name, NULL/*id_out*/))
       {
          g_set_error(err,
                      INDEXER_ERROR,
@@ -480,4 +480,27 @@ static void doze_off(gboolean really)
 {
    if(really)
       sleep(3);
+}
+
+static gboolean remove_invalid_cb(struct catalog *catalog,
+                                  float pertinence,
+                                  int entry_id,
+                                  const char *name,
+                                  const char *long_name,
+                                  const char *path,
+                                  int source_id,
+                                  const char *source_type,
+                                  void *userdata)
+{
+    struct indexer *indexer = (struct indexer *)userdata;
+    if(!indexer->validate(indexer, name, long_name, path))
+        catalog_remove_entry(catalog, source_id, path);
+}
+
+void remove_invalid_entries(struct indexer *indexer, int source_id, struct catalog *catalog)
+{
+    g_return_if_fail(indexer);
+    g_return_if_fail(catalog);
+
+    catalog_get_source_content(catalog, source_id, remove_invalid_cb, indexer);
 }

@@ -74,12 +74,12 @@ static void setup()
     fail_unless(catalog_add_source(catalog, "test", &source_id), "add_source");
     for(int i=0; i<entries_len; i++)
     {
-        fail_unless(catalog_addentry(catalog,
-                                     entries[i]/*path*/,
-                                     entries[i]/*name*/,
-                                     entries[i]/*long_name*/,
-                                     source_id,
-                                     NULL/*id_out*/),
+        fail_unless(catalog_add_entry(catalog,
+                                      source_id,
+                                      entries[i]/*path*/,
+                                      entries[i]/*name*/,
+                                      entries[i]/*long_name*/,
+                                      NULL/*id_out*/),
                     "add source");
     }
     catalog_disconnect(catalog);

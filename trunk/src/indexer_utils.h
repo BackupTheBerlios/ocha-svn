@@ -107,5 +107,10 @@ guint source_attribute_change_notify_add(const char *type,
  */
 void source_attribute_change_notify_remove(guint id);
 
+/**
+ * Apply validate() on all entries and remove those for which
+ * it fails.
+ */
+void remove_invalid_entries(struct indexer *indexer, int source_id, struct catalog *);
 
 #endif /*INDEXER_UTILS_H*/

@@ -209,6 +209,7 @@ static gboolean index(struct indexer_source *self, struct catalog *catalog, GErr
    g_return_val_if_fail(catalog!=NULL, FALSE);
    g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
+   remove_invalid_entries(&indexer_files, self->id, catalog);
    return index_recursively(INDEXER_NAME,
                             catalog,
                             self->id,

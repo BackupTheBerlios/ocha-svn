@@ -191,7 +191,16 @@ gboolean catalog_remove_source(struct catalog *catalog, int source_id);
  * @param id_out if non-null, this variable will be set to the generated ID of the entry
  * @return TRUE if the entry was added, FALSE otherwise
  */
-gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int source_id, int *id_out);
+gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *path, const char *name, const char *long_name, int *id_out);
+
+/**
+ * Remove a stale entry from the catalog
+ * @param catalog
+ * @param source_id source
+ * @param path local path or URI
+ * @return TRUE if the entry was remove, FALSE otherwise
+ */
+gboolean catalog_remove_entry(struct catalog *catalog, int source_id, const char *path);
 
 /**
  * Get a pointer on the last error that happened with

@@ -239,9 +239,20 @@ gboolean catalog_remove_source(struct catalog *catalog, int source_id)
    g_return_val_if_fail(catalog!=NULL, FALSE);
 
    return execute_update_printf(catalog, TRUE/*autocommit*/,
-                                "DELETE FROM sources where id=%d; DELETE FROM entries where source_id=%d",
+                                "DELETE FROM sources WHERE id=%d; DELETE FROM entries WHERE source_id=%d",
                                 source_id,
                                 source_id);
+}
+
+gboolean catalog_remove_entry(struct catalog *catalog, int source_id, const char *path)
+{
+   g_return_val_if_fail(catalog!=NULL, FALSE);
+   g_return_val_if_fail(path!=NULL, FALSE);
+
+   return execute_update_printf(catalog, TRUE/*autocommit*/,
+                                "DELETE FROM entries WHERE source_id=%d AND path='%q'",
+                                source_id,
+                                path);
 }
 
 static gboolean catalog_findentry(struct catalog *catalog, const char *path, int source_id, int *id_out)
@@ -253,7 +264,7 @@ static gboolean catalog_findentry(struct catalog *catalog, const char *path, int
    if(execute_query_printf(catalog,
                            findid_callback,
                            &id,
-                           "SELECT id FROM entries WHERE path='%q' and source_id='%d'",
+                           "SELECT id FROM entries WHERE path='%q' AND source_id='%d'",
                            path,
                            source_id)
       && id!=-1)
@@ -265,7 +276,7 @@ static gboolean catalog_findentry(struct catalog *catalog, const char *path, int
    return FALSE;
 }
 
-gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int source_id, int *id_out)
+gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *path, const char *name, const char *long_name, int *id_out)
 {
    g_return_val_if_fail(catalog!=NULL, FALSE);
    g_return_val_if_fail(path!=NULL, FALSE);

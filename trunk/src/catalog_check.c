@@ -99,12 +99,12 @@ static void setup_query()
                "source could not be created");
    for(int i=0; i<entries_length; i++)
       {
-         fail_unless(catalog_addentry(catalog,
-                                      entries[i].path,
-                                      entries[i].filename,
-                                      entries[i].path/*long_name*/,
-                                      source_id,
-                                      &entries[i].id),
+         fail_unless(catalog_add_entry(catalog,
+                                       source_id,
+                                       entries[i].path,
+                                       entries[i].filename,
+                                       entries[i].path/*long_name*/,
+                                       &entries[i].id),
                      "entry could not be created");
       }
 
@@ -140,7 +140,7 @@ START_TEST(test_addentry)
    int entry_id=-1;
    catalog_cmd(catalog,
                "1st addentry(/tmp/toto.txt)",
-               catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", source_id, &entry_id));
+               catalog_add_entry(catalog, source_id, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", &entry_id));
 
    catalog_disconnect(catalog);
 }
@@ -153,7 +153,7 @@ START_TEST(test_addentry_escape)
 
    catalog_cmd(catalog,
                "1st addentry(/tmp/toto.txt)",
-               catalog_addentry(catalog, "/tmp/to'to.txt", "To'to", "/tmp/toto.txt", source_id, NULL));
+               catalog_add_entry(catalog, source_id, "/tmp/to'to.txt", "To'to", "/tmp/toto.txt", NULL));
 
    catalog_disconnect(catalog);
 }
@@ -168,10 +168,10 @@ START_TEST(test_addentry_noduplicate)
    catalog_add_source(catalog, "test", &source_id);
 
    int entry_id_1=-1;
-   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", source_id, &entry_id_1),
+   fail_unless(catalog_add_entry(catalog, source_id, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", &entry_id_1),
                "1st addentry failed");
    int entry_id_2=-1;
-   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", source_id, &entry_id_2),
+   fail_unless(catalog_add_entry(catalog, source_id, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", &entry_id_2),
                "2nd addentry failed");
 
    catalog_disconnect(catalog);
@@ -187,12 +187,12 @@ static void addentries(struct catalog *catalog, int sourceid, int count, const c
        printf("adding %s into source %d\n", name, sourceid);
        catalog_cmd(catalog,
                    name,
-                   catalog_addentry(catalog,
-                                    name,
-                                    name,
-                                    name,
-                                    sourceid,
-                                    NULL/*id_out*/));
+                   catalog_add_entry(catalog,
+                                     sourceid,
+                                     name,
+                                     name,
+                                     name,
+                                     NULL/*id_out*/));
        g_free(name);
    }
 }
@@ -267,6 +267,33 @@ START_TEST(test_get_source_content)
    catalog_disconnect(catalog);
 
    printf("--- test_get_source_content_size_OK\n");
+}
+END_TEST
+
+START_TEST(test_remove_entry)
+{
+   printf("--- test_remove_entry\n");
+
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+   int source_id = -1;
+   catalog_cmd(catalog,
+               "add_source(edit)",
+               catalog_add_source(catalog, "test", &source_id));
+   addentries(catalog, source_id, 5, "entry-%d");
+
+   mark_point();
+   catalog_cmd(catalog,
+               "remove_entry",
+               catalog_remove_entry(catalog, source_id, "entry-1"));
+   mark_point();
+
+   guint count=-1;
+   catalog_cmd(catalog,
+               "get count",
+               catalog_get_source_content_count(catalog, source_id, &count));
+   fail_unless(count==4, "entry not deleted");
+
+   printf("--- test_remove_entry OK\n");
 }
 END_TEST
 
@@ -733,6 +760,7 @@ Suite *catalog_check_suite(void)
    tcase_add_test(tc_core, test_addentry_escape);
    tcase_add_test(tc_core, test_get_source_content_size);
    tcase_add_test(tc_core, test_get_source_content);
+   tcase_add_test(tc_core, test_remove_entry);
    tcase_add_test(tc_core, test_remove_source);
 
    tcase_add_checked_fixture(tc_query, setup_query, teardown_query);

@@ -130,7 +130,7 @@ const char *catalog_error(struct catalog *catalog)
 {
    return "mock error";
 }
-gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int command_id, int *id_out)
+gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *path, const char *name, const char *long_name, int *id_out)
 {
    struct addentry_args *args =
       (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,
@@ -158,11 +158,11 @@ gboolean catalog_addentry(struct catalog *catalog, const char *path, const char 
                                args->expect.description,
                                args->long_name,
                                long_name));
-   fail_unless(command_id==args->command_id,
+   fail_unless(source_id==args->command_id,
                g_strdup_printf("wrong command id for %s, expected %d, got %d",
                                args->expect.description,
                                args->command_id,
-                               command_id));
+                               source_id));
    expectation_call(&args->expect);
    if(id_out)
       *id_out=args->id;
