@@ -12,6 +12,12 @@
 #ifndef DESKTOP_FILE_H
 #define DESKTOP_FILE_H
 
+enum _GnomeDesktopFileEncoding {
+        GNOME_DESKTOP_FILE_ENCODING_UTF8,
+        GNOME_DESKTOP_FILE_ENCODING_LEGACY,
+        GNOME_DESKTOP_FILE_ENCODING_UNKNOWN
+};
+
 typedef struct _GnomeDesktopFile GnomeDesktopFile;
 typedef enum _GnomeDesktopFileEncoding GnomeDesktopFileEncoding;
 
@@ -24,11 +30,6 @@ typedef void (* GnomeDesktopFileLineFunc) (GnomeDesktopFile *df,
                 const char       *value, /* This is raw unescaped data */
                 gpointer          data);
 
-enum _GnomeDesktopFileEncoding {
-        GNOME_DESKTOP_FILE_ENCODING_UTF8,
-        GNOME_DESKTOP_FILE_ENCODING_LEGACY,
-        GNOME_DESKTOP_FILE_ENCODING_UNKNOWN
-};
 
 typedef enum
 {

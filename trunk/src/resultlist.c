@@ -48,11 +48,10 @@ static GtkTreeSelection *selection;
 /* ------------------------- prototypes */
 static void row_inserted_cb(GtkTreeModel *model, GtkTreePath *path, GtkTreeIter *iter, gpointer userdata);
 static void row_deleted_cb(GtkTreeModel *model, GtkTreePath *path, gpointer userdata);
-static void select_first_row_if_no_selection();
+static void select_first_row_if_no_selection(void);
 static struct resultholder *resultholder_new(const char *query, float pertinence, struct result *result);
 static void resultholder_refresh(const char *query, struct resultholder *self, float pertinence);
 static void resultholder_delete(struct resultholder *self);
-static void str_lower(char *dest, const char *from);
 static void append_markup_escaped(GString *gstr, const char *str);
 static void append_query_pango_highlight(GString *gstr, const char *query, const char *str, const char *on, const char *off);
 static const char *create_highlighted_label_markup(const char *query, struct result  *result);
@@ -61,14 +60,17 @@ static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* rendere
 /* ------------------------- public functions */
 void resultlist_init()
 {
+        GtkTreeViewColumn* col;
+        GtkCellRenderer* cell_renderer_name;
+
         view = gtk_tree_view_new();
         gtk_widget_show (view);
         gtk_tree_view_set_headers_visible (GTK_TREE_VIEW (view), FALSE);
 
         model=gtk_list_store_new(1/*n_columns*/, G_TYPE_POINTER);
 
-        GtkTreeViewColumn* col = gtk_tree_view_column_new();
-        GtkCellRenderer* cell_renderer_name = gtk_cell_renderer_text_new();
+        col =  gtk_tree_view_column_new();
+        cell_renderer_name =  gtk_cell_renderer_text_new();
         gtk_tree_view_column_set_title(col, "Result");
         gtk_tree_view_column_pack_start(col, cell_renderer_name, TRUE/*expand*/);
         gtk_tree_view_column_set_cell_data_func(col,
@@ -123,9 +125,10 @@ void resultlist_clear()
 
 void resultlist_executed(struct result *result)
 {
+        struct resultholder *holder;
+
         g_return_if_fail(result!=NULL);
 
-        struct resultholder *holder;
         holder = (struct resultholder *)g_hash_table_lookup(hash, result->path);
         if(holder) {
                 holder->executed=TRUE;
@@ -261,9 +264,11 @@ static struct resultholder *resultholder_new(const char *query,
                                              float pertinence,
                                              struct result *result)
 {
+        struct resultholder *retval;
+
         g_return_val_if_fail(result, NULL);
 
-        struct resultholder *retval = g_new(struct resultholder, 1);
+        retval =  g_new(struct resultholder, 1);
         retval->result=result;
         retval->pertinence=pertinence;
         retval->label_markup=create_highlighted_label_markup(query, result);
@@ -300,14 +305,6 @@ static void resultholder_delete(struct resultholder *self)
         g_free(self);
 }
 
-static void str_lower(char *dest, const char *from)
-{
-        int len = strlen(from);
-        for(int i=0; i<len; i++)
-                dest[i]=tolower(from[i]);
-        dest[len]='\0';
-}
-
 static void append_markup_escaped(GString *gstr, const char *str)
 {
         char *escaped = g_markup_escape_text(str, -1);
@@ -328,16 +325,19 @@ static void append_query_pango_highlight(GString *gstr,
 static const char *create_highlighted_label_markup(const char *query,
                                                    struct result  *result)
 {
-        const char *name = result->name;
+        const char *markup;
+        const char *name;
+        GString *full;
 
-        GString *full = g_string_new("");
+        name =  result->name;
+        full =  g_string_new("");
         g_string_append(full, "<big><b>");
         append_query_pango_highlight(full, query, name, "<u>", "</u>");
         g_string_append(full, "</b></big>\n<small>");
         append_markup_escaped(full, result->long_name);
         g_string_append(full, "</small>");
 
-        const char *markup = full->str;
+        markup =  full->str;
         g_string_free(full, FALSE/* do not free content*/);
         return markup;
 }

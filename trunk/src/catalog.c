@@ -31,7 +31,7 @@ struct catalog
         GCond *busy_wait_cond;
         GMutex *busy_wait_mutex;
 
-        char path[];
+        char *path;
 };
 
 /* ------------------------- prototypes */
@@ -44,12 +44,9 @@ static gboolean execute_update_printf(struct catalog *catalog, gboolean autocomm
 static int progress_callback(void *userdata);
 static gboolean execute_query_printf(struct catalog *catalog, sqlite_callback callback, void *userdata, const char *sql, ...);
 static gboolean create_tables(sqlite *db, char **errmsg);
-static int count(const char *str, char c);
 static int result_sqlite_callback(void *userdata, int col_count, char **col_data, char **col_names);
 static void get_id(struct catalog  *catalog, int *id_out);
 static int findid_callback(void *userdata, int column_count, char **result, char **names);
-static int findids_callback(void *userdata, int column_count, char **result, char **names);
-static int set_string_callback(void *userdata, int column_count, char **result, char **names);
 static gboolean findentry(struct catalog *catalog, const char *path, int source_id, int *id_out);
 
 /* ------------------------- public functions */
@@ -61,12 +58,13 @@ gboolean catalog_add_entry(struct catalog *catalog,
                            const char *long_name,
                            int *id_out)
 {
+        int old_id=-1;
+
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(path!=NULL, FALSE);
         g_return_val_if_fail(name!=NULL, FALSE);
         g_return_val_if_fail(long_name!=NULL, FALSE);
 
-        int old_id=-1;
         if(findentry(catalog, path, source_id, &old_id))
         {
                 return execute_update_printf(catalog, TRUE/*autocommit*/,
@@ -114,14 +112,17 @@ gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_o
 
 struct catalog *catalog_connect(const char *path, GError **err)
 {
+        gboolean newdb;
+        char *errmsg;
+        sqlite *db;
+        struct catalog *catalog;
+
         g_return_val_if_fail(path, NULL);
         g_return_val_if_fail(err==NULL || *err==NULL, NULL);
 
-        gboolean newdb = !exists(path);
-        char *errmsg = NULL;
-
-
-        sqlite *db = sqlite_open(path, 0600, &errmsg);
+        newdb = !exists(path);
+        errmsg = NULL;
+        db = sqlite_open(path, 0600, &errmsg);
         if(!db) {
                 g_set_error(err,
                             catalog_error_quark(),
@@ -150,14 +151,14 @@ struct catalog *catalog_connect(const char *path, GError **err)
                 }
         }
 
-        struct catalog *catalog;
-        catalog = (struct catalog *)g_malloc(sizeof(struct catalog)+strlen(path)+1);
+
+        catalog = g_new(struct catalog, 1);
         catalog->stop=FALSE;
         catalog->db=db;
         catalog->error=g_string_new("");
         catalog->busy_wait_cond=g_cond_new();
         catalog->busy_wait_mutex=g_mutex_new();
-        strcpy(catalog->path, path);
+        catalog->path=g_strdup(path);
         return catalog;
 }
 
@@ -168,6 +169,7 @@ void catalog_disconnect(struct catalog *catalog)
         g_cond_free(catalog->busy_wait_cond);
         g_mutex_free(catalog->busy_wait_mutex);
         g_string_free(catalog->error, TRUE/*free_segment*/);
+        g_free(catalog->path);
         g_free(catalog);
 }
 
@@ -176,6 +178,11 @@ gboolean catalog_executequery(struct catalog *catalog,
                               catalog_callback_f callback,
                               void *userdata)
 {
+        GString *sql;
+        gboolean has_space;
+        const char *cptr;
+        gboolean ret;
+
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(query!=NULL, FALSE);
         g_return_val_if_fail(callback!=NULL, FALSE);
@@ -184,13 +191,14 @@ gboolean catalog_executequery(struct catalog *catalog,
                 return TRUE;
 
         /* the order of the columns is important, see result_sqlite_callback() */
-        GString *sql;
+
         sql = g_string_new("SELECT e.id, e.path, e.name, e.long_name, "
                            "       s.id, s.type, e.lastuse "
                            "FROM entries e, sources s "
                            "WHERE e.name LIKE '%%");
-        gboolean has_space=FALSE;
-        for(const char *cptr=query; *cptr!='\0'; cptr++)
+
+        has_space=FALSE;
+        for(cptr=query; *cptr!='\0'; cptr++)
         {
                 char c = *cptr;
                 switch(c) {
@@ -216,10 +224,10 @@ gboolean catalog_executequery(struct catalog *catalog,
                         "ORDER BY e.lastuse DESC");
         catalog->callback=callback;
         catalog->callback_userdata=userdata;
-        gboolean ret = execute_query_printf(catalog,
-                                            result_sqlite_callback,
-                                            catalog/*userdata*/,
-                                            sql->str);
+        ret = execute_query_printf(catalog,
+                                   result_sqlite_callback,
+                                   catalog/*userdata*/,
+                                   sql->str);
         g_string_free(sql, TRUE/*free content*/);
 
         /* the catalog was probably called from two threads
@@ -258,18 +266,20 @@ gboolean catalog_get_source_content(struct catalog *catalog,
                                     catalog_callback_f callback,
                                     void *userdata)
 {
+        gboolean ret;
+
         catalog->callback=callback;
         catalog->callback_userdata=userdata;
-        gboolean ret = execute_query_printf(catalog,
-                                            result_sqlite_callback,
-                                            catalog/*userdata*/,
-                                            "SELECT e.id, e.path, e.name, e.long_name, "
-                                            " s.id, s.type, e.lastuse "
-                                            "FROM entries e, sources s "
-                                            "WHERE e.source_id=%d and s.id=%d "
-                                            "ORDER BY e.path",
-                                            source_id,
-                                            source_id);
+        ret = execute_query_printf(catalog,
+                                   result_sqlite_callback,
+                                   catalog/*userdata*/,
+                                   "SELECT e.id, e.path, e.name, e.long_name, "
+                                   " s.id, s.type, e.lastuse "
+                                   "FROM entries e, sources s "
+                                   "WHERE e.source_id=%d and s.id=%d "
+                                   "ORDER BY e.path",
+                                   source_id,
+                                   source_id);
         catalog->callback=NULL;
         catalog->callback_userdata=userdata;
         return ret;
@@ -279,10 +289,11 @@ gboolean catalog_get_source_content_count(struct catalog *catalog,
                                           int source_id,
                                           unsigned int *count_out)
 {
+        guint number;
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(count_out!=NULL, FALSE);
 
-        unsigned int number=0;
+        number=0;
         if(execute_query_printf(catalog,
                                 getcount_callback,
                                 &number,
@@ -343,11 +354,11 @@ void catalog_restart(struct catalog *catalog)
 
 gboolean catalog_update_entry_timestamp(struct catalog *catalog, int entry_id)
 {
-        g_return_val_if_fail(catalog, FALSE);
         GTimeVal timeval;
+
+        g_return_val_if_fail(catalog, FALSE);
+
         g_get_current_time(&timeval);
-
-
         return execute_update_printf(catalog, TRUE/*autocommit*/,
                                      "UPDATE entries "
                                      "SET lastuse='%16.16lx.%6.6lu' "
@@ -367,11 +378,14 @@ static int getcount_callback(void *userdata,
                              char **result,
                              char **names)
 {
+        guint *number_out;
+        long l;
+
         g_return_val_if_fail(userdata!=NULL, 1);
         g_return_val_if_fail(column_count>0, 1);
-        unsigned int *number_out = (int *)userdata;
-        long l = atol(result[0]);
-        *number_out=(unsigned int)l;
+        number_out = (guint *)userdata;
+        l = atol(result[0]);
+        *number_out=(guint)l;
         return 1; /* no need for more results */
 }
 
@@ -422,16 +436,19 @@ static int execute_update_nocatalog_vprintf(sqlite *db,
                                             char **errmsg,
                                             va_list ap)
 {
+        int ret;
+
         sqlite_busy_timeout(db, 30000/*30 seconds timout, for updates*/);
 
-        int ret = sqlite_exec_vprintf(db,
-                                      sql,
-                                      NULL/*no callback*/,
-                                      NULL/*no userdata*/,
-                                      errmsg,
-                                      ap);
-        if(ret!=0)
+        ret=sqlite_exec_vprintf(db,
+                            sql,
+                            NULL/*no callback*/,
+                            NULL/*no userdata*/,
+                            errmsg,
+                            ap);
+        if(ret!=0) {
                 sqlite_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        }
 
         sqlite_busy_timeout(db, -1/*disable, for queries*/);
 
@@ -442,20 +459,18 @@ static gboolean execute_update_printf(struct catalog *catalog,
                                       const char *sql, ...)
 {
         va_list ap;
+        int ret;
+        char *errmsg = NULL;
+
         va_start(ap, sql);
 
-        int ret;
-        char *errmsg=NULL;
         if(autocommit) {
-                int sql_len = strlen(sql);
-                char buffer[strlen("BEGIN;")+sql_len+strlen(";COMMIT;")+1];
-                strcpy(buffer, "BEGIN;");
-                strcat(buffer, sql);
-                strcat(buffer, ";COMMIT;");
+                char *buffer = g_strdup_printf("BEGIN;%s;COMMIT;", sql);
                 ret = execute_update_nocatalog_vprintf(catalog->db,
                                                        buffer,
                                                        &errmsg,
                                                        ap);
+                g_free(buffer);
         } else {
                 ret = execute_update_nocatalog_vprintf(catalog->db,
                                                        sql,
@@ -477,11 +492,13 @@ static gboolean execute_query_printf(struct catalog *catalog,
                                      const char *sql, ...)
 {
         va_list ap;
-        va_start(ap, sql);
         char *errmsg=NULL;
+        int ret;
+
+        va_start(ap, sql);
+
 
         sqlite_progress_handler(catalog->db, 1, progress_callback, catalog);
-        int ret;
         do {
                 if(catalog->stop) {
                         ret=SQLITE_ABORT;
@@ -513,40 +530,48 @@ static gboolean execute_query_printf(struct catalog *catalog,
 
 static gboolean create_tables(sqlite *db, char **errmsg)
 {
-        int ret = execute_update_nocatalog_printf(db,
-                        "BEGIN; "
-                        "CREATE TABLE entries (id INTEGER PRIMARY KEY, "
-                        "path VARCHAR NOT NULL, "
-                        "name VARCHAR NOT NULL, "
-                        "long_name VARCHAR NOT NULL, "
-                        "source_id INTEGER, "
-                        "lastuse TIMESTAMP, UNIQUE (id, path));"
-                        "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
-                        "CREATE INDEX path_idx ON entries (path);"
-                        "CREATE INDEX source_idx ON entries (source_id);"
-                        "CREATE TABLE sources (id INTEGER PRIMARY KEY , "
-                        "type VARCHAR NOT NULL);"
-                        "CREATE TABLE source_attrs (source_id INTEGER, "
-                        "attribute VARCHAR NOT NULL,"
-                        "value VARCHAR NOT NULL,"
-                        "PRIMARY KEY (source_id, attribute));"
-                        "CREATE TABLE VERSION ( version INTEGER, revision INTEGER );"
-                        "INSERT INTO VERSION VALUES ( %d, %d );"
-                        "COMMIT;",
-                        errmsg,
-                        SCHEMA_VERSION,
-                        SCHEMA_REVISION);
-        return ret==SQLITE_OK;
-}
-
-static int count(const char *str, char c)
-{
-        int count=0;
-        for(const char *ptr = str; *ptr!='\0'; ptr++) {
-                if(*ptr==c)
-                        count++;
+        int ret;
+        ret = execute_update_nocatalog_printf(db, "BEGIN", errmsg);
+        if(ret!=SQLITE_OK) {
+                return FALSE;
         }
-        return count;
+        ret = execute_update_nocatalog_printf(db,
+                                              "CREATE TABLE entries (id INTEGER PRIMARY KEY, "
+                                              "path VARCHAR NOT NULL, "
+                                              "name VARCHAR NOT NULL, "
+                                              "long_name VARCHAR NOT NULL, "
+                                              "source_id INTEGER, "
+                                              "lastuse TIMESTAMP, UNIQUE (id, path));"
+                                              "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
+                                              "CREATE INDEX path_idx ON entries (path);"
+                                              "CREATE INDEX source_idx ON entries (source_id);",
+                                              errmsg);
+        if(ret!=SQLITE_OK) {
+                return FALSE;
+        }
+        ret = execute_update_nocatalog_printf(db,
+                                              "CREATE TABLE sources (id INTEGER PRIMARY KEY , "
+                                              "type VARCHAR NOT NULL);"
+                                              "CREATE TABLE source_attrs (source_id INTEGER, "
+                                              "attribute VARCHAR NOT NULL,"
+                                              "value VARCHAR NOT NULL,"
+                                              "PRIMARY KEY (source_id, attribute));",
+                                              errmsg);
+        if(ret!=SQLITE_OK) {
+                return FALSE;
+        }
+        ret = execute_update_nocatalog_printf(db,
+                                              "CREATE TABLE VERSION ( version INTEGER, revision INTEGER );"
+                                              "INSERT INTO VERSION VALUES ( %d, %d );",
+                                              errmsg,
+                                              SCHEMA_VERSION,
+                                              SCHEMA_REVISION);
+        if(ret!=SQLITE_OK) {
+                return FALSE;
+        }
+
+        ret = execute_update_nocatalog_printf(db, "COMMIT", errmsg);
+        return ret==SQLITE_OK;
 }
 
 static int result_sqlite_callback(void *userdata,
@@ -554,8 +579,18 @@ static int result_sqlite_callback(void *userdata,
                                   char **col_data,
                                   char **col_names)
 {
-        struct catalog *catalog = (struct catalog *)userdata;
-        catalog_callback_f callback = catalog->callback;
+        int entry_id ;
+        const char *path ;
+        const char *name ;
+        const char *long_name ;
+        int source_id ;
+        const char *source_type ;
+        struct catalog *catalog ;
+        catalog_callback_f callback ;
+        gboolean go_on ;
+
+        catalog =  (struct catalog *)userdata;
+        callback =  catalog->callback;
 
         /* executequery called by another thread: forbidden */
         g_return_val_if_fail(callback!=NULL, 1);
@@ -563,17 +598,17 @@ static int result_sqlite_callback(void *userdata,
         /* this must correspond to the query in catalog_executequery()
          * and catalog_get_source_content()
          */
-        const int entry_id = atoi(col_data[0]);
-        const char *path = col_data[1];
-        const char *name = col_data[2];
-        const char *long_name = col_data[3];
-        const int source_id = atoi(col_data[4]);
-        const char *source_type = col_data[5];
+        entry_id = atoi(col_data[0]);
+        path = col_data[1];
+        name = col_data[2];
+        long_name = col_data[3];
+        source_id = atoi(col_data[4]);
+        source_type = col_data[5];
 
         if(catalog->stop)
                 return 1;
 
-        gboolean go_on = catalog->callback(catalog,
+        go_on = catalog->callback(catalog,
                                            0.5/*pertinence*/,
                                            entry_id,
                                            name,
@@ -599,63 +634,25 @@ static int findid_callback(void *userdata,
                            char **result,
                            char **names)
 {
+        int *id_out;
         g_return_val_if_fail(userdata!=NULL, 1);
         g_return_val_if_fail(column_count>0, 1);
-        int *id_out = (int *)userdata;
+        id_out =  (int *)userdata;
         *id_out=atoi(result[0]);
         return 1; /* no need for more results */
 }
 
-/**
- * sqlite callback that expects ids as its result
- * @param userdata a pointer to a GArray *
- */
-static int findids_callback(void *userdata,
-                            int column_count,
-                            char **result,
-                            char **names)
-{
-        g_return_val_if_fail(userdata!=NULL, 1);
-        g_return_val_if_fail(column_count>0, 1);
-        GArray **array_ptr = (GArray **)userdata;
-        if(*array_ptr==NULL)
-                *array_ptr=g_array_new(FALSE/*not zero_terminated*/,
-                                       FALSE/*not clear*/,
-                                       sizeof(int));
-        int id=atoi(result[0]);
-        g_array_append_val(*array_ptr, id);
-        return FALSE; /* continue */
-}
-
-/**
- * sqlite callback that gets one result and set it
- * into username as a string (duplicated using g_strdup())
- * @param userdata a pointer to char *, it must not be null, but it must contain null
- */
-static int set_string_callback(void *userdata,
-                               int column_count,
-                               char **result,
-                               char **names)
-{
-        g_return_val_if_fail(userdata!=NULL, 1);
-        g_return_val_if_fail(column_count>0, 1);
-        char **str_out = (char **)userdata;
-        g_return_val_if_fail(*str_out==NULL, 1);
-
-        *str_out=g_strdup(result[0]);
-
-        return 1/*stop*/;
-}
 
 static gboolean findentry(struct catalog *catalog,
                           const char *path,
                           int source_id,
                           int *id_out)
 {
+        int id=-1;
+
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(path!=NULL, FALSE);
 
-        int id=-1;
         if(execute_query_printf(catalog,
                                 findid_callback,
                                 &id,

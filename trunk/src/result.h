@@ -82,7 +82,7 @@ typedef enum
         /** Such an error meant that some resource was missing, but the result is generally valid */
         RESULT_ERROR_MISSING_RESOURCE,
         /** Generic error code, use it only when nothing else matches */
-        RESULT_ERROR_FAILED,
+        RESULT_ERROR_FAILED
 } ResultErrorCode;
 
 #endif /* RESULT_H */

@@ -8,15 +8,17 @@
 /* ------------------------- public functions */
 gboolean indexer_source_destroy(struct indexer_source *source, struct catalog *catalog)
 {
+        gboolean success=TRUE;
+        gchar *path;
+
         g_return_val_if_fail(source, FALSE);
 
-        gboolean success=TRUE;
 
         if(!catalog_remove_source(catalog, source->id)) {
                 success=FALSE;
         }
 
-        gchar *path = ocha_gconf_get_source_key(source->indexer->name,
+        path =  ocha_gconf_get_source_key(source->indexer->name,
                                                 source->id);
         if(!gconf_client_recursive_unset(ocha_gconf_get_client(),
                                          path,

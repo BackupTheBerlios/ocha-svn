@@ -27,8 +27,6 @@
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
 
-static struct result_queue *result_queue;
-
 /* ------------------------- prototypes */
 static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_unused, gpointer data);
 static void install_keygrab(void);
@@ -38,10 +36,16 @@ static void install_keygrab(void);
 int main(int argc, char *argv[])
 {
         struct configuration config;
+        int i;
+        const char *catalog_path;
+        struct result_queue *queue;
+        struct queryrunner *runners[3];
+        struct queryrunner *compound;
+
         ocha_init(argc, argv, TRUE/*has gui*/, &config);
         ocha_init_requires_catalog(config.catalog_path);
 
-        for(int i=1; i<argc; i++) {
+        for(i=1; i<argc; i++) {
                 const char *arg = argv[i];
                 if(strncmp("--pid=", arg, strlen("--pid="))==0) {
                         const char *file=&arg[strlen("--pid=")];
@@ -58,16 +62,14 @@ int main(int argc, char *argv[])
 
         querywin_init();
 
-        const char *catalog_path = config.catalog_path;
+        catalog_path = config.catalog_path;
 
-        struct result_queue *queue = querywin_get_result_queue();
-        struct queryrunner *runners[] = {
-                                                netwm_queryrunner_create(GDK_DISPLAY(),
-                                                                         queue),
-                                                catalog_queryrunner_new(catalog_path,
-                                                                        queue),
-                                        };
-        struct queryrunner *compound = compound_queryrunner_new(runners, sizeof(runners)/sizeof(struct queryrunner *));
+        queue = querywin_get_result_queue();
+        runners[0]=netwm_queryrunner_create(GDK_DISPLAY(), queue);
+        runners[1]=catalog_queryrunner_new(catalog_path, queue);
+        runners[2]=NULL;
+
+        compound = compound_queryrunner_new(runners, 2);
         querywin_set_queryrunner(compound);
         querywin_start();
 
@@ -82,12 +84,16 @@ int main(int argc, char *argv[])
 
 static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_unused, gpointer data)
 {
-        int keycode = GPOINTER_TO_INT(data);
-        XEvent *xev = (XEvent *) xevent;
+        int keycode;
+        XEvent *xev;
+        XKeyEvent *key;
+
+        keycode = GPOINTER_TO_INT(data);
+        xev = (XEvent *) xevent;
         if (xev->type != KeyPress)
                 return GDK_FILTER_CONTINUE;
 
-        XKeyEvent *key = (XKeyEvent *) xevent;
+        key = (XKeyEvent *) xevent;
         if (keycode == key->keycode)
                 querywin_start();
         return GDK_FILTER_CONTINUE;
@@ -97,24 +103,22 @@ static void install_keygrab()
 {
         GdkDisplay *display = gdk_display_get_default();
         int keycode = XKeysymToKeycode(GDK_DISPLAY(), XK_space);
-        for (int i = 0; i < gdk_display_get_n_screens (display); i++) {
-                GdkScreen *screen = gdk_display_get_screen (display, i);
-                if (!screen)
-                        continue;
-                GdkWindow *root = gdk_screen_get_root_window (screen);
-                gdk_error_trap_push ();
+        int i;
+        for (i = 0; i < gdk_display_get_n_screens (display); i++) {
+                GdkScreen *screen;
+                GdkWindow *root;
 
+                screen = gdk_display_get_screen (display, i);
+                if (!screen) {
+                        continue;
+                }
+                root = gdk_screen_get_root_window (screen);
                 XGrabKey(GDK_DISPLAY(), keycode,
                          Mod1Mask,
                          GDK_WINDOW_XID(root),
                          True,
                          GrabModeAsync,
                          GrabModeAsync);
-                gdk_flush ();
-                if (gdk_error_trap_pop ()) {
-                        fprintf (stderr, "Error grabbing key %d, %p\n", keycode, root);
-                        exit(88);
-                }
                 gdk_window_add_filter(root, filter_keygrab, GINT_TO_POINTER(keycode)/*userdata*/);
         }
 }

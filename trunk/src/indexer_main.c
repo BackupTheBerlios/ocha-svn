@@ -31,13 +31,19 @@ static void usage(FILE *out)
 
 int main(int argc, char *argv[])
 {
-        gboolean slow=FALSE;
+        int curarg;
         gboolean verbose=TRUE;
-        int maxdepth=-1;
         struct configuration config;
+        struct indexer **indexer_ptr;
+        const char *catalog_path;
+        int retval = 0;
+        GError *err = NULL;
+        struct catalog *catalog;
+
+
         ocha_init(argc, argv, FALSE/*no UI*/, &config);
 
-        int curarg;
+
         for(curarg=1; curarg<argc; curarg++) {
                 const char *arg=argv[curarg];
 
@@ -65,11 +71,9 @@ int main(int argc, char *argv[])
                 usage(stderr);
                 exit(111);
         }
-        const char *catalog_path = config.catalog_path;
+        catalog_path =  config.catalog_path;
+        catalog =  catalog_connect(catalog_path, &err);
 
-        int retval=0;
-        GError *err = NULL;
-        struct catalog *catalog = catalog_connect(catalog_path, &err);
         if(catalog==NULL) {
                 fprintf(stderr, "error: could not open or create create catalog at '%s': %s\n",
                         catalog_path,
@@ -85,25 +89,26 @@ int main(int argc, char *argv[])
                 }
         }
 
-        for(struct indexer **indexer_ptr = indexers_list();
+        for(indexer_ptr = indexers_list();
             *indexer_ptr;
             indexer_ptr++) {
                 struct indexer *indexer = *indexer_ptr;
                 int *source_ids = NULL;
                 int source_ids_len = 0;
+                int i;
                 ocha_gconf_get_sources(indexer->name, &source_ids, &source_ids_len);
-                for(int i=0; i<source_ids_len; i++) {
+                for(i=0; i<source_ids_len; i++) {
                         int source_id = source_ids[i];
                         struct indexer_source *source = indexer_load_source(indexer,
                                                                             catalog,
                                                                             source_id);
                         if(source) {
+                                GError *err = NULL;
                                 if(verbose)
                                         printf("indexing %s: %s...\n",
                                                indexer->display_name,
                                                source->display_name);
 
-                                GError *err = NULL;
                                 if(!indexer_source_index(source, catalog, &err)) {
                                         fprintf(stderr,
                                                 "error indexing list for %s (ID %d): %s\n",
@@ -138,6 +143,7 @@ int main(int argc, char *argv[])
 /* ------------------------- static functions */
 static gboolean first_time(gboolean verbose, struct catalog *catalog)
 {
+        struct indexer **indexer_ptr;
         if(verbose)
         {
                 printf("First time startup. "
@@ -146,9 +152,7 @@ static gboolean first_time(gboolean verbose, struct catalog *catalog)
                 printf("Configuring catalog...\n");
         }
 
-        for(struct indexer **indexer_ptr = indexers_list();
-            *indexer_ptr;
-            indexer_ptr++) {
+        for(indexer_ptr = indexers_list(); *indexer_ptr; indexer_ptr++) {
                 struct indexer *indexer = *indexer_ptr;
                 if(verbose)
                         printf("First-time configuration of module %s...\n",

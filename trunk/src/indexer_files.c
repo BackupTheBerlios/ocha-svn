@@ -91,10 +91,12 @@ static struct indexer_source *indexer_files_load_source(struct indexer *self,
                                                         struct catalog *catalog,
                                                         int id)
 {
+        struct indexer_source *retval;
+
         g_return_val_if_fail(catalog!=NULL, NULL);
         g_return_val_if_fail(self==&indexer_files, NULL);
 
-        struct indexer_source *retval = g_new(struct indexer_source, 1);
+        retval =  g_new(struct indexer_source, 1);
         retval->id=id;
         retval->indexer=self;
         retval->index=indexer_files_source_index;
@@ -121,6 +123,7 @@ static gboolean indexer_files_execute(struct indexer *self,
                                       const char *text_uri,
                                       GError **err)
 {
+        GError *gnome_err;
         g_return_val_if_fail(text_uri!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
         g_return_val_if_fail(self==&indexer_files, FALSE);
@@ -135,7 +138,7 @@ static gboolean indexer_files_execute(struct indexer *self,
         }
 
         printf("opening %s...\n", text_uri);
-        GError *gnome_err = NULL;
+        gnome_err =  NULL;
         if(!gnome_url_show(text_uri, &gnome_err)) {
                 g_set_error(err,
                             RESULT_ERROR,
@@ -215,10 +218,11 @@ static struct indexer_source *indexer_files_new_source(struct indexer *indexer,
                                                        struct catalog *catalog,
                                                        GError **err)
 {
+        int id=-1;
+
         g_return_val_if_fail(indexer, NULL);
         g_return_val_if_fail(err==NULL || (*err==NULL), NULL);
 
-        int id=-1;
         if(add_source(catalog,
                       NULL/*no path*/,
                       0/*ignore content*/,
@@ -279,29 +283,58 @@ static void indexer_files_source_notify_remove(struct indexer_source *source,
 
 static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *source)
 {
+        GtkWidget *retval;
+        int source_id;
+        char *current_path;
+        char *current_depth;
+        char *current_ignore;
+        int current_depth_i;
+        GtkWidget *frame_top;
+        GtkWidget *frame_top_label;
+        GtkWidget *align;
+        GtkWidget *top_table;
+        GtkWidget *pathLabel;
+        GtkWidget *path;
+        GtkWidget *choose;
+        GtkWidget *frame_bottom;
+        GtkWidget *frame_bottom_label;
+        GtkWidget *bottom_table;
+        GtkWidget *include_label;
+        GtkWidget *exclude_label;
+        GtkWidget *include_contents;
+        GtkWidget *depth_label;
+        GtkWidget *depth_value;
+        PangoAttrList *attrs;
+        GtkWidget *include;
+        GtkWidget *exclude;
+        GtkWidget *depth;
+        GtkWidget *filler;
+        GtkWidget *explanation;
+
         g_return_val_if_fail(source, NULL);
 
-        GtkWidget *retval = gtk_vbox_new(FALSE, 0);
+        retval =  gtk_vbox_new(FALSE, 0);
         gtk_widget_show(retval);
-        int source_id = source->id;
+        source_id =  source->id;
 
-        char *current_path=ocha_gconf_get_source_attribute(INDEXER_NAME,
-                                                            source->id,
-                                                            "path");
-        char *current_depth=ocha_gconf_get_source_attribute(INDEXER_NAME,
-                                                            source->id,
-                                                            "depth");
-        char *current_ignore=ocha_gconf_get_source_attribute(INDEXER_NAME,
-                                                             source->id,
-                                                             "ignore");
+        current_path = ocha_gconf_get_source_attribute(INDEXER_NAME,
+                                                       source->id,
+                                                       "path");
+        current_depth = ocha_gconf_get_source_attribute(INDEXER_NAME,
+                                                        source->id,
+                                                        "depth");
+        current_ignore = ocha_gconf_get_source_attribute(INDEXER_NAME,
+                                                         source->id,
+                                                         "ignore");
 
-        int current_depth_i = current_depth ? atoi(current_depth):1;
-        if(current_depth_i==-1)
+        current_depth_i =  current_depth ? atoi(current_depth):1;
+        if(current_depth_i==-1) {
                 current_depth_i=DEPTH_INFINITY;
+        }
 
         /* --- Top frame: folder */
 
-        GtkWidget *frame_top = gtk_frame_new(NULL);
+        frame_top =  gtk_frame_new(NULL);
         gtk_widget_show(frame_top);
         gtk_box_pack_start(GTK_BOX(retval),
                            frame_top,
@@ -309,24 +342,24 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
                            TRUE/*fill*/,
                            0);
         gtk_frame_set_shadow_type(GTK_FRAME(frame_top), GTK_SHADOW_NONE);
-        GtkWidget *frame_top_label = gtk_label_new("<b>Folder</b>");
+        frame_top_label =  gtk_label_new("<b>Folder</b>");
         gtk_widget_show(frame_top_label);
         gtk_frame_set_label_widget(GTK_FRAME(frame_top), frame_top_label);
         gtk_label_set_use_markup(GTK_LABEL(frame_top_label), TRUE);
 
-        GtkWidget *align = gtk_alignment_new(0.5, 0.5, 1, 1);
+        align =  gtk_alignment_new(0.5, 0.5, 1, 1);
         gtk_widget_show(align);
         gtk_container_add(GTK_CONTAINER(frame_top), align);
         gtk_alignment_set_padding(GTK_ALIGNMENT(align),
                                   0, 0, 12, 0);
 
-        GtkWidget *top_table = gtk_table_new(2/*rows*/,
+        top_table =  gtk_table_new(2/*rows*/,
                                              2/*columns*/,
                                              FALSE);
         gtk_widget_show(top_table);
         gtk_container_add(GTK_CONTAINER(align), top_table);
 
-        GtkWidget *pathLabel = gtk_label_new("Path: ");
+        pathLabel =  gtk_label_new("Path: ");
         gtk_widget_show(pathLabel);
         gtk_table_attach(GTK_TABLE(top_table),
                          pathLabel, 0, 1, 0, 1,
@@ -334,14 +367,14 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
         gtk_misc_set_alignment(GTK_MISC(pathLabel), 0, 0.5);
         gtk_misc_set_padding(GTK_MISC(pathLabel), 4, 0);
 
-        GtkWidget *path = gtk_label_new(current_path ? current_path:"");
+        path =  gtk_label_new(current_path ? current_path:"");
         gtk_widget_show(path);
         gtk_table_attach(GTK_TABLE(top_table), path, 1, 2, 0, 1,
                          GTK_EXPAND | GTK_FILL, 0, 0, 0);
         gtk_misc_set_alignment(GTK_MISC(path), 0, 0.5);
         gtk_misc_set_padding(GTK_MISC(path), 4, 0);
 
-        GtkWidget *choose = gtk_file_chooser_button_new("Path",
+        choose =  gtk_file_chooser_button_new("Path",
                             GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
         gtk_widget_show(choose);
         gtk_table_attach(GTK_TABLE(top_table), choose, 1, 2, 1, 2,
@@ -362,7 +395,7 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
 
         /* --- Bottom frame: Indexing */
 
-        GtkWidget *frame_bottom = gtk_frame_new(NULL);
+        frame_bottom =  gtk_frame_new(NULL);
         gtk_widget_show(frame_bottom);
         gtk_box_pack_start(GTK_BOX(retval),
                            frame_bottom,
@@ -370,7 +403,7 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
                            TRUE/*fill*/,
                            0);
         gtk_frame_set_shadow_type(GTK_FRAME(frame_bottom), GTK_SHADOW_NONE);
-        GtkWidget *frame_bottom_label = gtk_label_new("<b>Indexing</b>");
+        frame_bottom_label =  gtk_label_new("<b>Indexing</b>");
         gtk_widget_show(frame_bottom_label);
         gtk_frame_set_label_widget(GTK_FRAME(frame_bottom), frame_bottom_label);
         gtk_label_set_use_markup(GTK_LABEL(frame_bottom_label), TRUE);
@@ -380,26 +413,26 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
         gtk_container_add(GTK_CONTAINER(frame_bottom), align);
         gtk_alignment_set_padding(GTK_ALIGNMENT(align), 0, 0, 12, 0);
 
-        GtkWidget *bottom_table = gtk_table_new(5, 3, FALSE);
+        bottom_table =  gtk_table_new(5, 3, FALSE);
         gtk_widget_show(bottom_table);
         gtk_container_add(GTK_CONTAINER(align), bottom_table);
         gtk_container_set_border_width(GTK_CONTAINER(bottom_table), 4);
 
-        GtkWidget *include_label = gtk_label_new("Include: ");
+        include_label =  gtk_label_new("Include: ");
         gtk_widget_show(include_label);
         gtk_table_attach(GTK_TABLE(bottom_table), include_label, 0, 1, 1, 2,
                          (GtkAttachOptions)(GTK_FILL),
                          (GtkAttachOptions)(0), 0, 0);
         gtk_misc_set_alignment(GTK_MISC(include_label), 0, 0.5);
 
-        GtkWidget *exclude_label = gtk_label_new("Exclude:");
+        exclude_label =  gtk_label_new("Exclude:");
         gtk_widget_show(exclude_label);
         gtk_table_attach(GTK_TABLE(bottom_table), exclude_label, 0, 1, 2, 3,
                          (GtkAttachOptions)(GTK_FILL),
                          (GtkAttachOptions)(0), 0, 0);
         gtk_misc_set_alignment(GTK_MISC(exclude_label), 0, 0.5);
 
-        GtkWidget *include_contents = gtk_check_button_new_with_mnemonic("Include Contents");
+        include_contents =  gtk_check_button_new_with_mnemonic("Include Contents");
         gtk_widget_show(include_contents);
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(include_contents),
                                      current_depth_i>0);
@@ -415,33 +448,33 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
                          G_CALLBACK(include_content_disable_cb),
                          bottom_table/*userdata*/);
 
-        GtkWidget *depth_label = gtk_label_new("Depth");
+        depth_label =  gtk_label_new("Depth");
         gtk_widget_show(depth_label);
         gtk_table_attach(GTK_TABLE(bottom_table), depth_label, 2, 3, 0, 1,
                          (GtkAttachOptions)(GTK_FILL),
                          (GtkAttachOptions)(0), 0, 0);
         gtk_label_set_justify(GTK_LABEL(depth_label), GTK_JUSTIFY_CENTER);
 
-        GtkWidget *depth_value = gtk_label_new("");
+        depth_value =  gtk_label_new("");
         gtk_widget_show(depth_value);
         gtk_table_attach(GTK_TABLE(bottom_table), depth_value, 2, 3, 1, 2,
                          (GtkAttachOptions)(0),
                          (GtkAttachOptions)(0), 0, 0);
         gtk_label_set_justify(GTK_LABEL(depth_value), GTK_JUSTIFY_CENTER);
 
-        PangoAttrList *attrs = pango_attr_list_new();
+        attrs =  pango_attr_list_new();
         pango_attr_list_insert(attrs,
                                pango_attr_scale_new(PANGO_SCALE_SMALL));
         gtk_label_set_attributes(GTK_LABEL(depth_value), attrs);
         pango_attr_list_unref(attrs);
 
-        GtkWidget *include = gtk_entry_new();
+        include =  gtk_entry_new();
         gtk_widget_show(include);
         gtk_table_attach(GTK_TABLE(bottom_table), include, 1, 2, 1, 2,
                          (GtkAttachOptions)(GTK_EXPAND | GTK_FILL),
                          (GtkAttachOptions)(0), 4, 0);
 
-        GtkWidget *exclude = gtk_entry_new();
+        exclude =  gtk_entry_new();
         gtk_widget_show(exclude);
         gtk_table_attach(GTK_TABLE(bottom_table), exclude, 1, 2, 2, 3,
                          (GtkAttachOptions)(GTK_EXPAND | GTK_FILL),
@@ -453,9 +486,9 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
                          G_CALLBACK(exclude_changed_cb),
                          GINT_TO_POINTER(source_id)/*userdata*/);
 
-        GtkWidget *depth = gtk_vscale_new_with_range(1.0/*min*/,
-                           DEPTH_INFINITY/*max*/,
-                           1.0/*step*/);
+        depth =  gtk_vscale_new_with_range(1.0/*min*/,
+                                           DEPTH_INFINITY/*max*/,
+                                           1.0/*step*/);
         gtk_widget_show(depth);
         gtk_table_attach(GTK_TABLE(bottom_table), depth, 2, 3, 2, 5,
                          (GtkAttachOptions)(GTK_FILL),
@@ -479,17 +512,17 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
                          G_CALLBACK(include_content_reset_depth_cb),
                          depth/*userdata*/);
 
-        GtkWidget *filler= gtk_label_new("");
+        filler =  gtk_label_new("");
         gtk_widget_show(filler);
         gtk_table_attach(GTK_TABLE(bottom_table), filler, 1, 2, 4, 5,
                          (GtkAttachOptions)(GTK_EXPAND | GTK_FILL),
                          (GtkAttachOptions)(GTK_EXPAND), 0, 0);
         gtk_misc_set_alignment(GTK_MISC(filler), 0, 0.5);
 
-        GtkWidget *explanation = gtk_label_new("Fill include/exclude with comma-separated "
-                                               "patterns to be applied to files or directories "
-                                               "inside the current folder.\n"
-                                               "Example: <i>*.txt,*.gif,*.jpg</i>");
+        explanation =  gtk_label_new("Fill include/exclude with comma-separated "
+                                     "patterns to be applied to files or directories "
+                                     "inside the current folder.\n"
+                                     "Example: <i>*.txt,*.gif,*.jpg</i>");
         gtk_widget_show(explanation);
         gtk_table_attach(GTK_TABLE(bottom_table), explanation, 1, 2, 3, 4,
                          (GtkAttachOptions)(GTK_FILL),
@@ -499,12 +532,15 @@ static GtkWidget *indexer_files_source_editor_widget(struct indexer_source *sour
         gtk_misc_set_alignment(GTK_MISC(explanation), 0, 0);
         gtk_misc_set_padding(GTK_MISC(explanation), 4, 0);
 
-        if(current_path)
+        if(current_path) {
                 g_free(current_path);
-        if(current_depth)
+        }
+        if(current_depth) {
                 g_free(current_depth);
-        if(current_ignore)
+        }
+        if(current_ignore) {
                 g_free(current_ignore);
+        }
 
         include_content_disable_cb(GTK_TOGGLE_BUTTON(include_contents), bottom_table);
 
@@ -549,25 +585,31 @@ static gboolean index_file_cb(struct catalog *catalog,
                               GError **err,
                               gpointer userdata)
 {
+        char *uri;
+        gboolean retval;
 
-        if(!has_gnome_mime_command(path))
+        if(!has_gnome_mime_command(path)) {
                 return TRUE;
+        }
 
-        char uri[strlen("file://")+strlen(path)+1];
-        strcpy(uri, "file://");
-        strcat(uri, path);
-
-        return catalog_addentry_witherrors(catalog,
-                                           uri,
-                                           filename,
-                                           path/*long_name*/,
-                                           source_id,
-                                           err);
+        uri = g_strdup_printf("file://%s", path);
+        retval = catalog_addentry_witherrors(catalog,
+                                             uri,
+                                             filename,
+                                             path/*long_name*/,
+                                             source_id,
+                                             err);
+        g_free(uri);
+        return retval;
 }
 
 static gboolean has_gnome_mime_command(const char *path)
 {
-        GString *uri = g_string_new("file://");
+        gboolean retval;
+        char *mimetype;
+        GString *uri;
+
+        uri =  g_string_new("file://");
         if(*path!='/') {
                 const char *cwd = g_get_current_dir();
                 g_string_append(uri, cwd);
@@ -577,8 +619,8 @@ static gboolean has_gnome_mime_command(const char *path)
         }
         g_string_append(uri, path);
 
-        gboolean retval=FALSE;
-        char *mimetype = gnome_vfs_get_mime_type(uri->str);
+        retval = FALSE;
+        mimetype =  gnome_vfs_get_mime_type(uri->str);
         if(mimetype) {
                 char *app = gnome_vfs_mime_get_default_desktop_entry(mimetype);
                 if(app) {
@@ -637,13 +679,17 @@ static char *display_name(struct catalog *catalog, int id)
 
 static void depth_changed_cb(GtkRange *range, gpointer userdata)
 {
+        int source_id;
+        int value;
+        char *value_as_string;
+
         g_return_if_fail(range);
         g_return_if_fail(userdata);
-        int source_id = GPOINTER_TO_INT(userdata);
-        int value = (int)gtk_range_get_value(range);
+        source_id =  GPOINTER_TO_INT(userdata);
+        value =  (int)gtk_range_get_value(range);
         if(value>=DEPTH_INFINITY)
                 value=-1;
-        char *value_as_string = g_strdup_printf("%d", (int)value);
+        value_as_string =  g_strdup_printf("%d", (int)value);
         ocha_gconf_set_source_attribute(INDEXER_NAME,
                                         source_id,
                                         "depth",
@@ -652,11 +698,14 @@ static void depth_changed_cb(GtkRange *range, gpointer userdata)
 }
 static void update_depth_label_cb(GtkRange *range, gpointer userdata)
 {
+        GtkLabel *label;
+        int value;
+
         g_return_if_fail(range);
         g_return_if_fail(userdata);
-        GtkLabel *label = GTK_LABEL(userdata);
 
-        int value = (int)gtk_range_get_value(range);
+        label =  GTK_LABEL(userdata);
+        value =  (int)gtk_range_get_value(range);
         if(value>=DEPTH_INFINITY) {
                 gtk_label_set_text(label, "\xe2\x88\x9e"/*U+221E INFINITY*/);
         } else {
@@ -667,10 +716,13 @@ static void update_depth_label_cb(GtkRange *range, gpointer userdata)
 }
 static void exclude_changed_cb(GtkEditable *widget, gpointer userdata)
 {
+        int source_id;
+        const char *text;
+
         g_return_if_fail(widget);
         g_return_if_fail(userdata);
-        int source_id = GPOINTER_TO_INT(userdata);
-        const char *text = gtk_entry_get_text(GTK_ENTRY(widget));
+        source_id =  GPOINTER_TO_INT(userdata);
+        text =  gtk_entry_get_text(GTK_ENTRY(widget));
         ocha_gconf_set_source_attribute(INDEXER_NAME,
                                         source_id,
                                         "ignore",
@@ -678,9 +730,12 @@ static void exclude_changed_cb(GtkEditable *widget, gpointer userdata)
 }
 static void include_content_set_attribute_cb(GtkToggleButton *toggle, gpointer userdata)
 {
+        int source_id;
+
         g_return_if_fail(toggle);
         g_return_if_fail(userdata);
-        int source_id = GPOINTER_TO_INT(userdata);
+
+        source_id = GPOINTER_TO_INT(userdata);
         if(gtk_toggle_button_get_active(toggle)) {
                 ocha_gconf_set_source_attribute(INDEXER_NAME,
                                                 source_id,
@@ -695,13 +750,19 @@ static void include_content_set_attribute_cb(GtkToggleButton *toggle, gpointer u
 }
 static void include_content_disable_cb(GtkToggleButton *toggle, gpointer userdata)
 {
+        GtkContainer *parent;
+        gboolean active;
+        GList *children;
+        GList *child;
+
         g_return_if_fail(toggle);
         g_return_if_fail(userdata);
-        GtkContainer *parent = GTK_CONTAINER(userdata);
-        gboolean active = gtk_toggle_button_get_active(toggle);
 
-        GList *children = gtk_container_get_children(parent);
-        for(GList *child=children; child; child=child->next) {
+        parent =  GTK_CONTAINER(userdata);
+        active =  gtk_toggle_button_get_active(toggle);
+
+        children =  gtk_container_get_children(parent);
+        for(child=children; child; child=child->next) {
                 GtkWidget *childw = child->data;
                 if(childw==GTK_WIDGET(toggle))
                         continue;
@@ -714,9 +775,13 @@ static void include_content_disable_cb(GtkToggleButton *toggle, gpointer userdat
 
 static void include_content_reset_depth_cb(GtkToggleButton *toggle, gpointer userdata)
 {
+        GtkRange *depth;
+        gboolean active;
+
         g_return_if_fail(toggle);
-        GtkRange *depth = GTK_RANGE(userdata);
-        gboolean active = gtk_toggle_button_get_active(toggle);
+
+        depth =  GTK_RANGE(userdata);
+        active =  gtk_toggle_button_get_active(toggle);
         if(active) {
                 /* was inactive, is now active */
                 gtk_range_set_value(depth, 1);
@@ -726,20 +791,25 @@ static void include_content_reset_depth_cb(GtkToggleButton *toggle, gpointer use
 static void change_path_cb(GtkFileChooser *chooser, gpointer userdata)
 {
         int id = GPOINTER_TO_INT(userdata);
-
         gchar *filename = gtk_file_chooser_get_filename(chooser);
+
         ocha_gconf_set_source_attribute(INDEXER_NAME, id, "path", filename);
-        if(filename)
+        if(filename) {
                 g_free(filename);
+        }
 }
 static void update_path_label_cb(GtkFileChooser *chooser, gpointer userdata)
 {
-        GtkLabel *label = GTK_LABEL(userdata);
+        GtkLabel *label;
+        gchar *uri;
+
+        label =  GTK_LABEL(userdata);
         g_return_if_fail(label);
 
-        gchar *uri = gtk_file_chooser_get_uri(chooser);
+        uri = gtk_file_chooser_get_uri(chooser);
         gtk_label_set_text(label, uri ? uri:"");
-        if(uri)
+        if(uri) {
                 g_free(uri);
+        }
 }
 

@@ -1,28 +1,28 @@
 
 /** \file Ripped of from wmctrl and later heavily modified.
- 
+
 Original copyright notice:
- 
+
 wmctrl
 A command line tool to interact with an EWMH/NetWM compatible X Window Manager.
- 
+
 Author, current maintainer: Tomas Styblo <tripie@cpan.org>
- 
+
 Copyright (C) 2003
- 
+
 This program is free software which I release under the GNU General Public
 License. You may redistribute and/or modify this program under the terms
 of that license as published by the Free Software Foundation; either
 version 2 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 To get a copy of the GNU General Puplic License,  write to the
 Free Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- 
+
 */
 
 #include "netwm.h"
@@ -46,41 +46,19 @@ Free Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #define MAX_PROPERTY_VALUE_LEN 4096
 #define SELECT_WINDOW_MAGIC ":SELECT:"
 
-#define p_verbose(...) ((void *)0)
 
 /* ------------------------- declarations of static functions */
-static gboolean wm_supports (Display *disp, const gchar *prop);
 static Window *get_client_list (Display *disp, unsigned long *size);
 static int client_msg(Display *disp, Window win, char *msg,
                       unsigned long data0, unsigned long data1,
                       unsigned long data2, unsigned long data3,
                       unsigned long data4);
-static int list_windows (Display *disp);
-static int list_desktops (Display *disp);
-static int showing_desktop (Display *disp);
-static int change_viewport (Display *disp);
-static int change_geometry (Display *disp);
-static int change_number_of_desktops (Display *disp);
-static int switch_desktop (Display *disp);
-static int wm_info (Display *disp);
-static gchar *get_output_str (gchar *str, gboolean is_utf8);
-static int action_window (Display *disp, Window win, char mode);
-static int action_window_pid (Display *disp, char mode);
-static int action_window_str (Display *disp, char mode);
 static int activate_window (Display *disp, Window win,
                             gboolean switch_desktop);
-static int close_window (Display *disp, Window win);
-static int longest_str (gchar **strv);
-static int window_to_desktop (Display *disp, Window win, int desktop);
-static void window_set_title (Display *disp, Window win, char *str, char mode);
 static gchar *get_window_class (Display *disp, Window win);
 static gchar *get_window_title (Display *disp, Window win);
 static gchar *get_property (Display *disp, Window win,
                             Atom xa_prop_type, gchar *prop_name, unsigned long *size);
-static void init_charset(void);
-static int window_move_resize (Display *disp, Window win, char *arg);
-static int window_state (Display *disp, Window win, char *arg);
-static Window Select_Window(Display *dpy);
 
 /* ------------------------- public functions */
 
@@ -106,13 +84,17 @@ char *netwm_get_window_class(Display *disp, Window win)
 
 char *netwm_get_window_host(Display *disp, Window win)
 {
-        char *host = get_property(disp, win,
-                                  XA_STRING,
-                                  "WM_CLIENT_MACHINE",
-                                  NULL);
-        if(host==NULL)
+        char *host;
+        char *host_utf8;
+
+        host = get_property(disp, win,
+                            XA_STRING,
+                            "WM_CLIENT_MACHINE",
+                            NULL);
+        if(host==NULL) {
                 return NULL;
-        char *host_utf8 = g_locale_to_utf8(host, -1, NULL, NULL, NULL);
+        }
+        host_utf8 =  g_locale_to_utf8(host, -1, NULL, NULL, NULL);
         g_free(host);
         return host_utf8;
 }
@@ -155,18 +137,14 @@ static int activate_window (Display *disp, Window win, /* {{{ */
         /* desktop ID */
         if ((desktop = (unsigned long *)get_property(disp, win,
                         XA_CARDINAL, "_NET_WM_DESKTOP", NULL)) == NULL) {
-                if ((desktop = (unsigned long *)get_property(disp, win,
-                                XA_CARDINAL, "_WIN_WORKSPACE", NULL)) == NULL) {
-                        p_verbose("Cannot find desktop ID of the window.\n");
-                }
+                desktop = (unsigned long *)get_property(disp, win,
+                                                        XA_CARDINAL, "_WIN_WORKSPACE", NULL);
         }
 
         if (switch_desktop && desktop) {
-                if (client_msg(disp, DefaultRootWindow(disp),
-                                "_NET_CURRENT_DESKTOP",
-                                *desktop, 0, 0, 0, 0) != EXIT_SUCCESS) {
-                        p_verbose("Cannot switch desktop.\n");
-                }
+                client_msg(disp, DefaultRootWindow(disp),
+                           "_NET_CURRENT_DESKTOP",
+                           *desktop, 0, 0, 0, 0);
                 g_free(desktop);
         }
 
@@ -239,12 +217,10 @@ static gchar *get_property (Display *disp, Window win, /*{{{*/
         if (XGetWindowProperty(disp, win, xa_prop_name, 0, MAX_PROPERTY_VALUE_LEN / 4, False,
                                xa_prop_type, &xa_ret_type, &ret_format,
                                &ret_nitems, &ret_bytes_after, &ret_prop) != Success) {
-                p_verbose("Cannot get %s property.\n", prop_name);
                 return NULL;
         }
 
         if (xa_ret_type != xa_prop_type) {
-                p_verbose("Invalid type of %s property.\n", prop_name);
                 XFree(ret_prop);
                 return NULL;
         }

@@ -9,7 +9,7 @@
 #include "query.h"
 
 /** I've used junit for too long... */
-#define assertTrue(msg, expr) fail_unless(expr, msg)
+#define assertTrue(msg, expr) _assertTrue(msg, expr, __FILE__, __LINE__)
 
 static const char *utf8_ayto = "\xce\xb1\xcf\x85\xcf\x84\xcf\x8c";
 static const char *utf8_AYTO = "\xce\x91\xce\xa5\xce\xa4\xce\x8c";
@@ -17,13 +17,11 @@ static const char *utf8_AYTO_EINAI = "\xce\x91\xce\xa5\xce\xa4\xce\x8c \xce\x95\
 static const char *utf8_Ti_einai_ayto = "\xce\xa4\xce\xb9 \xce\xb5\xce\xaf\xce\xbd\xce\xb1\xce\xb9 \xce\xb1\xcf\x85\xcf\x84\xcf\x8c";
 static const char *utf8_TI_EINAI_AYTO = "\xce\xa4\xce\x99 \xce\x95\xce\x8a\xce\x9d\xce\x91\xce\x99 \xce\x91\xce\xa5\xce\xa4\xce\x8c";
 static const char *utf8_ete = "\xc3\xa9t\xc3\xa9";
-static const char *utf8_ETE_accents = "\xc3\x89T\xc3\x89";
-static const char *utf8_ETE = "ETE";
 static const char *utf8_Cet_ete = "Cet \xc3\xa9t\xc3\xa9";
 static const char *utf8_CET_ETE_accents = "CET \xc3\x89T\xc3\x89";
-static const char *utf8_CET_ETE_noaccents = "CET ETE";
 
 /* ------------------------- prototypes */
+static Suite *query_check_suite(void);
 /**
  * query_highlight, defined in query.c,
  * which should not be used anywhere else.
@@ -31,6 +29,7 @@ static const char *utf8_CET_ETE_noaccents = "CET ETE";
 extern gboolean query_highlight(const char *query, const char *name, char *highlight);
 static void displayable_highlight(char *highlight, int len);
 static void assertHighlightIs(const char *query, const char *name, const char *pattern);
+static void _assertTrue(const char *msg, gboolean expression, const char *file, int line);
 
 /* ------------------------- test cases */
 static void setup()
@@ -145,8 +144,8 @@ END_TEST
 
 START_TEST(test_result_ismatch)
 {
-        printf("--test_result_ismatch\n");
         struct result result;
+        printf("--test_result_ismatch\n");
         memset(&result, 0, sizeof(result));
         result.name="bottom";
         /* I don't set anything else, because it must not
@@ -261,7 +260,7 @@ END_TEST
 
 /* ------------------------- test suite */
 
-Suite *query_check_suite(void)
+static Suite *query_check_suite(void)
 {
         Suite *s = suite_create("query");
         TCase *tc_core = tcase_create("query_core");
@@ -305,7 +304,8 @@ int main(void)
 /* ------------------------- private functions */
 static void displayable_highlight(char *highlight, int len)
 {
-        for(int i=0; i<len; i++) {
+        int i;
+        for(i=0; i<len; i++) {
                 if(highlight[i]=='\0')
                         highlight[i]=' ';
         }
@@ -313,10 +313,13 @@ static void displayable_highlight(char *highlight, int len)
 static void assertHighlightIs(const char *query, const char *name, const char *pattern)
 {
         const int namelen=strlen(name);
-        char goal[namelen+1];
-        strcmp(name, goal);
+        char *goal = g_strdup(name);
         gboolean expected_retval=FALSE;
-        for(int i=0; i<namelen; i++) {
+        int i;
+        char *dest;
+        gboolean retval;
+
+        for(i=0; i<namelen; i++) {
                 if(pattern[i]=='1') {
                         expected_retval=TRUE;
                         goal[i]=name[i];
@@ -324,10 +327,10 @@ static void assertHighlightIs(const char *query, const char *name, const char *p
                         goal[i]='\0';
         }
         goal[namelen]='\0';
-        char dest[namelen+2];
+        dest=g_malloc(namelen+2);
         memset(dest, 'w', namelen+1);
         dest[namelen+1]='\0';
-        gboolean retval = query_highlight(query, name, dest);
+        retval = query_highlight(query, name, dest);
         fail_unless(expected_retval==retval,
                     g_strdup_printf("assertHighlightIs(%s, %s, ...): returned %s when it should have returned %s\n",
                                     query,
@@ -335,13 +338,20 @@ static void assertHighlightIs(const char *query, const char *name, const char *p
                                     retval ? "TRUE":"FALSE",
                                     expected_retval ? "TRUE":"FALSE"));
         if(retval) {
-                if(memcmp(dest, goal, namelen+1)==0)
-                        return;
-
-                displayable_highlight(goal, namelen);
-                displayable_highlight(dest, namelen);
-                fail(g_strdup_printf("assertHighlightIs(%s, %s, result): result was:\n '%s'\nwhen it should have been:\n '%s'\n",
-                                     query, name, dest, goal));
+                if(memcmp(dest, goal, namelen+1)!=0)
+                {
+                        displayable_highlight(goal, namelen);
+                        displayable_highlight(dest, namelen);
+                        fail(g_strdup_printf("assertHighlightIs(%s, %s, result): "
+                                             " result was:\n '%s'\nwhen it should have been:\n '%s'\n",
+                                             query, name, dest, goal));
+                }
         }
+        g_free(dest);
+        g_free(goal);
 }
 
+static void _assertTrue(const char *msg, gboolean expression, const char *file, int line)
+{
+        _fail_unless(expression, file, line, msg);
+}

@@ -44,19 +44,17 @@ struct entry_definition entries[] =
 #define catalog_cmd(catalog, comment, ret) _catalog_cmd(catalog, comment, ret, __FILE__, __LINE__)
 
 /* ------------------------- prototypes */
+static Suite *catalog_check_suite(void);
 static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered);
 static gboolean collect_result_names_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, void *userdata);
 static void _catalog_cmd(struct catalog *catalog, const char *comment, gboolean ret, const char *file, int line);
 static gboolean exists(const char *path);
 static void unlink_if_exists(const char *path);
-static void free_result(gpointer data, gpointer userdata);
 static void execute_query_and_expect(const char *query, int goal_length, char *goal[], gboolean ordered);
 static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered);
 static gboolean test_source_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int result_source_id, const char *source_type, void *userdata);
-static gboolean contains_result(GList *list, const char *name);
 static gboolean countdown_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, void *userdata);
 static gboolean countdown_interrupt_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, void *userdata);
-static int sleeper_progress_handler(void *userdata);
 static gpointer execute_query_thread(void *userdata);
 static void addentries(struct catalog *catalog, int sourceid, int count, const char *name_pattern);
 
@@ -77,6 +75,7 @@ static void teardown()
 
 static void setup_query()
 {
+        int i;
         setup();
         catalog=catalog_connect(PATH, NULL);
 
@@ -84,7 +83,7 @@ static void setup_query()
                                        "test",
                                        &source_id),
                     "source could not be created");
-        for(int i=0; i<entries_length; i++) {
+        for(i=0; i<entries_length; i++) {
                 fail_unless(catalog_add_entry(catalog,
                                               source_id,
                                               entries[i].path,
@@ -106,9 +105,12 @@ static void teardown_query()
 
 START_TEST(test_create)
 {
-        printf("--- test_create\n");
         GError *err = NULL;
-        struct catalog *catalog=catalog_connect(PATH, &err);
+        struct catalog *catalog;
+
+        printf("--- test_create\n");
+
+        catalog = catalog_connect(PATH, &err);
         if(!catalog) {
                 fail_unless(err!=NULL, "no catalog and no error message");
                 fail(err->message);
@@ -121,13 +123,15 @@ END_TEST
 
 START_TEST(test_addentry)
 {
-        printf("--- test_addentry\n");
         struct catalog *catalog=catalog_connect(PATH, NULL);
-
         int source_id=-1;
+        int entry_id=-1;
+
+        printf("--- test_addentry\n");
+        catalog = catalog_connect(PATH, NULL);
+
         catalog_add_source(catalog, "test", &source_id);
 
-        int entry_id=-1;
         catalog_cmd(catalog,
                     "1st addentry(/tmp/toto.txt)",
                     catalog_add_entry(catalog,
@@ -143,8 +147,10 @@ END_TEST
 
 START_TEST(test_addentry_escape)
 {
+        struct catalog *catalog;
         printf("--- test_addentry_escape\n");
-        struct catalog *catalog=catalog_connect(PATH, NULL);
+
+        catalog = catalog_connect(PATH, NULL);
 
         catalog_cmd(catalog,
                     "1st addentry(/tmp/toto.txt)",
@@ -161,13 +167,16 @@ END_TEST
 
 START_TEST(test_addentry_noduplicate)
 {
-        printf("--- test_addentry_noduplicate\n");
-        struct catalog *catalog=catalog_connect(PATH, NULL);
-
+        struct catalog *catalog;
         int source_id=-1;
+        int entry_id_1=-1;
+        int entry_id_2=-1;
+
+        printf("--- test_addentry_noduplicate\n");
+        catalog = catalog_connect(PATH, NULL);
+
         catalog_add_source(catalog, "test", &source_id);
 
-        int entry_id_1=-1;
         fail_unless(catalog_add_entry(catalog,
                                       source_id,
                                       "/tmp/toto.txt",
@@ -175,7 +184,6 @@ START_TEST(test_addentry_noduplicate)
                                       "/tmp/toto.txt",
                                       &entry_id_1),
                     "1st addentry failed");
-        int entry_id_2=-1;
         fail_unless(catalog_add_entry(catalog,
                                       source_id,
                                       "/tmp/toto.txt",
@@ -191,15 +199,20 @@ END_TEST
 
 START_TEST(test_get_source_content_size)
 {
-        printf("--- test_get_source_content_size\n");
-        struct catalog *catalog=catalog_connect(PATH, NULL);
+        struct catalog *catalog;
         int source1_id = -1;
+        int source2_id = -1;
+        unsigned int source1_count = -1;
+        unsigned int source2_count = -1;
+
+        printf("--- test_get_source_content_size\n");
+        catalog = catalog_connect(PATH, NULL);
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog,
                                        "test",
                                        &source1_id));
-        int source2_id = -1;
+
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog,
@@ -208,8 +221,6 @@ START_TEST(test_get_source_content_size)
         addentries(catalog, source1_id, 10, "source1-entry-%d");
         addentries(catalog, source2_id, 3, "source2-entry-%d");
 
-        unsigned int source1_count = -1;
-        unsigned int source2_count = -1;
         catalog_cmd(catalog,
                     "count source1",
                     catalog_get_source_content_count(catalog,
@@ -235,13 +246,23 @@ END_TEST
 
 START_TEST(test_get_source_content)
 {
-        printf("--- test_get_source_content\n");
-        struct catalog *catalog=catalog_connect(PATH, NULL);
+        struct catalog *catalog;
         int source1_id = -1;
+        int source2_id = -1;
+        GArray *array;
+        static char *source1_entries[] = {
+                "source1-entry-0",
+                "source1-entry-1",
+                "source1-entry-2",
+                "source1-entry-3",
+                "source1-entry-4" };
+
+        printf("--- test_get_source_content\n");
+        catalog = catalog_connect(PATH, NULL);
+
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog, "test", &source1_id));
-        int source2_id = -1;
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog, "test", &source2_id));
@@ -250,9 +271,9 @@ START_TEST(test_get_source_content)
         addentries(catalog, source2_id, 3, "source1-entry-%d");
 
         mark_point();
-        GArray *array = g_array_new(TRUE/*zero_terminated*/,
-                                    TRUE/*clear*/,
-                                    sizeof(char *));
+        array =  g_array_new(TRUE/*zero_terminated*/,
+                             TRUE/*clear*/,
+                             sizeof(char *));
         mark_point();
         catalog_cmd(catalog,
                     "get_source_content(source1)",
@@ -263,12 +284,7 @@ START_TEST(test_get_source_content)
         mark_point();
         assert_array_contains("get content of source 1",
                               5,
-                              (char *[]) { "source1-entry-0",
-                                      "source1-entry-1",
-                                      "source1-entry-2",
-                                      "source1-entry-3",
-                                      "source1-entry-4"
-                              },
+                              source1_entries,
                               array,
                               FALSE/*not ordered*/);
 
@@ -280,10 +296,13 @@ END_TEST
 
 START_TEST(test_remove_entry)
 {
+        struct catalog *catalog;
+        int source_id = -1;
+        guint count=-1;
         printf("--- test_remove_entry\n");
 
-        struct catalog *catalog=catalog_connect(PATH, NULL);
-        int source_id = -1;
+        catalog = catalog_connect(PATH, NULL);
+
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog, "test", &source_id));
@@ -297,7 +316,7 @@ START_TEST(test_remove_entry)
                                          "entry-1"));
         mark_point();
 
-        guint count=-1;
+
         catalog_cmd(catalog,
                     "get count",
                     catalog_get_source_content_count(catalog,
@@ -311,10 +330,14 @@ END_TEST
 
 START_TEST(test_remove_source)
 {
+        struct catalog *catalog;
+        int source1_id = -1;
+        guint source1_count=-1;
+
         printf("--- test_remove_source\n");
 
-        struct catalog *catalog=catalog_connect(PATH, NULL);
-        int source1_id = -1;
+        catalog = catalog_connect(PATH, NULL);
+
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog, "test", &source1_id));
@@ -326,7 +349,7 @@ START_TEST(test_remove_source)
                     catalog_remove_source(catalog, source1_id));
         mark_point();
 
-        guint source1_count=-1;
+
         catalog_cmd(catalog,
                     "get count",
                     catalog_get_source_content_count(catalog,
@@ -342,19 +365,20 @@ END_TEST
 
 START_TEST(test_execute_query)
 {
+        static char *array[] = { "toto.c" };
+
         printf("--- test_execute_query\n");
         execute_query_and_expect("toto.c",
                                  1,
-                                 (char *[]) { "toto.c"
-                                 },
+                                 array,
                                  FALSE/*not ordered*/);
 }
 END_TEST
 
 START_TEST(test_execute_query_test_source)
 {
-        printf("--- test_execute_query_test_source\n");
         gboolean checked = FALSE;
+        printf("--- test_execute_query_test_source\n");
         catalog_cmd(catalog,
                     "executequery()",
                     catalog_executequery(catalog,
@@ -370,32 +394,33 @@ END_TEST
 
 START_TEST(test_lastexecuted_first)
 {
+        static char *goal[] = { "toto.h", "total.h", "toto.c" };
         printf("--- test_lastexecuted_first\n");
         catalog_update_entry_timestamp(catalog, entries[2].id/*total.h*/);
         catalog_update_entry_timestamp(catalog, entries[1].id/*toto.h*/);
         execute_query_and_expect("tot",
                                  3,
-                                 (char *[]) { "toto.h", "total.h", "toto.c"
-                                 },
+                                 goal,
                                  TRUE/*ordered*/);
 }
 END_TEST
 
 START_TEST(test_execute_query_with_space)
 {
+        static char *goal[] = { "toto.c" };
         printf("--- test_execute_query\n");
         execute_query_and_expect("to .c",
                                  1,
-                                 (char *[]) { "toto.c"
-                                 },
+                                 goal,
                                  FALSE/*not ordered*/);
 }
 END_TEST
 
 START_TEST(test_callback_stops_query)
 {
-        printf("--- test_callback_stops_query\n");
         int count=1;
+        printf("--- test_callback_stops_query\n");
+
         catalog_cmd(catalog,
                     "executequery(t)",
                     catalog_executequery(catalog,
@@ -408,8 +433,9 @@ END_TEST
 
 START_TEST(test_interrupt_stops_query)
 {
-        printf("--- test_interrupt_stops_query\n");
         int count=1;
+        printf("--- test_interrupt_stops_query\n");
+
         catalog_cmd(catalog,
                     "executequery(t)",
                     catalog_executequery(catalog,
@@ -422,8 +448,10 @@ END_TEST
 
 START_TEST(test_recover_from_interruption)
 {
-        printf("--- test_recover_from_interruption\n");
         int count=1;
+        GArray *array;
+        printf("--- test_recover_from_interruption\n");
+
         catalog_cmd(catalog,
                     "executequery(t)",
                     catalog_executequery(catalog,
@@ -432,7 +460,7 @@ START_TEST(test_recover_from_interruption)
                                          &count));
         fail_unless(count==0, "wrong count");
 
-        GArray *array = g_array_new(TRUE, TRUE, sizeof(char *));
+        array =  g_array_new(TRUE, TRUE, sizeof(char *));
         catalog_cmd(catalog,
                     "executequery(t)",
                     catalog_executequery(catalog,
@@ -456,15 +484,18 @@ END_TEST
 
 START_TEST(test_busy)
 {
+        GThread *thread;
+        static char *goal[] = { "toto.c" };
+
         printf("--- test_busy\n");
         execute_query_mutex = g_mutex_new();
         execute_query_cond = g_cond_new();
 
         g_mutex_lock(execute_query_mutex);
-        GThread *thread = g_thread_create(execute_query_thread,
-                                          NULL/*userdata*/,
-                                          FALSE/*not joinable*/,
-                                          NULL);
+        thread =  g_thread_create(execute_query_thread,
+                                  NULL/*userdata*/,
+                                  FALSE/*not joinable*/,
+                                  NULL);
         fail_unless(thread!=NULL,
                     "thread creation failed");
 
@@ -479,10 +510,8 @@ START_TEST(test_busy)
         printf("test_busy: execute query\n");
         execute_query_and_expect("toto.c",
                                  0,
-                                 (char *[]) {
-                                         NULL
-                                 }
-                                 , FALSE/*not ordered*/);
+                                 NULL,
+                                 FALSE/*not ordered*/);
         printf("test_busy: query done\n");
         catalog_restart(catalog);
 
@@ -495,9 +524,8 @@ START_TEST(test_busy)
 
         execute_query_and_expect("toto.c",
                                  1,
-                                 (char *[]) { "toto.c"
-                                 }
-                                 , FALSE/*not ordered*/);
+                                 goal,
+                                 FALSE/*not ordered*/);
 
         g_mutex_lock(execute_query_mutex);
         g_cond_broadcast(execute_query_cond); /* tell the thread to finish*/
@@ -507,12 +535,11 @@ END_TEST
 
 /* ------------------------- main */
 
-Suite *catalog_check_suite(void)
+static Suite *catalog_check_suite(void)
 {
         Suite *s = suite_create("catalog");
         TCase *tc_core = tcase_create("catalog_core");
         TCase *tc_query = tcase_create("catalog_query");
-        TCase *tc_execute = tcase_create("catalog_execute");
 
         tcase_add_checked_fixture(tc_core, setup, teardown);
         suite_add_tcase(s, tc_core);
@@ -606,9 +633,12 @@ static gboolean collect_result_names_callback(struct catalog *catalog,
                 const char *source_type,
                 void *userdata)
 {
+        GArray **results;
+        char *name_dup;
+
         printf("collect_result_names_callback\n");
         mark_point();
-        GArray **results = (GArray **)userdata;
+        results =  (GArray **)userdata;
         g_return_val_if_fail(results, FALSE);
 
         fail_unless(name!=NULL, "missing name");
@@ -616,7 +646,7 @@ static gboolean collect_result_names_callback(struct catalog *catalog,
         fail_unless(path!=NULL, "missing long path/uri");
 
         mark_point();
-        char *name_dup = g_strdup(name);
+        name_dup =  g_strdup(name);
         mark_point();
         g_array_append_val(*results,
                            name_dup);
@@ -626,18 +656,6 @@ static gboolean collect_result_names_callback(struct catalog *catalog,
         return TRUE;/*continue*/
 }
 
-/**
- * GFunc that release a result passed as data
- *
- * @param data a result
- * @param userdata ignored
- */
-static void free_result(gpointer data, gpointer userdata)
-{
-        struct result *result = (struct result *)data;
-        g_return_if_fail(result!=NULL);
-        result->release(result);
-}
 static void execute_query_and_expect(const char *query,
                                      int goal_length,
                                      char *goal[],
@@ -651,27 +669,28 @@ static void execute_query_and_expect(const char *query,
 }
 static void assert_array_contains(const char *query,
                                   int goal_length,
-                                  char *goal[],
+                                  char **goal,
                                   GArray *array,
                                   gboolean ordered)
 {
-        mark_point();
+        int i;
         int found_length = array->len;
-        mark_point();
         char **found = (char **)array->data;
-        mark_point();
         GString* msg = g_string_new("");
+
+        mark_point();
+
         g_string_append(msg, "query: '");
         g_string_append(msg, query);
         g_string_append(msg, "' found: [");
         mark_point();
-        for(int i=0; i<found_length; i++) {
+        for(i=0; i<found_length; i++) {
                 g_string_append_c(msg, ' ');
                 g_string_append(msg, found[i]);
         }
         mark_point();
         g_string_append(msg, " ] expected: [");
-        for(int i=0; i<goal_length; i++) {
+        for(i=0; i<goal_length; i++) {
                 g_string_append_c(msg, ' ');
                 g_string_append(msg, goal[i]);
         }
@@ -681,7 +700,7 @@ static void assert_array_contains(const char *query,
                 fail(msg->str);
         }
         if(ordered) {
-                for(int i=0; i<goal_length; i++) {
+                for(i=0; i<goal_length; i++) {
                         if(strcmp(goal[i], found[i])!=0) {
                                 g_string_append_printf(msg,
                                                        "expected '%s' at index %d, got '%s",
@@ -693,9 +712,10 @@ static void assert_array_contains(const char *query,
                 }
         } else /* not ordered */
         {
-                for(int i=0; i<goal_length; i++) {
+                for(i=0; i<goal_length; i++) {
                         gboolean ok=FALSE;
-                        for(int j=0; j<found_length; j++) {
+                        int j;
+                        for(j=0; j<found_length; j++) {
                                 if(found[j]!=NULL && strcmp(goal[i], found[j])==0) {
                                         found[j]=NULL;
                                         ok=TRUE;
@@ -709,7 +729,7 @@ static void assert_array_contains(const char *query,
                 }
         }
         mark_point();
-        for(int i=0; i<found_length; i++)
+        for(i=0; i<found_length; i++)
                 g_free(found[i]);
         g_free(array);
 }
@@ -730,20 +750,9 @@ static gboolean test_source_callback(struct catalog *catalog,
         fail_unless(strcmp("test", source_type)==0,
                     "wrong source type");
         *checked=TRUE;
+        return TRUE/*continue*/;
 }
 
-static gboolean contains_result(GList *list, const char *name)
-{
-        gboolean executed=FALSE;
-        for(GList *current = list; current; current=g_list_next(current)) {
-                char *result_name=(char *)current->data;
-                if(strcmp(name, result_name)==0) {
-                        executed=TRUE;
-                        printf("execute: %s\n");
-                }
-        }
-        return executed;
-}
 /**
  * Let the query return only that many result and return FALSE.
  *
@@ -801,15 +810,8 @@ static gboolean countdown_interrupt_callback(struct catalog *catalog,
         return TRUE/*continue*/;
 }
 
-static int sleeper_progress_handler(void *userdata)
-{
-        sleep(1);
-        return 0;/*continue*/
-}
-
 static gpointer execute_query_thread(void *userdata)
 {
-        gboolean *stop = (gboolean *)userdata;
         char *errmsg=NULL;
         sqlite *db=sqlite_open(PATH, 0600, &errmsg);
         if(!db) {
@@ -865,7 +867,8 @@ static void addentries(struct catalog *catalog,
                        int count,
                        const char *name_pattern)
 {
-        for(int i=0; i<count; i++)
+        int i;
+        for(i=0; i<count; i++)
         {
                 char *name = g_strdup_printf(name_pattern, i);
                 printf("adding %s into source %d\n", name, sourceid);

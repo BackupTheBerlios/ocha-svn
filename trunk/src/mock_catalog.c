@@ -52,7 +52,7 @@ static void expectation_init(struct expectation *ex, const char *description);
 static gboolean expectation_check(struct expectation *expect);
 static void expectation_call(struct expectation *expect);
 static void expectations_met_cb(gpointer key, gpointer value, gpointer userdata);
-static void init_source_attrs();
+static void init_source_attrs(void);
 
 /* ------------------------- public functions: mock_catalog */
 struct catalog *mock_catalog_new(void)
@@ -86,11 +86,13 @@ void mock_catalog_expect_addentry(struct catalog *catalog,
                                   int command_id,
                                   int id)
 {
+        struct addentry_args *expect;
+
         fail_unless(path!=NULL, "no path");
         fail_unless(name!=NULL, "no name");
         fail_unless(long_name!=NULL, "no long_name");
 
-        struct addentry_args *expect = g_new(struct addentry_args, 1);
+        expect =  g_new(struct addentry_args, 1);
         expectation_init(&expect->expect,
                          g_strdup_printf("addentry(catalog, '%s', '%s', '%s', %d):%d",
                                          path,
@@ -165,36 +167,13 @@ gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *p
         return TRUE;
 }
 
-gboolean catalog_addcommand(struct catalog *catalog, const char *name, const char *execute, int *id_out)
-{
-        struct addcommand_args *args =
-                                        (struct addcommand_args *)g_hash_table_lookup(catalog->expected_addcommand,
-                                                        name);
-        if(args==NULL)
-{
-                fail(g_strdup_printf("unexpected call catalog_addcommand(catalog, '%s', '%s')\n",
-                                     name,
-                                     execute));
-                expectation_call(NULL);
-                return FALSE;
-        }
-
-        fail_unless(strcmp(args->execute, execute)==0,
-                    g_strdup_printf("wrong execute for %s, expected '%s', got '%s'",
-                                    args->expect.description,
-                                    args->execute,
-                                    execute));
-
-        expectation_call(&args->expect);
-        if(id_out)
-                *id_out=args->id;
-        return TRUE;
-}
 
 char *ocha_gconf_get_source_attribute(const char *type, int source_id, const char *attribute)
 {
+        char *retval;
+
         init_source_attrs();
-        char *retval=g_hash_table_lookup(source_attrs, attribute);
+        retval = g_hash_table_lookup(source_attrs, attribute);
         return retval ? g_strdup(retval):NULL;
 }
 gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const char *attribute, const char *value)

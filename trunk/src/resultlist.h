@@ -14,7 +14,7 @@
  * Make sure you call this function before any other
  * in this module.
  */
-void resultlist_init();
+void resultlist_init(void);
 
 /**
  * Get the treeview widget that's the view of the result list.

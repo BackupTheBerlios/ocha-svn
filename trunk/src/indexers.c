@@ -24,9 +24,10 @@ struct indexer **indexers_list()
 
 struct indexer *indexers_get(const char *type)
 {
+        struct indexer **ptr;
         g_return_val_if_fail(type!=NULL, NULL);
 
-        for(struct indexer **ptr=indexers; *ptr; ptr++) {
+        for(ptr=indexers; *ptr; ptr++) {
                 if(strcmp(type, (*ptr)->name)==0)
                         return *ptr;
         }

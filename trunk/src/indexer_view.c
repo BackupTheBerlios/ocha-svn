@@ -32,10 +32,11 @@ static GtkWidget *properties_widget_from_indexer(struct indexer *indexer);
 /* ------------------------- public functions */
 struct indexer_view *indexer_view_new(struct catalog *catalog)
 {
+        struct indexer_view *view;
+
         g_return_val_if_fail(catalog!=NULL, NULL);
 
-        struct indexer_view *view = (struct indexer_view *)
-                g_new(struct indexer_view, 1);
+        view =  g_new(struct indexer_view, 1);
         memset(view, 0, sizeof(struct indexer_view));
         view->catalog=catalog;
         view->current_source_id=-1;
@@ -71,19 +72,21 @@ void indexer_view_attach_source(struct indexer_view *view,
                                 struct indexer *indexer,
                                 struct indexer_source *source)
 {
+        gboolean issame;
+
         g_return_if_fail(view);
         g_return_if_fail(indexer);
 
-        gboolean issame = view->current_indexer==indexer
+        issame = view->current_indexer==indexer
                 && ( ( source==NULL && view->current_source_id==-1)
                      || ( source!=NULL && source->id==view->current_source_id));
         if(!issame)
         {
+                GtkWidget *widget;
+
                 if(view->current_indexer!=NULL) {
                         indexer_view_detach(view);
                 }
-
-                GtkWidget *widget;
 
                 g_return_if_fail(view->properties_widget_container!=NULL);
                 g_return_if_fail(view->current_indexer==NULL);
@@ -119,10 +122,16 @@ void indexer_view_detach(struct indexer_view *view)
 /* ------------------------- static functions */
 static void init_widgets(struct indexer_view *view)
 {
+        GtkWidget *notebook;
+        GtkWidget *location;
+        GtkWidget *contentlist;
+        int i;
+        static const char *notebook_labels[] = {"Location", "Contents", NULL };
+
         g_return_if_fail(view);
         g_return_if_fail(view->properties_widget_container==NULL);
 
-        GtkWidget *notebook = gtk_notebook_new ();
+        notebook =  gtk_notebook_new ();
         view->root_widget = notebook;
         gtk_widget_show(notebook);
 
@@ -132,21 +141,18 @@ static void init_widgets(struct indexer_view *view)
          * properties_widget_container; container_add/remove
          * are enough
          */
-        GtkWidget *location = gtk_vbox_new(FALSE/*not homogenous*/,
-                                           0/*padding*/);
+        location =  gtk_vbox_new(FALSE/*not homogenous*/,
+                                 0/*padding*/);
         gtk_widget_show (location);
         gtk_container_add(GTK_CONTAINER(notebook), location);
 
         view->properties_widget_container=location;
 
-        GtkWidget *contentlist = gtk_label_new("Content\nList");
+        contentlist =  gtk_label_new("Content\nList");
         gtk_widget_show(contentlist);
         gtk_container_add(GTK_CONTAINER(notebook), contentlist);
 
-        const char *notebook_labels[] =
-                {"Location", "Contents", NULL
-                };
-        for(int i=0; notebook_labels[i]; i++) {
+        for(i=0; notebook_labels[i]; i++) {
                 GtkWidget *label = gtk_label_new(notebook_labels[i]);
                 gtk_widget_show(label);
                 gtk_notebook_set_tab_label(GTK_NOTEBOOK(notebook),
@@ -159,25 +165,31 @@ static void init_widgets(struct indexer_view *view)
 static GtkWidget *properties_widget_from_source(struct indexer *indexer,
                                                 struct indexer_source *source)
 {
+        GtkWidget *widget;
+
         g_return_val_if_fail(indexer!=NULL, NULL);
         g_return_val_if_fail(source!=NULL, NULL);
 
-        GtkWidget *widget = indexer_source_editor_widget(source);
+        widget =  indexer_source_editor_widget(source);
         gtk_widget_show(widget);
         return widget;
 }
 
 static GtkWidget *properties_widget_from_indexer(struct indexer *indexer)
 {
+        char *text;
+        GtkWidget *label;
+        GtkWidget *align;
+
         g_return_val_if_fail(indexer!=NULL, NULL);
 
 
-        char *text = g_strdup_printf("<span size='x-large'><b>%s</b></span>\n\n"
-                                     "<span size='large'>%s</span>",
-                                     indexer->display_name,
-                                     indexer->description);
+        text = g_strdup_printf("<span size='x-large'><b>%s</b></span>\n\n"
+                               "<span size='large'>%s</span>",
+                               indexer->display_name,
+                               indexer->description);
 
-        GtkWidget *label = gtk_label_new(text);
+        label =  gtk_label_new(text);
         gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
         gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
         gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_FILL);
@@ -188,10 +200,10 @@ static GtkWidget *properties_widget_from_indexer(struct indexer *indexer)
         g_free(text);
         gtk_widget_show(label);
 
-        GtkWidget *align = gtk_alignment_new(0.0/*xalign*/,
-                                             0.5/*yalign*/,
-                                             0.6/*xscale*/,
-                                             1.0/*yscale*/);
+        align =  gtk_alignment_new(0.0/*xalign*/,
+                                   0.5/*yalign*/,
+                                   0.6/*xscale*/,
+                                   1.0/*yscale*/);
         gtk_alignment_set_padding(GTK_ALIGNMENT(align),
                                   12/*top*/,
                                   0/*bottom*/,

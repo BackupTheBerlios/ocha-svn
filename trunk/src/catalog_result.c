@@ -21,9 +21,6 @@ struct catalog_result
         int entry_id;
         struct indexer *indexer;
         const char *catalog_path;
-
-        /** buffer for the path, catalog path, display name and execute string */
-        char buffer[];
 };
 
 /* ------------------------- prototypes */
@@ -42,34 +39,20 @@ struct result *catalog_result_create(const char *catalog_path,
                                                              const char *long_name,
                                                              int entry_id)
 {
+        struct catalog_result *result;
+
         g_return_val_if_fail(catalog_path, NULL);
         g_return_val_if_fail(path, NULL);
         g_return_val_if_fail(name, NULL);
         g_return_val_if_fail(indexer, NULL);
 
-        struct catalog_result *result = g_malloc(sizeof(struct catalog_result)
-                                                 +strlen(path)+1
-                                                 +strlen(name)+1
-                                                 +strlen(long_name)+1
-                                                 +strlen(catalog_path)+1);
+        result =  g_new(struct catalog_result, 1);
         result->entry_id=entry_id;
         result->indexer=indexer;
-        char *buf = result->buffer;
-
-        result->base.path=buf;
-        strcpy(buf, path);
-        buf+=strlen(path)+1;
-
-        result->base.name=buf;
-        strcpy(buf, name);
-        buf+=strlen(name)+1;
-
-        result->base.long_name=buf;
-        strcpy(buf, long_name);
-        buf+=strlen(long_name)+1;
-
-        result->catalog_path=buf;
-        strcpy(buf, catalog_path);
+        result->base.path=g_strdup(path);
+        result->base.name=g_strdup(name);
+        result->base.long_name=g_strdup(long_name);
+        result->catalog_path=g_strdup(catalog_path);
 
         result->base.execute=catalog_result_execute;
         result->base.validate=catalog_result_validate;
@@ -124,8 +107,14 @@ static gboolean catalog_result_execute(struct result *_self, GError **err)
         return FALSE;
 }
 
-static void catalog_result_free(struct result *self)
+static void catalog_result_free(struct result *_self)
 {
+        struct catalog_result *self = (struct catalog_result *)_self;
         g_return_if_fail(self);
+
+        g_free((gpointer)self->base.path);
+        g_free((gpointer)self->base.name);
+        g_free((gpointer)self->base.long_name);
+        g_free((gpointer)self->catalog_path);
         g_free(self);
 }

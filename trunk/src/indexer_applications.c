@@ -25,7 +25,7 @@
 /* ------------------------- prototypes: indexer_application */
 
 static struct indexer_source *indexer_application_load_source(struct indexer *self, struct catalog *catalog, int id);
-static gboolean indexer_application_execute(struct indexer *self, const char *name, const char *long_name, const char *uri, GError **err);;
+static gboolean indexer_application_execute(struct indexer *self, const char *name, const char *long_name, const char *uri, GError **err);
 static gboolean indexer_application_validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri);
 static gboolean indexer_application_discover(struct indexer *indexer, struct catalog *catalog);
 
@@ -81,6 +81,10 @@ static struct indexer_source *indexer_application_load_source(struct indexer *se
 }
 static gboolean indexer_application_execute(struct indexer *self, const char *name, const char *long_name, const char *uri, GError **err)
 {
+        GError *gnome_err;
+        gboolean retval;
+        GnomeDesktopFile *desktopfile;
+
         g_return_val_if_fail(self!=NULL, FALSE);
         g_return_val_if_fail(name!=NULL, FALSE);
         g_return_val_if_fail(long_name!=NULL, FALSE);
@@ -88,10 +92,10 @@ static gboolean indexer_application_execute(struct indexer *self, const char *na
         g_return_val_if_fail(g_str_has_prefix(uri, "file://"), FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-        GError *gnome_err = NULL;
+        gnome_err =  NULL;
 
-        gboolean retval = FALSE;
-        GnomeDesktopFile *desktopfile = gnome_desktop_file_load(&uri[strlen("file://")],
+        retval =  FALSE;
+        desktopfile =  gnome_desktop_file_load(&uri[strlen("file://")],
                                         &gnome_err);
         if(desktopfile==NULL)
         {
@@ -106,11 +110,12 @@ static gboolean indexer_application_execute(struct indexer *self, const char *na
         } else
         {
                 char *exec = NULL;
+                gboolean terminal = FALSE;
+
                 gnome_desktop_file_get_string(desktopfile,
                                               DESKTOP_SECTION,
                                               "Exec",
                                               &exec);
-                gboolean terminal = FALSE;
                 gnome_desktop_file_get_boolean(desktopfile,
                                                DESKTOP_SECTION,
                                                "Terminal",
@@ -166,11 +171,11 @@ static gboolean indexer_application_validate(struct indexer *self, const char *n
 
 static gboolean indexer_application_discover(struct indexer *indexer, struct catalog *catalog)
 {
-        gboolean retval = FALSE;
+        gboolean retval = TRUE;
         char *home = gnome_util_prepend_user_home(".local/share");
         char *possibilities[] =
                 {
-                        home,
+                        NULL,
                         "/usr/share",
                         "/usr/local/share",
                         "/opt/gnome/share",
@@ -179,16 +184,15 @@ static gboolean indexer_application_discover(struct indexer *indexer, struct cat
                         "/opt/kde3/share",
                         NULL
                 };
-
-        for(char **ptr=possibilities; *ptr; ptr++)
-        {
-                gboolean ok=TRUE;
+        char **ptr;
+        possibilities[0]=home;
+        for(ptr=possibilities; *ptr; ptr++) {
                 char *possibility = *ptr;
-                if(!add_source_for_directory(catalog, possibility))
-                        goto error;
+                if(!add_source_for_directory(catalog, possibility)) {
+                        retval=FALSE;
+                        break;
+                }
         }
-        retval=TRUE;
-error:
         g_free(home);
         return retval;
 }
@@ -251,62 +255,70 @@ static gboolean index_application_cb(struct catalog *catalog,
                                      GError **err,
                                      gpointer userdata)
 {
+        char *uri;
+        GnomeDesktopFile *desktopfile;
+        char *type = NULL;
+        char *name = NULL;
+        char *comment = NULL;
+        char *generic_name = NULL;
+        gboolean nodisplay = FALSE;
+        gboolean hidden = FALSE;
+        char *exec = NULL;
+        char *description=NULL;
+        gboolean retval;
+
         if(!g_str_has_suffix(filename, ".desktop"))
                 return TRUE;
 
-        char uri[strlen("file://")+strlen(path)+1];
-        strcpy(uri, "file://");
-        strcat(uri, path);
+        uri = g_strdup_printf("file://%s", path);
 
-        GnomeDesktopFile *desktopfile = gnome_desktop_file_load(path,
-                                        NULL/*ignore errors*/);
+        desktopfile =  gnome_desktop_file_load(path,
+                                               NULL/*ignore errors*/);
         if(desktopfile==NULL)
                 return TRUE;
 
-        char *type = NULL;
+
         gnome_desktop_file_get_string(desktopfile,
                                       DESKTOP_SECTION,
                                       "Type",
                                       &type);
-        char *name = NULL;
+
         gnome_desktop_file_get_string(desktopfile,
                                       DESKTOP_SECTION,
                                       "Name",
                                       &name);
-        char *comment = NULL;
+
         gnome_desktop_file_get_string(desktopfile,
                                       DESKTOP_SECTION,
                                       "Comment",
                                       &comment);
 
-        char *generic_name = NULL;
         gnome_desktop_file_get_string(desktopfile,
                                       DESKTOP_SECTION,
                                       "GenericName",
                                       &generic_name);
-        gboolean nodisplay = FALSE;
+
         gnome_desktop_file_get_boolean(desktopfile,
                                        DESKTOP_SECTION,
                                        "NoDisplay",
                                        &nodisplay);
 
-        gboolean hidden = FALSE;
+
         gnome_desktop_file_get_boolean(desktopfile,
                                        DESKTOP_SECTION,
                                        "Hidden",
                                        &hidden);
 
-        char *exec = NULL;
         gnome_desktop_file_get_string(desktopfile,
                                       DESKTOP_SECTION,
                                       "Exec",
                                       &exec);
 
-        char *description=NULL;
+
         if(comment && generic_name)
                 description=g_strdup_printf("%s (%s)", comment, generic_name);
 
-        gboolean retval = TRUE;
+        retval = TRUE;
         if((type==NULL || g_strcasecmp("Application", type)==0)
                         && !hidden
                         && !nodisplay
@@ -338,6 +350,7 @@ static gboolean index_application_cb(struct catalog *catalog,
                 g_free(name);
         if(exec)
                 g_free(exec);
+        g_free(uri);
 
         gnome_desktop_file_free(desktopfile);
         return retval;

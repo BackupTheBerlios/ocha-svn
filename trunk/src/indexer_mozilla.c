@@ -95,6 +95,9 @@ static gboolean indexer_mozilla_execute(struct indexer *self,
                                         const char *url,
                                         GError **err)
 {
+        GError *gnome_err = NULL;
+        gboolean shown;
+
         g_return_val_if_fail(self!=NULL, FALSE);
         g_return_val_if_fail(name!=NULL, FALSE);
         g_return_val_if_fail(long_name!=NULL, FALSE);
@@ -102,20 +105,21 @@ static gboolean indexer_mozilla_execute(struct indexer *self,
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
         printf("opening %s...\n", url);
-        GError *gnome_err = NULL;
-        gboolean shown;
         shown = gnome_url_show(url, &gnome_err);
         if(!shown)
         {
                 /* use the good old  gnome-moz-remote
                  * if url_show fails.
                  */
-                const char *argv[] = { "gnome-moz-remote", url };
+                gboolean executed;
+                const char *argv[2];
+                argv[0]= "gnome-moz-remote";
+                argv[1]= url;
                 errno=0;
 
-                gboolean executed = gnome_execute_async(NULL/*dir*/,
-                                                        2,
-                                                        (char * const *)argv);
+                executed = gnome_execute_async(NULL/*dir*/,
+                                               2,
+                                               (char * const *)argv);
                 if(!executed)
                         g_set_error(err,
                                     RESULT_ERROR,
@@ -145,7 +149,8 @@ static gboolean indexer_mozilla_discover(struct indexer *indexer,
                                           sizeof(struct discovered));
         gboolean retval = TRUE;
         char *directories[] = { ".mozilla", ".firefox", ".phoenix", NULL };
-        for(int i=0; retval && directories[i]; i++) {
+        int i;
+        for(i=0; retval && directories[i]; i++) {
                 char *path = gnome_util_prepend_user_home(directories[i]);
                 if(g_file_test(path, G_FILE_TEST_EXISTS)
                    && g_file_test(path, G_FILE_TEST_IS_DIR)) {
@@ -164,7 +169,8 @@ static gboolean indexer_mozilla_discover(struct indexer *indexer,
         if(discovereds->len>0) {
                 struct discovered *start = (struct discovered *)discovereds->data;
                 struct discovered *end = start+discovereds->len;
-                for(struct discovered *current=start; current<end; current++) {
+                struct discovered *current;
+                for(current=start; current<end; current++) {
                         int id;
                         if(catalog_add_source(catalog, INDEXER_NAME, &id)) {
                                 if(ocha_gconf_set_source_attribute(INDEXER_NAME,
@@ -203,11 +209,13 @@ static void indexer_mozilla_source_release(struct indexer_source *source)
 
 static gboolean indexer_mozilla_source_index(struct indexer_source *self, struct catalog *catalog, GError **err)
 {
+        char *path = NULL;
+        gboolean retval;
+
         g_return_val_if_fail(self!=NULL, FALSE);
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-        char *path = NULL;
         if(!catalog_get_source_attribute_witherrors(INDEXER_NAME,
                                                     self->id,
                                                     "path",
@@ -216,10 +224,10 @@ static gboolean indexer_mozilla_source_index(struct indexer_source *self, struct
                                                     err)) {
                 return FALSE;
         }
-        gboolean retval = catalog_index_bookmarks(catalog,
-                                                  self->id,
-                                                  path,
-                                                  err);
+        retval =  catalog_index_bookmarks(catalog,
+                                          self->id,
+                                          path,
+                                          err);
         g_free(path);
         return retval;
 }
@@ -255,11 +263,15 @@ static void indexer_mozilla_source_notify_remove(struct indexer_source *source,
 
 static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, const char *bookmark_file, GError **err)
 {
+        FILE *fh;
+        gboolean error;
+        GString *line;
+
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(bookmark_file!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-        FILE *fh = fopen(bookmark_file, "r");
+        fh =  fopen(bookmark_file, "r");
         if(!fh) {
                 g_set_error(err,
                             INDEXER_ERROR,
@@ -270,8 +282,8 @@ static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, 
                 return FALSE;
         }
 
-        gboolean error=FALSE;
-        GString *line = g_string_new("");
+        error = FALSE;
+        line =  g_string_new("");
         while( !error && bookmarks_read_line(fh, line, err) ) {
                 char *a_open = strstr(line->str, "<A");
                 if(a_open) {
@@ -284,9 +296,10 @@ static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, 
                                         if(a_end) {
                                                 char *a_close = strstr(a_end, "</A>");
                                                 if(a_close) {
+                                                        char *expanded_label;
                                                         *href_end='\0';
                                                         *a_close='\0';
-                                                        char *expanded_label = html_expand_common_entities(a_end+1);
+                                                        expanded_label = html_expand_common_entities(a_end+1);
                                                         if(!catalog_addentry_witherrors(catalog,
                                                                                         href_start,
                                                                                         expanded_label,
@@ -308,7 +321,7 @@ static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, 
 
 static gboolean bookmarks_read_line(FILE *fh, GString *line, GError **err)
 {
-        int buffer_len=256;
+#define buffer_len 256
         char buffer[buffer_len];
         g_string_truncate(line, 0);
         errno=0;
@@ -329,12 +342,16 @@ static gboolean bookmarks_read_line(FILE *fh, GString *line, GError **err)
                 return FALSE;
         }
         return line->len>0;
+#undef buffer_len
 }
 
 static char *html_expand_common_entities(const char *str)
 {
         GString *retval = g_string_new("");
-        for(const char *c=str; *c!='\0'; c++) {
+        char *retval_str;
+        const char *c;
+
+        for(c=str; *c!='\0'; c++) {
                 if(*c=='&') {
                         gboolean writec=FALSE;
                         const char *start=c+1;
@@ -373,7 +390,7 @@ static char *html_expand_common_entities(const char *str)
                         g_string_append_c(retval, *c);
                 }
         }
-        char *retval_str = retval->str;
+        retval_str = retval->str;
         g_string_free(retval, FALSE/*don't free retval_str*/);
         return retval_str;
 }
@@ -382,13 +399,16 @@ static struct discovered *discover_add_boorkmark_file(GArray *discovereds, const
 {
         struct discovered *start = (struct discovered *)discovereds->data;
         struct discovered *end = start+discovereds->len;
-        for(struct discovered *current=start; current<end; current++) {
+        struct discovered *last;
+        struct discovered *current;
+
+        for(current=start; current<end; current++) {
                 if(strcmp(path, current->path)==0) {
                         return current;
                 }
         }
         g_array_set_size(discovereds, discovereds->len+1);
-        struct discovered *last;
+
         last = ((struct discovered *)discovereds->data)+(discovereds->len-1);
         last->path=g_strdup(path);
         last->profile_name=NULL;
@@ -399,10 +419,11 @@ static void discover_add_profiles_file(GArray *discovereds, const char *path)
 {
         GKeyFile *keyfile = g_key_file_new();
         if(g_key_file_load_from_file(keyfile, path, G_KEY_FILE_NONE, NULL/*err*/)) {
-                int groups_len = 0;
+                guint groups_len = 0;
                 gchar **groups = g_key_file_get_groups(keyfile, &groups_len);
                 if(groups) {
-                        for(int i=0; i<groups_len; i++) {
+                        int i;
+                        for(i=0; i<groups_len; i++) {
                                 gchar *group = groups[i];
                                 gchar *profile_name = g_key_file_get_string(keyfile,
                                                       group,
@@ -415,14 +436,21 @@ static void discover_add_profiles_file(GArray *discovereds, const char *path)
                                                               NULL/*err*/);
                                         if(profile_path) {
                                                 struct discovered *discovered;
-                                                char full_profile_path[strlen(path)+1+strlen(profile_path)+1+strlen("bookmarks.html")+1];
+                                                char *full_profile_path;
+
+                                                full_profile_path=g_malloc(strlen(path)+1
+                                                                           +strlen(profile_path)+1
+                                                                           +strlen("bookmarks.html")+1);
                                                 if(*profile_path=='/')
                                                         strcpy(full_profile_path, profile_path);
                                                 else {
+                                                        char *lastslash;
+
                                                         strcpy(full_profile_path, path);
-                                                        char *lastslash = strrchr(full_profile_path, '/');
-                                                        if(lastslash)
+                                                        lastslash = strrchr(full_profile_path, '/');
+                                                        if(lastslash) {
                                                                 *lastslash='\0';
+                                                        }
                                                         strcat(full_profile_path, "/");
                                                         strcat(full_profile_path, profile_path);
                                                 }
@@ -432,6 +460,8 @@ static void discover_add_profiles_file(GArray *discovereds, const char *path)
                                                 discovered = discover_add_boorkmark_file(discovereds,
                                                                 full_profile_path);
                                                 discovered->profile_name=g_strdup(profile_name);
+
+                                                g_free(full_profile_path);
                                                 g_free(profile_path);
                                         }
                                         g_free(profile_name);

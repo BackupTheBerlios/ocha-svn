@@ -55,6 +55,7 @@ static GMainContext *maincontext;
 static struct location caller_location;
 
 /* ------------------------- prototypes */
+static Suite *catalog_queryrunner_check_suite(void);
 static void _run(const char *query, const char *file, int line);
 static gboolean timeout_callback(gpointer userdata);
 static void _get_results_counted(const char *query, int count, const char *file, int line);
@@ -65,14 +66,18 @@ static void result_handler(struct queryrunner *caller, const char *query, float 
 
 static void setup()
 {
+        int source_id;
+        struct catalog *catalog;
+        int i;
+
         unlink(CATALOG_PATH);
         g_thread_init(NULL/*vtable*/);
 
-        int source_id;
-        struct catalog *catalog = catalog_connect(CATALOG_PATH, NULL/*errs*/);
+
+        catalog =  catalog_connect(CATALOG_PATH, NULL/*errs*/);
         fail_unless(catalog!=NULL, "no catalog in " CATALOG_PATH);
         fail_unless(catalog_add_source(catalog, "test", &source_id), "add_source");
-        for(int i=0; i<entries_len; i++) {
+        for(i=0; i<entries_len; i++) {
                 fail_unless(catalog_add_entry(catalog,
                                               source_id,
                                               entries[i]/*path*/,
@@ -203,7 +208,7 @@ END_TEST
 
 /* ------------------------- main */
 
-Suite *catalog_queryrunner_check_suite(void)
+static Suite *catalog_queryrunner_check_suite(void)
 {
         Suite *s = suite_create("catalog_queryrunner");
         TCase *tc_core = tcase_create("catalog_queryrunner_core");
@@ -249,6 +254,9 @@ static gboolean timeout_callback(gpointer userdata)
 
 static void _get_results_counted(const char *query, int count, const char *file, int line)
 {
+        gboolean timed_out = FALSE;
+        guint timeout_1;
+
         _mark_point(file, line);
         caller_location.file=file;
         caller_location.line=line;
@@ -262,8 +270,7 @@ static void _get_results_counted(const char *query, int count, const char *file,
                count,
                query);
 
-        gboolean timed_out = FALSE;
-        guint timeout_1 = g_timeout_add(10000, timeout_callback, &timed_out);
+        timeout_1 = g_timeout_add(10000, timeout_callback, &timed_out);
 
         while(!timed_out && current_result_count<expected_result_count) {
                 g_main_context_iteration(maincontext, TRUE/*may block*/);
@@ -293,6 +300,7 @@ static void _get_results_counted(const char *query, int count, const char *file,
 
 static void _assert_no_more_results(const char *file, int line)
 {
+        gboolean timed_out = FALSE;
         _mark_point(file, line);
         printf("%s:%d: waiting 3s to make sure there are no more results\n",
                file,
@@ -303,8 +311,6 @@ static void _assert_no_more_results(const char *file, int line)
         expected_result_count=0;
         current_result_count=0;
         expected_query="<<no query>>";
-
-        gboolean timed_out = FALSE;
 
         g_timeout_add(3000, timeout_callback, &timed_out);
         while(!timed_out)

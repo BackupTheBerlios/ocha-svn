@@ -41,8 +41,9 @@ struct indexer **indexers_list()
 struct indexer *indexers_get(const char *type)
 {
         g_return_val_if_fail(type!=NULL, NULL);
-        if(strcmp(type, "test")==0)
+        if(strcmp(type, "test")==0) {
                 return &mock_indexer;
+        }
         return NULL;
 }
 
@@ -57,6 +58,7 @@ static struct indexer_source *mock_indexer_load_source(struct indexer *self, str
 {
         fail_unless(self==&mock_indexer, "wrong indexer");
         fail("unexpected call to load_source");
+        return NULL;
 }
 static gboolean mock_indexer_execute(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err)
 {
@@ -65,6 +67,7 @@ static gboolean mock_indexer_execute(struct indexer *self, const char *name, con
                name,
                long_name,
                path);
+        return FALSE;
 }
 static gboolean mock_indexer_validate(struct indexer *self, const char *name, const char *long_name, const char *path)
 {

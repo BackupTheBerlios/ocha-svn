@@ -15,7 +15,7 @@
  * Initialize the structure necessary for querywin to work.
  * Call this before any other functions in this module.
  */
-void querywin_init();
+void querywin_init(void);
 
 /**
  * Get the result queue created by querywin_init()

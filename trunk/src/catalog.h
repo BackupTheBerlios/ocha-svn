@@ -15,7 +15,7 @@ typedef enum
 } CatalogErrorCodes;
 
 /** get the error quark for the errors returned by catalog */
-GQuark catalog_error_quark();
+GQuark catalog_error_quark(void);
 
 /**
  * Make a connection to an sqlite catalog,

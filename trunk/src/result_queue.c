@@ -37,7 +37,7 @@ struct event
         struct queryrunner *caller;
         struct result *result;
         float pertinence;
-        char query[];
+        char *query;
 };
 
 /** Number of result queues on the system.
@@ -55,6 +55,7 @@ static void result_queue_source_finalize(GSource *source);
 
 /* ------------------------- prototypes: other */
 static struct event *event_new(struct result_queue *queue, struct queryrunner *caller, const char *query, float pertinence, struct result *result);
+static void event_free(struct event *queue);
 static gboolean source_callback(gpointer data);
 
 /* ------------------------- definitions */
@@ -73,9 +74,11 @@ struct result_queue* result_queue_new(GMainContext* context,
                                       result_queue_handler_f handler,
                                       gpointer userdata)
 {
+        struct result_queue *queue;
+
         g_return_val_if_fail(handler!=NULL, NULL);
 
-        struct result_queue *queue = (struct result_queue *)
+        queue = (struct result_queue *)
                 g_source_new(&source_functions,
                              sizeof(struct result_queue));
         queue->async_queue=g_async_queue_new();
@@ -96,9 +99,10 @@ struct result_queue* result_queue_new(GMainContext* context,
 
 void result_queue_delete(struct result_queue* queue)
 {
+        GSource *source;
         g_return_if_fail(queue);
 
-        GSource* source=SOURCE(queue);
+        source=SOURCE(queue);
         g_source_destroy(source);
         g_source_unref(source);
         /* resources are only released by source_finalize(),
@@ -113,12 +117,14 @@ void result_queue_add(struct result_queue *queue,
                       float pertinence,
                       struct result *result)
 {
+        struct event *ev;
+
         /* WARNING: can be used by more than one thread at a time */
         g_return_if_fail(queue);
         g_return_if_fail(query);
         g_return_if_fail(result);
 
-        struct event *ev = event_new(queue, caller, query, pertinence, result);
+        ev = event_new(queue, caller, query, pertinence, result);
         g_async_queue_push(queue->async_queue, ev);
         g_main_context_wakeup(queue->main_context);
 }
@@ -138,8 +144,10 @@ void result_queue_add(struct result_queue *queue,
  */
 static gboolean result_queue_source_prepare(GSource *source, gint *timeout)
 {
+        struct result_queue *queue;
+
         g_return_val_if_fail(source, FALSE);
-        struct result_queue *queue = (struct result_queue *)source;
+        queue = (struct result_queue *)source;
         *timeout=-1;
         return g_async_queue_length(queue->async_queue)>0;
 }
@@ -150,8 +158,10 @@ static gboolean result_queue_source_prepare(GSource *source, gint *timeout)
  */
 static gboolean result_queue_source_check(GSource *source)
 {
+        struct result_queue *queue;
+
         g_return_val_if_fail(source, FALSE);
-        struct result_queue *queue = (struct result_queue *)source;
+        queue = (struct result_queue *)source;
         return g_async_queue_length(queue->async_queue)>0;
 }
 
@@ -165,18 +175,18 @@ static gboolean result_queue_source_check(GSource *source)
  */
 static gboolean result_queue_source_dispatch(GSource *source, GSourceFunc callback, gpointer user_data)
 {
+        struct result_queue *queue;
+        struct event *ev;
+
         g_return_val_if_fail(source, FALSE);
         g_return_val_if_fail(callback==source_callback, FALSE);
 
-        struct result_queue *queue = RESULT_QUEUE(source);
-
-        gpointer data;
-        while( (data=g_async_queue_try_pop(queue->async_queue)) != NULL) {
-                callback(data);
-                g_free(data);
+        queue = RESULT_QUEUE(source);
+        while( (ev=(struct event *)g_async_queue_try_pop(queue->async_queue)) != NULL) {
+                callback(ev);
+                event_free(ev);
         }
         return TRUE;
-
 }
 
 /**
@@ -190,18 +200,22 @@ static gboolean result_queue_source_dispatch(GSource *source, GSourceFunc callba
  */
 static void result_queue_source_finalize(GSource *source)
 {
+        struct result_queue *queue;
+        GAsyncQueue* async_queue;
+        struct event *ev;
+
         g_return_if_fail(source);
-        struct result_queue *queue = RESULT_QUEUE(source);
-        GAsyncQueue* async_queue = queue->async_queue;
+        queue = RESULT_QUEUE(source);
+        async_queue = queue->async_queue;
         g_async_queue_lock(async_queue);
 
         /* Just in case: empty the queue, release the results and unreference */
-        struct event *ev;
         while((ev=(struct event *)g_async_queue_try_pop_unlocked(async_queue))!=NULL) {
                 struct result *result = ev->result;
-                if(result && result->release)
+                if(result && result->release) {
                         result->release(result);
-                g_free(ev);
+                }
+                event_free(ev);
         }
         g_async_queue_unref_and_unlock(async_queue);
         result_queue_counter--;
@@ -210,23 +224,30 @@ static void result_queue_source_finalize(GSource *source)
 /* ------------------------- static functions */
 
 static struct event *event_new(struct result_queue *queue,
-                                                       struct queryrunner *caller,
-                                                       const char *query,
-                                                       float pertinence,
-                                                       struct result *result)
+                               struct queryrunner *caller,
+                               const char *query,
+                               float pertinence,
+                               struct result *result)
 {
+        struct event *retval;
+
         g_return_val_if_fail(query!=NULL, NULL);
         g_return_val_if_fail(result!=NULL, NULL);
 
-        struct event *retval =
-                                        (struct event *)
-                                        g_malloc(sizeof(struct event)+strlen(query)+1);
+
+        retval = g_new(struct event, 1);
         retval->queue=queue;
         retval->caller=caller;
         retval->result=result;
         retval->pertinence=pertinence;
-        strcpy(retval->query, query);
+        retval->query=g_strdup(query);
         return retval;
+}
+static void event_free(struct event *event)
+{
+        g_return_if_fail(event);
+        g_free(event->query);
+        g_free(event);
 }
 
 /**
@@ -237,12 +258,17 @@ static struct event *event_new(struct result_queue *queue,
  */
 static gboolean source_callback(gpointer data)
 {
+        struct event *ev;
+
         g_return_val_if_fail(data!=NULL, TRUE);
-        struct event *ev = (struct event*)data;
+
+        ev = (struct event*)data;
         ev->queue->handler(ev->caller,
                            ev->query,
                            ev->pertinence,
                            ev->result,
                            ev->queue->userdata);
+
+        return TRUE;
 }
 

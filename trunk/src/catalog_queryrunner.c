@@ -11,7 +11,7 @@
 #include "indexers.h"
 #include <stdio.h>
 #include <string.h>
-
+#include "string_utils.h"
 /**
  * Number of results to send without pausing
  * in the "first bunch".
@@ -110,12 +110,14 @@ static void catalog_queryrunner_stop(struct queryrunner *_self);
 /* ------------------------- public functions */
 struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queue *catalog_queryrunner_queue)
 {
+        struct catalog_queryrunner *queryrunner;
+
         if(!try_connect(path))
         {
                 fprintf(stderr, "connection to catalog in %s failed\n", path);
                 return NULL;
         }
-        struct catalog_queryrunner *queryrunner = g_new(struct catalog_queryrunner, 1);
+        queryrunner = g_new(struct catalog_queryrunner, 1);
 
         queryrunner->base.start=catalog_queryrunner_start;
         queryrunner->base.run_query=catalog_queryrunner_run_query;
@@ -147,30 +149,31 @@ struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queu
  */
 static void catalog_queryrunner_start(struct queryrunner *_self)
 {
+        struct catalog_queryrunner *self;
+
         g_return_if_fail(_self!=NULL);
 #ifdef DEBUG
-
         printf("%s:%d start\n", __FILE__, __LINE__);
 #endif
 
-        struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
-        lock(self->mutex)
-                ;
+        self = CATALOG_QUERYRUNNER(_self);
+        lock(self->mutex);
         self->started=TRUE;
         g_cond_broadcast(self->cond);
         unlock(self->mutex);
-
 }
 
 static void catalog_queryrunner_stop(struct queryrunner *_self)
 {
+        struct catalog_queryrunner *self;
+
         g_return_if_fail(_self!=NULL);
 #ifdef DEBUG
 
         printf("%s:%d stop\n", __FILE__, __LINE__);
 #endif
 
-        struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
+        self = CATALOG_QUERYRUNNER(_self);
 
         lock(self->mutex)
                 ;
@@ -185,6 +188,8 @@ static void catalog_queryrunner_stop(struct queryrunner *_self)
 
 static void catalog_queryrunner_run_query(struct queryrunner *_self, const char *query)
 {
+        struct catalog_queryrunner *self;
+
         g_return_if_fail(_self!=NULL);
         g_return_if_fail(query!=NULL);
 
@@ -194,14 +199,10 @@ static void catalog_queryrunner_run_query(struct queryrunner *_self, const char 
                __FILE__, __LINE__, query);
 #endif
 
-        struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
-        lock(self->mutex)
-                ;
-        char stripped_query[strlen(query)+1];
-        strcpy(stripped_query, query);
-        g_strstrip(stripped_query);
+        self = CATALOG_QUERYRUNNER(_self);
+        lock(self->mutex);
 
-        if(strcmp(self->query->str, stripped_query)!=0)
+        if(!string_equals_ignore_spaces(self->query->str, query))
         {
                 if(self->catalog) {
 #ifdef DEBUG
@@ -211,7 +212,8 @@ static void catalog_queryrunner_run_query(struct queryrunner *_self, const char 
 
                         catalog_interrupt(self->catalog);
                 }
-                g_string_assign(self->query, stripped_query);
+                g_string_assign(self->query, query);
+                strstrip_on_gstring(self->query);
 
 #ifdef DEBUG
 
@@ -232,15 +234,14 @@ static void catalog_queryrunner_run_query(struct queryrunner *_self, const char 
 
 static void catalog_queryrunner_consolidate(struct queryrunner *_self)
 {
-        g_return_if_fail(_self!=NULL);
-        struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
-
 }
 
 static void catalog_queryrunner_release(struct queryrunner *_self)
 {
+        struct catalog_queryrunner *self;
+
         g_return_if_fail(_self!=NULL);
-        struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
+        self = CATALOG_QUERYRUNNER(_self);
 
         catalog_queryrunner_stop(QUERYRUNNER(self));
 #ifdef DEBUG
@@ -293,8 +294,10 @@ static gpointer runquery_thread(gpointer userdata)
 while(!queryrunner->stopping) {
                 if(queryrunner->started) {
                         if(!queryrunner->catalog) {
+                                struct catalog *catalog;
+
                                 unlock(queryrunner->mutex);
-                                struct catalog *catalog=catalog_connect(queryrunner->path, NULL/*errmsg*/);
+                                catalog=catalog_connect(queryrunner->path, NULL/*errmsg*/);
                                 if(!catalog) {
 #ifdef DEBUG
                                         printf("%s:%d connection to catalog %s failed\n",
@@ -410,15 +413,20 @@ static gboolean result_callback(struct catalog *catalog,
                                 const char *source_type,
                                 void *userdata)
 {
+        struct catalog_queryrunner *self;
+        struct indexer *indexer;
+        const char *query;
+        struct result *result;
+        int count;
+
         g_return_val_if_fail(userdata!=NULL, FALSE);
         g_return_val_if_fail(name!=NULL, FALSE);
         g_return_val_if_fail(long_name!=NULL, FALSE);
         g_return_val_if_fail(path!=NULL, FALSE);
         g_return_val_if_fail(source_type!=NULL, FALSE);
 
-        struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(userdata);
-
-        struct indexer *indexer = indexers_get(source_type);
+        self = CATALOG_QUERYRUNNER(userdata);
+        indexer = indexers_get(source_type);
         if(!indexer)
         {
                 /* it can happen, because indexers may be removed, but it's
@@ -432,13 +440,13 @@ static gboolean result_callback(struct catalog *catalog,
                 return TRUE;
         }
 
-        struct result *result = catalog_result_create(self->path,
-                                                        indexer,
-                                                        path,
-                                                        name,
-                                                        long_name,
-                                                        entry_id);
-        const char *query = self->running_query->str;
+        result = catalog_result_create(self->path,
+                                       indexer,
+                                       path,
+                                       name,
+                                       long_name,
+                                       entry_id);
+        query = self->running_query->str;
 #ifdef DEBUG
 
         printf("%s:%d:query(%s) add %s\n",
@@ -450,7 +458,7 @@ static gboolean result_callback(struct catalog *catalog,
                          query,
                          pertinence,
                          result);
-        int count = self->count;
+        count = self->count;
         count++;
         self->count=count;
         if(count>=MAXIMUM)

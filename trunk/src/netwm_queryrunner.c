@@ -88,23 +88,33 @@ struct queryrunner *netwm_queryrunner_create(Display *display,
 /* ------------------------- member functions: netwm_queryrunner */
 static void netwm_queryrunner_start(struct queryrunner *_self)
 {
-        struct netwm_queryrunner *self = TO_NETWM_QUERYRUNNER(_self);
+        struct netwm_queryrunner *self;
+        unsigned long len;
+        Window *windows;
+        int i;
+
+        self =  TO_NETWM_QUERYRUNNER(_self);
         g_return_if_fail(self);
 
         if(self->window_infos->len>0)
                 return;
 
-        unsigned long len=0;
-        Window *windows=netwm_get_client_list(self->display, &len);
+        len = 0;
+        windows = netwm_get_client_list(self->display, &len);
 
         if(len>0)
         {
-                for(int i=0; i<len; i++) {
-                        Window win = windows[i];
+                for(i=0; i<len; i++) {
+                        Window win;
+                        const char *title;
+                        const char *class;
+                        const char *host;
+
+                        win =  windows[i];
                         gdk_error_trap_push();
-                        const char *title = netwm_get_window_title(self->display, win);
-                        const char *class = netwm_get_window_class(self->display, win);
-                        const char *host = netwm_get_window_host(self->display, win);
+                        title =  netwm_get_window_title(self->display, win);
+                        class =  netwm_get_window_class(self->display, win);
+                        host =  netwm_get_window_host(self->display, win);
                         gdk_flush();
                         if(gdk_error_trap_pop()==0) {
                                 struct window_info info;
@@ -134,17 +144,22 @@ static void netwm_queryrunner_stop(struct queryrunner *_self)
 }
 static void netwm_queryrunner_run_query(struct queryrunner *_self, const char *query)
 {
-        struct netwm_queryrunner *self = TO_NETWM_QUERYRUNNER(_self);
+        struct netwm_queryrunner *self;
+        int len;
+        struct window_info *info;
+        int i;
+
+        self =  TO_NETWM_QUERYRUNNER(_self);
         g_return_if_fail(self);
         g_return_if_fail(query);
 
-        int len = self->window_infos->len;
+        len =  self->window_infos->len;
         if(len==0) {
                 return;
         }
 
-        struct window_info *info = (struct window_info *)self->window_infos->data;
-        for(int i=0; i<len; i++, info++) {
+        info =  (struct window_info *)self->window_infos->data;
+        for(i=0; i<len; i++, info++) {
                 Window win = info->win;
                 const char *title = info->title;
                 if(query_ismatch(query, title)) {
@@ -178,11 +193,12 @@ static struct result *netwm_queryrunner_result_new(Display *display,
                                                    const char *title,
                                                    const char *description)
 {
+        struct window_result *retval;
+
         g_return_val_if_fail(display, NULL);
         g_return_val_if_fail(title, NULL);
 
-        struct window_result *retval = g_new(struct window_result, 1);
-
+        retval =  g_new(struct window_result, 1);
         retval->base.name=g_strdup(title);
         retval->base.long_name=g_strdup(description);
         retval->base.path=g_strdup_printf("x-win:0x%lx", (unsigned long)win);
@@ -198,20 +214,24 @@ static struct result *netwm_queryrunner_result_new(Display *display,
 static gboolean netwm_queryrunner_result_execute(struct result *_self,
                                                  GError **err)
 {
-        struct window_result *self = TO_WINDOW_RESULT(_self);
+        gboolean retval;
+        gint xerror;
+        struct window_result *self;
+
+        self =  TO_WINDOW_RESULT(_self);
         g_return_val_if_fail(self, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
         printf("activate window %s '%s'\n",
                self->base.path,
                self->base.name);
-        gboolean retval;
+
         gdk_error_trap_push();
         retval=netwm_activate_window(self->display,
                                      self->win,
                                      TRUE/*switch desktop*/);
         gdk_flush();
-        gint xerror = gdk_error_trap_pop();
+        xerror =  gdk_error_trap_pop();
         if(xerror)
         {
                 g_set_error(err,
@@ -228,19 +248,25 @@ static gboolean netwm_queryrunner_result_execute(struct result *_self,
 
 static gboolean netwm_queryrunner_result_validate(struct result *_self)
 {
-        gboolean retval = TRUE;
-        struct window_result *self = TO_WINDOW_RESULT(_self);
+        char *title;
+        gboolean retval;
+        struct window_result *self;
+
+        self =  TO_WINDOW_RESULT(_self);
         g_return_val_if_fail(self, FALSE);
 
+        retval=TRUE;
         gdk_error_trap_push();
-        char *title = netwm_get_window_title(self->display, self->win);
-        if(title==NULL)
+        title = netwm_get_window_title(self->display, self->win);
+        if(title==NULL) {
                 retval=FALSE;
-        else
+        }else {
                 g_free(title);
+        }
         gdk_flush();
-        if(gdk_error_trap_pop())
+        if(gdk_error_trap_pop()) {
                 retval=FALSE;
+        }
 
         return retval;
 }
@@ -263,8 +289,9 @@ static void clear_windows_list(struct netwm_queryrunner *self)
         GArray *array = self->window_infos;
         int len = array->len;
         if(len>0) {
+                int i;
                 struct window_info *info = (struct window_info *)array->data;
-                for(int i=0; i<len; i++, info++) {
+                for(i=0; i<len; i++, info++) {
                         g_free((void *)info->title);
                         g_free((void *)info->description);
                 }

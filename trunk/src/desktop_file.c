@@ -230,51 +230,6 @@ unescape_string (gchar *str, gint len)
         return res;
 }
 
-static gchar *
-escape_string (const gchar *str, gboolean escape_first_space)
-{
-        gchar *res;
-        char *q;
-        const gchar *p;
-        const gchar *end;
-
-        /* len + 1 is enough, because unescaping never makes the
-         * string longer */
-        res = g_new (gchar, strlen (str)*2 + 1);
-
-        p = str;
-        q = res;
-        end = str + strlen (str);
-
-        while (*p) {
-                if (*p == ' ') {
-                        if (escape_first_space && p == str) {
-                                *q++ = '\\';
-                                *q++ = 's';
-                        } else
-                                *q++ = ' ';
-                } else if (*p == '\\') {
-                        *q++ = '\\';
-                        *q++ = '\\';
-                } else if (*p == '\t') {
-                        *q++ = '\\';
-                        *q++ = 't';
-                } else if (*p == '\n') {
-                        *q++ = '\\';
-                        *q++ = 'n';
-                } else if (*p == '\r') {
-                        *q++ = '\\';
-                        *q++ = 'r';
-                } else
-                        *q++ = *p;
-                p++;
-        }
-        *q = 0;
-
-        return res;
-}
-
-
 static GnomeDesktopFileSection*
 new_section (GnomeDesktopFile       *df,
              const char             *name,
@@ -1087,7 +1042,6 @@ known_encodings[] = {
                             {"EUC-CN", {"zh_TW"}},
                             {"EUC-JP", {"ja"}},
                             {"EUC-KR", {"ko"}},
-                            {"GEORGIAN-ACADEMY", {}},
                             {"GEORGIAN-PS", {"ka"}},
                             {"ISO-8859-1", {"br", "ca", "da", "de", "en", "es", "eu", "fi", "fr", "gl", "it", "nl", "wa", "no", "pt", "pt", "sv"}},
                             {"ISO-8859-2", {"cs", "hr", "hu", "pl", "ro", "sk", "sl", "sq", "sr"}},
@@ -1102,7 +1056,6 @@ known_encodings[] = {
                             {"KOI8-U", {"uk"}},
                             {"TCVN-5712", {"vi"}},
                             {"TIS-620", {"th"}},
-                            {"VISCII", {}},
                     };
 
 struct
@@ -1272,9 +1225,11 @@ gboolean gnome_desktop_file_get_boolean       (GnomeDesktopFile  *df,
                 gboolean          *val)
 {
         char *str = NULL;
+        gboolean retval = FALSE;
+
         if(!gnome_desktop_file_get_string(df, section, keyname, &str))
                 return FALSE;
-        gboolean retval = FALSE;
+
         if(strcmp("1", str)==0 || g_strcasecmp("true", str)==0) {
                 if(val)
                         *val=TRUE;

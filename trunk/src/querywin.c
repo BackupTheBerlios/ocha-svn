@@ -1,5 +1,6 @@
 #include "querywin.h"
 #include "resultlist.h"
+#include "string_utils.h"
 #include <string.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
@@ -131,6 +132,7 @@ static gboolean focus_out_cb(GtkWidget* widget, GdkEventFocus* ev, gpointer user
 static gboolean map_event_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata)
 {
         gtk_window_present(GTK_WINDOW(querywin));
+        return FALSE/*go on*/;
 }
 
 /**
@@ -159,9 +161,8 @@ static void result_handler_cb(struct queryrunner *caller,
 static gboolean run_query(gpointer userdata)
 {
         if(strcmp(running_query->str, query_str->str)!=0) {
-                char buffer[query_str->len+1];
-                strcpy(buffer, query_str->str);
-                g_string_assign(running_query, g_strstrip(buffer));
+                g_string_assign(running_query, query_str->str);
+                strstrip_on_gstring(running_query);
                 queryrunner->run_query(queryrunner, running_query->str);
         }
         return FALSE;
@@ -300,3 +301,4 @@ static gboolean execute_result(struct result *result)
         }
         return TRUE;
 }
+

@@ -49,12 +49,14 @@ static char *get_catalog_path(void)
 {
         GString *catalog_path = g_string_new("");
         const char *homedir = g_get_home_dir();
+        char *retval;
+
         g_string_append(catalog_path, homedir);
 
         g_string_append(catalog_path, "/.ocha");
         mkdir(catalog_path->str, 0700);
         g_string_append(catalog_path, "/catalog");
-        char *retval = catalog_path->str;
+        retval = catalog_path->str;
         g_string_free(catalog_path, FALSE);
         return retval;
 }
