@@ -145,11 +145,16 @@ class QueryWin(QueryObserver):
         win.set_keep_above(True)
         win.connect("focus_out_event", self.cb_focus_out_event)
 
+        win.connect("map_event", self.cb_map_event)
+
+    def cb_map_event(self, event, userdata):
+        self.win.present()
+
     def cb_focus_out_event(self, event, userdata):
         self.win.hide()
 
     def show(self):
-        self.win.present()
+        self.win.show()
 
     def ping(self):
         self.__ping=now()
