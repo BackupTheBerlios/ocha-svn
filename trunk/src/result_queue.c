@@ -209,10 +209,13 @@ static gboolean source_dispatch(GSource *source, GSourceFunc callback, gpointer 
 
    struct result_queue *queue = RESULT_QUEUE(source);
 
-   gpointer data=g_async_queue_pop(queue->async_queue);
-   gboolean result=callback(data);
-   g_free(data);
-   return result;
+   gpointer data;
+   while( (data=g_async_queue_try_pop(queue->async_queue)) != NULL)
+      {
+         callback(data);
+         g_free(data);
+      }
+   return TRUE;
 
 }
 

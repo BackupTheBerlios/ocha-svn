@@ -34,6 +34,18 @@ static struct mock_result results[] =
 #define assert_executed(result, expected) fail_unless(##result " executed ? expected " ##expected, results[result].executed==expected)
 #define assert_released(result, expected) fail_unless(##result " released ? expected " ##expected, results[result].released==released)
 
+
+/*define TEST_VERBOSE*/
+
+#ifdef TEST_VERBOSE
+# define TEST_HEADER(name) printf("---- " #name "\n")
+# define TEST_FOOTER() printf("----\n")
+#else
+# define TEST_HEADER(name) ((void *)0)
+# define TEST_FOOTER() ((void *)0)
+#endif
+
+
 static bool execute_cb(struct result *_result)
 {
    struct mock_result *result = (struct mock_result *)_result;
@@ -52,12 +64,11 @@ static void release_cb(struct result *_result)
 static void setup()
 {
    g_thread_init(NULL/*vtable*/);
-   printf("---- start:\n");
 }
 
 static void teardown()
 {
-   printf("---- end\n");
+   TEST_FOOTER();
 }
 
 static void handler_not_called(struct queryrunner *caller,
@@ -80,10 +91,13 @@ static void handler_release(struct queryrunner *caller,
 
 START_TEST(test_newdelete)
 {
+   TEST_HEADER(test_newdelete);
+
    struct result_queue *queue = result_queue_new(NULL/*no context*/,
                                                  handler_not_called,
                                                  NULL/*userdata*/);
    result_queue_delete(queue);
+
 }
 END_TEST
 
@@ -120,7 +134,6 @@ static struct result_queue* process_queue() {
 static void assert_all_released() {
    for(int i=0; i<RESULTS_LEN; i++)
       {
-         printf("check result %d\n", i);
          fail_unless(results[i].released,
                      "result i not released");
       }
@@ -131,6 +144,8 @@ static void assert_all_released() {
 
 START_TEST(test_add_result)
 {
+   TEST_HEADER(test_add_result);
+
    process_queue();
    assert_all_released();
 }
@@ -138,6 +153,8 @@ END_TEST
 
 START_TEST(test_quit)
 {
+   TEST_HEADER(test_quit);
+
    int oldcount = result_queue_counter;
    struct result_queue* queue = process_queue();
    result_queue_delete(queue);
@@ -170,6 +187,8 @@ static gboolean test_gtk_loop_cb(gpointer _data)
 }
 START_TEST(test_gtk_loop)
 {
+   TEST_HEADER(test_gtk_loop);
+
    gtk_init(0, NULL);
    struct result_queue* queue = result_queue_new(NULL/*no context*/,
                                                  handler_release,
@@ -183,12 +202,97 @@ START_TEST(test_gtk_loop)
 }
 END_TEST
 
+static GPrivate* thread_identity;
+static GMutex* thread_mutex;
+static struct result_queue *thread_queue;
+#define PRODUCER_THREAD_RESULT_COUNT 1000
+#define PRODUCER_COUNT 10
+static gpointer producer_thread(gpointer mocks)
+{
+   struct result_queue* queue = thread_queue;
+   struct mock_result *mock = (struct mock_result *)mocks;
 
+   g_private_set(thread_identity, mocks);
+   g_mutex_lock(thread_mutex);
+   g_mutex_unlock(thread_mutex);
+
+   for(int i=0; i<PRODUCER_THREAD_RESULT_COUNT; i++)
+      {
+         mock[i].result.name="resultx";
+         mock[i].result.path="resultx/path";
+         mock[i].result.release=release_cb;
+         mock[i].result.execute=execute_cb;
+         mock[i].executed=false;
+         mock[i].released=false;
+         result_queue_add(queue,
+                          NULL/*runner*/,
+                          "myquery",
+                          1.0/*pertinence*/,
+                          &mock[i].result);
+         g_thread_yield();
+      }
+   return NULL;
+}
+
+static int result_count;
+static void test_add_result_from_several_thread_handler(struct queryrunner *caller,
+                                                        const char *query,
+                                                        float pertinence,
+                                                        struct result *result,
+                                                        gpointer userdata)
+{
+
+   fail_unless(g_private_get(thread_identity)==NULL, "not on main thread");
+   result->release(result);
+   result_count++;
+   if(result_count>=(PRODUCER_COUNT*PRODUCER_THREAD_RESULT_COUNT))
+      {
+         g_main_loop_quit((GMainLoop*)userdata);
+      }
+}
 
 
 START_TEST(test_add_result_from_several_threads)
 {
-   fail("write test");
+   fail_unless(g_main_context_acquire(NULL), "failed to acquire main context");
+   TEST_HEADER(test_add_result_from_several_threads);
+   thread_identity=g_private_new(NULL/*destructor*/);
+   g_private_set(thread_identity, NULL);
+
+   GMainLoop* main_loop = g_main_loop_new(NULL/*default context*/, FALSE/*not running*/);
+   thread_mutex=g_mutex_new();
+   g_mutex_lock(thread_mutex);
+
+
+   thread_queue = result_queue_new(NULL/*no context*/,
+                                   test_add_result_from_several_thread_handler,
+                                   main_loop/*userdata*/);
+
+   struct mock_result* mocks[PRODUCER_COUNT];
+   for(int i=0; i<PRODUCER_COUNT; i++)
+      {
+         mocks[i]=g_new(struct mock_result, PRODUCER_THREAD_RESULT_COUNT);
+         g_thread_create(producer_thread,
+                         mocks[i]/*data*/,
+                         false/*joinable*/,
+                         NULL/*error*/);
+      }
+
+   g_mutex_unlock(thread_mutex); /* launch producers */
+
+   g_main_loop_run(main_loop);
+   for(int i=0; i<PRODUCER_COUNT; i++)
+      {
+         for(int j=0; j<PRODUCER_THREAD_RESULT_COUNT; j++)
+            {
+               if(!mocks[i][j].released)
+                  {
+                     printf("mock[%d][%d] not released\n", i, j);
+                     fail("mock not released");
+                  }
+            }
+         g_free(mocks[i]);
+      }
 }
 END_TEST
 
@@ -207,7 +311,7 @@ Suite *result_queue_check_suite(void)
    return s;
 }
 
-int main(void)
+int main(int argc, char* argv[])
 {
    int nf;
    Suite *s = result_queue_check_suite ();
