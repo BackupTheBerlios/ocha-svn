@@ -318,6 +318,31 @@ int gnome_execute_async (const char *dir, int argc, char * const argv[])
 {
         return 0;
 }
+GnomeVFSResult gnome_vfs_get_file_info(const gchar *text_uri, GnomeVFSFileInfo *info, GnomeVFSFileInfoOptions options)
+{
+        return 0;
+}
+const gchar *gnome_vfs_result_to_string(GnomeVFSResult r)
+{
+        return "mock ! mock !";
+}
+GnomeVFSResult gnome_vfs_open(GnomeVFSHandle **handle, const gchar *text_uri, GnomeVFSOpenMode open_mode)
+{
+        return 0;
+}
+GnomeVFSResult gnome_vfs_close(GnomeVFSHandle *h)
+{
+        return 0;
+}
+GnomeVFSResult gnome_vfs_read(GnomeVFSHandle *h, gpointer buffer, GnomeVFSFileSize bytes, GnomeVFSFileSize *bytes_read)
+{
+        return 0;
+}
+GnomeVFSResult gnome_vfs_read_entire_file(const char *uri, int *file_size, char **file_contents)
+{
+        return 0;
+}
+
 /* ------------------------- test suite */
 
 static Suite *indexer_files_check_suite(void)

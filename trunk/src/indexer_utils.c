@@ -12,6 +12,7 @@
 #include "ocha_gconf.h"
 #include "indexer_utils.h"
 #include "indexers.h"
+#include "launchers.h"
 
 /** \file implementation of the API defined in indexer_utils.h */
 
@@ -312,12 +313,11 @@ void source_attribute_change_notify_remove(guint id)
                                    id);
 }
 
-void remove_invalid_entries(struct indexer *indexer, int source_id, struct catalog *catalog)
+void remove_invalid_entries(struct catalog *catalog, int source_id)
 {
-        g_return_if_fail(indexer);
         g_return_if_fail(catalog);
 
-        catalog_get_source_content(catalog, source_id, remove_invalid_cb, indexer);
+        catalog_get_source_content(catalog, source_id, remove_invalid_cb, NULL/*userdata*/);
 }
 
 /* ------------------------- static functions */
@@ -507,11 +507,11 @@ static gboolean remove_invalid_cb(struct catalog *catalog,
                                   const char *path,
                                   int source_id,
                                   const char *source_type,
-                                  const char *launcher,
+                                  const char *launcher_id,
                                   void *userdata)
 {
-        struct indexer *indexer = (struct indexer *)userdata;
-        if(!indexer->validate(indexer, name, long_name, path))
+        struct launcher *launcher = launchers_get(launcher_id);
+        if(launcher==NULL || !launcher_validate(launcher, path))
                 catalog_remove_entry(catalog, source_id, path);
         return TRUE/*continue*/;
 }

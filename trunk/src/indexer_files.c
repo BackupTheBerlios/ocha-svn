@@ -29,8 +29,6 @@
 
 /* ------------------------- prototypes: indexer_files */
 static struct indexer_source *indexer_files_load_source(struct indexer *self, struct catalog *catalog, int id);
-static gboolean indexer_files_execute(struct indexer *self, const char *name, const char *long_name, const char *text_uri, GError **err);
-static gboolean indexer_files_validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri);
 static gboolean indexer_files_discover(struct indexer *indexer, struct catalog *catalog);
 static struct indexer_source *indexer_files_new_source(struct indexer *indexer, struct catalog *catalog, GError **err);
 
@@ -63,8 +61,6 @@ struct indexer indexer_files = {
 
         indexer_files_discover,
         indexer_files_load_source,
-        indexer_files_execute,
-        indexer_files_validate,
         indexer_files_new_source,
         indexer_files_view_new
 };
@@ -97,69 +93,6 @@ static struct indexer_source *indexer_files_load_source(struct indexer *self,
         retval->remove_notification=indexer_files_source_notify_remove;
         return retval;
 }
-
-/**
- * Execute a file using gnome_vfs
- *
- * @param name file display name
- * @param long long file display name
- * @param text_uri file:// URL (file://<absolute path>) with three "/", then. (called 'path' elsewhere)
- * @param err error to set if execution failed
- * @return true if it worked
- */
-static gboolean indexer_files_execute(struct indexer *self,
-                                      const char *name,
-                                      const char *long_name,
-                                      const char *text_uri,
-                                      GError **err)
-{
-        GError *gnome_err;
-        g_return_val_if_fail(text_uri!=NULL, FALSE);
-        g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
-        g_return_val_if_fail(self==&indexer_files, FALSE);
-
-        if(!indexer_files_validate(self, name, long_name, text_uri)) {
-                g_set_error(err,
-                            RESULT_ERROR,
-                            RESULT_ERROR_INVALID_RESULT,
-                            "file not found: %s",
-                            text_uri);
-                return FALSE;
-        }
-
-        printf("opening %s...\n", text_uri);
-        gnome_err =  NULL;
-        if(!gnome_url_show(text_uri, &gnome_err)) {
-                g_set_error(err,
-                            RESULT_ERROR,
-                            RESULT_ERROR_MISSING_RESOURCE,
-                            "error opening %s: %s",
-                            text_uri,
-                            gnome_err->message);
-                g_error_free(gnome_err);
-                return FALSE;
-        }
-        return TRUE;
-}
-
-/**
- * Make sure the file still exists.
- *
- * @param name file display name
- * @param path long file display name, the path
- * @param text_uri file:// URL (file://<absolute path>) with three "/", then. (called 'path' elsewhere)
- */
-static gboolean indexer_files_validate(struct indexer *self,
-                                       const char *name,
-                                       const char *long_name,
-                                       const char *text_uri)
-{
-        g_return_val_if_fail(text_uri!=NULL, FALSE);
-        g_return_val_if_fail(self==&indexer_files, FALSE);
-
-        return uri_exists(text_uri);
-}
-
 
 static gboolean indexer_files_discover(struct indexer *indexer,
                                        struct catalog *catalog)
@@ -243,7 +176,7 @@ static gboolean indexer_files_source_index(struct indexer_source *self,
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-        remove_invalid_entries(&indexer_files, self->id, catalog);
+        remove_invalid_entries(catalog, self->id);
         return index_recursively(INDEXER_NAME,
                                  catalog,
                                  self->id,

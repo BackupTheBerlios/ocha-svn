@@ -26,8 +26,6 @@
 /* ------------------------- prototypes: indexer_application */
 
 static struct indexer_source *indexer_application_load_source(struct indexer *self, struct catalog *catalog, int id);
-static gboolean indexer_application_execute(struct indexer *self, const char *name, const char *long_name, const char *uri, GError **err);
-static gboolean indexer_application_validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri);
 static gboolean indexer_application_discover(struct indexer *indexer, struct catalog *catalog);
 static struct indexer_source_view *indexer_applications_new_view(struct indexer *indexer);
 
@@ -47,7 +45,6 @@ static void indexer_applications_source_view_release(struct indexer_source_view 
 static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore);
 static gboolean add_source_for_directory(struct catalog *catalog, const char *possibility);
 static char *display_name(struct catalog *catalog, int id);
-static void remove_exec_percents(char *str);
 
 /* ------------------------- definitions */
 
@@ -63,8 +60,6 @@ struct indexer indexer_applications = {
 
         indexer_application_discover,
         indexer_application_load_source,
-        indexer_application_execute,
-        indexer_application_validate,
         NULL/*new_source*/,
         indexer_applications_new_view,
 };
@@ -84,97 +79,6 @@ static struct indexer_source *indexer_application_load_source(struct indexer *se
         retval->remove_notification=indexer_application_source_notify_remove;
         return retval;
 }
-static gboolean indexer_application_execute(struct indexer *self, const char *name, const char *long_name, const char *uri, GError **err)
-{
-        GError *gnome_err;
-        gboolean retval;
-        GnomeDesktopFile *desktopfile;
-
-        g_return_val_if_fail(self!=NULL, FALSE);
-        g_return_val_if_fail(name!=NULL, FALSE);
-        g_return_val_if_fail(long_name!=NULL, FALSE);
-        g_return_val_if_fail(uri!=NULL, FALSE);
-        g_return_val_if_fail(g_str_has_prefix(uri, "file://"), FALSE);
-        g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
-
-        gnome_err =  NULL;
-
-        retval =  FALSE;
-        desktopfile =  gnome_desktop_file_load(&uri[strlen("file://")],
-                                        &gnome_err);
-        if(desktopfile==NULL)
-        {
-                g_set_error(err,
-                            RESULT_ERROR,
-                            RESULT_ERROR_INVALID_RESULT,
-                            "entry for application %s not found in %s: %s",
-                            name,
-                            uri,
-                            gnome_err->message);
-                g_error_free(gnome_err);
-        } else
-        {
-                char *exec = NULL;
-                gboolean terminal = FALSE;
-
-                gnome_desktop_file_get_string(desktopfile,
-                                              DESKTOP_SECTION,
-                                              "Exec",
-                                              &exec);
-                gnome_desktop_file_get_boolean(desktopfile,
-                                               DESKTOP_SECTION,
-                                               "Terminal",
-                                               &terminal);
-
-
-                if(!exec) {
-                        g_set_error(err,
-                                    RESULT_ERROR,
-                                    RESULT_ERROR_INVALID_RESULT,
-                                    "entry for application %s found in %s has no 'Exec' defined",
-                                    name,
-                                    uri);
-                } else {
-                        int pid;
-                        remove_exec_percents(exec);
-                        printf("execute: '%s' terminal=%d\n",
-                               exec,
-                               (int)terminal);
-                        errno=0;
-                        if(terminal)
-                                pid=gnome_execute_terminal_shell(NULL, exec);
-                        else
-                                pid=gnome_execute_shell(NULL, exec);
-                        if(pid==-1) {
-                                g_set_error(err,
-                                            RESULT_ERROR,
-                                            RESULT_ERROR_MISSING_RESOURCE,
-                                            "launching '%s' failed: %s",
-                                            exec,
-                                            errno!=0 ? strerror(errno):"unknown error");
-                        } else {
-                                printf("started application %s with PID %d\n",
-                                       exec,
-                                       pid);
-                                retval=TRUE;
-                        }
-                }
-                if(exec)
-                        g_free(exec);
-                gnome_desktop_file_free(desktopfile);
-        }
-
-        return retval;
-}
-
-
-static gboolean indexer_application_validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri)
-{
-        g_return_val_if_fail(text_uri!=NULL, FALSE);
-        g_return_val_if_fail(self==&indexer_applications, FALSE);
-        return uri_exists(text_uri);
-}
-
 static gboolean indexer_application_discover(struct indexer *indexer, struct catalog *catalog)
 {
         gboolean retval = TRUE;
@@ -253,7 +157,7 @@ static gboolean indexer_application_source_index(struct indexer_source *self, st
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-        remove_invalid_entries(&indexer_applications, self->id, catalog);
+        remove_invalid_entries(catalog, self->id);
         return index_recursively(INDEXER_NAME,
                                  catalog,
                                  self->id,
@@ -469,31 +373,4 @@ static char *display_name(struct catalog *catalog, int id)
         if(uri)
                 g_free(uri);
         return retval;
-}
-
-/**
- * Remove everything that starts with '%', except
- * for '%%', which gets transformed into a single '%'
- * @param str string to modify
- */
-static void remove_exec_percents(char *str)
-{
-        char *from;
-        char *to = str;
-        for(from=str; *from!='\0'; from++) {
-                if(*from=='%') {
-                        from++; /* skip this */
-                        if(from[1]=='%') {
-                                *to='%';
-                                to++;
-                        }
-                        /* else skip */
-                } else {
-                        if(from>to) {
-                                *to=*from;
-                        }
-                        to++;
-                }
-        }
-        *to='\0';
 }

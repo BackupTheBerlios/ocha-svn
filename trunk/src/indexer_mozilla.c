@@ -34,8 +34,6 @@ struct discovered
 /* ------------------------- prototypes: indexer_mozilla */
 
 static struct indexer_source *indexer_mozilla_load(struct indexer *self, struct catalog *catalog, int id);
-static gboolean indexer_mozilla_execute(struct indexer *self, const char *name, const char *long_name, const char *url, GError **err);
-static gboolean indexer_mozilla_validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri);
 static gboolean indexer_mozilla_discover(struct indexer *indexer, struct catalog *catalog);
 static struct indexer_source_view *indexer_mozilla_new_view(struct indexer *indexer);
 
@@ -71,8 +69,6 @@ struct indexer indexer_mozilla = {
 
         indexer_mozilla_discover,
         indexer_mozilla_load,
-        indexer_mozilla_execute,
-        indexer_mozilla_validate,
         NULL/*new_source*/,
         indexer_mozilla_new_view
 };
@@ -95,57 +91,6 @@ static struct indexer_source *indexer_mozilla_load(struct indexer *self,
         return retval;
 }
 
-static gboolean indexer_mozilla_execute(struct indexer *self,
-                                        const char *name,
-                                        const char *long_name,
-                                        const char *url,
-                                        GError **err)
-{
-        GError *gnome_err = NULL;
-        gboolean shown;
-
-        g_return_val_if_fail(self!=NULL, FALSE);
-        g_return_val_if_fail(name!=NULL, FALSE);
-        g_return_val_if_fail(long_name!=NULL, FALSE);
-        g_return_val_if_fail(url!=NULL, FALSE);
-        g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
-
-        printf("opening %s...\n", url);
-        shown = gnome_url_show(url, &gnome_err);
-        if(!shown)
-        {
-                /* use the good old  gnome-moz-remote
-                 * if url_show fails.
-                 */
-                gboolean executed;
-                const char *argv[2];
-                argv[0]= "gnome-moz-remote";
-                argv[1]= url;
-                errno=0;
-
-                executed = gnome_execute_async(NULL/*dir*/,
-                                               2,
-                                               (char * const *)argv);
-                if(!executed)
-                        g_set_error(err,
-                                    RESULT_ERROR,
-                                    RESULT_ERROR_MISSING_RESOURCE,
-                                    "error opening %s: %s",
-                                    url,
-                                    gnome_err->message);
-                g_error_free(gnome_err);
-                return FALSE;
-        }
-        return TRUE;
-}
-
-static gboolean indexer_mozilla_validate(struct indexer *self,
-                                         const char *name,
-                                         const char *long_name,
-                                         const char *text_uri)
-{
-        return TRUE;
-}
 
 static gboolean indexer_mozilla_discover(struct indexer *indexer,
                                          struct catalog *catalog)

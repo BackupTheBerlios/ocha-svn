@@ -97,35 +97,6 @@ struct indexer
         struct indexer_source *(*load_source)(struct indexer *self, struct catalog *catalog, int id);
 
         /**
-         * Execute an entry added by a indexer_source of this indexer.
-         *
-         * @param indexer
-         * @param name entry name
-         * @param long_name long entry name
-         * @param path entry path or uri
-         * @param err if non-NULL, any indexing errors
-         * will be added into this object iff this function
-         * returns FALSE. The errors types and domain are
-         * the same as those returned by the function
-         * execute in the struct result
-         * @return TRUE for success, FALSE for failure
-         * @see result
-         */
-        gboolean (*execute)(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err);
-
-        /**
-         * Validate an entry added by a indexer_source of this indexer.
-         *
-         * @param name entry name
-         * @param long_name long entry name
-         * @param path entry path or uri
-         * @return true if the entry is valid and execute
-         * has a chance of working, false otherwise
-         * @see result
-         */
-        gboolean (*validate)(struct indexer *, const char *name, const char *long_name, const char *path);
-
-        /**
          * Create a new source.
          *
          * Some indexers will not allow the creation of
@@ -278,46 +249,6 @@ static inline struct indexer_source *indexer_load_source(struct indexer *self, s
 {
         g_return_val_if_fail(self, NULL);
         return self->load_source(self, catalog, id);
-}
-
-/**
- * Execute an entry added by a indexer_source of this indexer.
- *
- * This is a shortcut for indexer->execute()
- *
- * @param indexer
- * @param name entry name
- * @param long_name long entry name
- * @param path entry path or uri
- * @param err if non-NULL, any indexing errors
- * will be added into this object iff this function
- * returns FALSE. The errors types and domain are
- * the same as those returned by the function
- * execute in the struct result
- * @return TRUE for success, FALSE for failure
- * @see result
- */
-static inline gboolean indexer_execute(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err)
-{
-        g_return_val_if_fail(self, FALSE);
-        return self->execute(self, name, long_name, path, err);
-}
-
-/**
- * Execute an entry added by a indexer_source of this indexer.
- *
- * This is a shortcut for indexer->validate()
- * @param name entry name
- * @param long_name long entry name
- * @param path entry path or uri
- * @return true if the entry is valid and execute
- * has a chance of working, false otherwise
- * @see result
- */
-static inline gboolean indexer_validate(struct indexer *self , const char *name, const char *long_name, const char *path)
-{
-        g_return_val_if_fail(self, FALSE);
-        return self->validate(self, name, long_name, path);
 }
 
 /**

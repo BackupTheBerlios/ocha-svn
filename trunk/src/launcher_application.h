@@ -16,4 +16,10 @@ struct launcher launcher_application;
  */
 #define LAUNCHER_APPLICATION_ID "application"
 
+/**
+ * Do a thorough evaluation of a .desktop file to see whether
+ * the launcher could use it.
+ */
+gboolean launcher_application_is_usable(const char *uri);
+
 #endif /* LAUNCHER_APPLICATION_H */

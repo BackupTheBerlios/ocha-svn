@@ -501,7 +501,6 @@ static gboolean execute_query_printf(struct catalog *catalog,
 
         va_start(ap, sql);
 
-
         sqlite_progress_handler(catalog->db, 1, progress_callback, catalog);
         do {
                 if(catalog->stop) {
