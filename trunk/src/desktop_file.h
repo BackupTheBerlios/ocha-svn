@@ -35,7 +35,8 @@ typedef enum
 {
         GNOME_DESKTOP_PARSE_ERROR_INVALID_SYNTAX,
         GNOME_DESKTOP_PARSE_ERROR_INVALID_ESCAPES,
-        GNOME_DESKTOP_PARSE_ERROR_INVALID_CHARS
+        GNOME_DESKTOP_PARSE_ERROR_INVALID_CHARS,
+        GNOME_DESKTOP_PARSE_ERROR_IO_ERROR
 } GnomeDesktopParseError;
 
 #define GNOME_DESKTOP_PARSE_ERROR gnome_desktop_parse_error_quark()
@@ -46,6 +47,7 @@ GnomeDesktopFile *gnome_desktop_file_new_from_string (char                      
                 GError                    **error);
 GnomeDesktopFile *gnome_desktop_file_load            (const char                 *filename,
                 GError                    **error);
+GnomeDesktopFile *gnome_desktop_file_load_uri(const char *uri, GError **err);
 gboolean          gnome_desktop_file_save            (GnomeDesktopFile           *df,
                 const char                 *path,
                 int                         mode,

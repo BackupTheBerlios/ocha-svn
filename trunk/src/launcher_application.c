@@ -22,9 +22,8 @@ static gboolean launcher_application_validate(struct launcher *launcher, const c
 
 /* ------------------------- prototypes: private functions */
 static gboolean get_application(const char *uri, char **exec_out, gboolean *terminal_out, GError **err);
-static GnomeDesktopFile *load_file(const char *uri, GError **err);
+static GnomeDesktopFile *load_desktop_file(const char *uri, GError **err);
 static void remove_exec_percents(char *str);
-static GnomeVFSResult read_into_string(GnomeVFSHandle *handle, char *buffer, GnomeVFSFileSize size);
 
 /* ------------------------- definitions */
 struct launcher launcher_application = {
@@ -138,7 +137,7 @@ static gboolean get_application(const char *uri, char **exec_out, gboolean *term
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
         retval =  FALSE;
-        desktopfile =  load_file(uri, err);
+        desktopfile =  load_desktop_file(uri, err);
         if(desktopfile!=NULL) {
                 char *exec = NULL;
                 gboolean terminal = FALSE;
@@ -175,67 +174,22 @@ static gboolean get_application(const char *uri, char **exec_out, gboolean *term
  * @param err if non-null, this will contain an error in the domain LAUNCHER_ERROR
  * @return desktop file or null
  */
-static GnomeDesktopFile *load_file(const char *uri, GError **err)
+static GnomeDesktopFile *load_desktop_file(const char *uri, GError **err)
 {
+        GnomeDesktopFile *retval;
         GError *gnome_err = NULL;
-        GnomeVFSResult result;
-        GnomeVFSFileSize size;
-        GnomeVFSHandle *handle;
-        GnomeVFSFileInfo info;
-        GnomeDesktopFile *retval = NULL;
 
-        g_return_val_if_fail(uri!=NULL, NULL);
+        g_return_val_if_fail(uri, NULL);
         g_return_val_if_fail(err==NULL || *err==NULL, NULL);
 
-        result = gnome_vfs_get_file_info(uri, &info, GNOME_VFS_FILE_INFO_FOLLOW_LINKS);
-        if(result==GNOME_VFS_OK) {
-                size=info.size;
-                if(size>(1024*1024)) {
-                        g_set_error(err,
-                                    LAUNCHER_ERROR,
-                                    LAUNCHER_INVALID_URI,
-                                    "Failed to parse application description in %s: it's too large (%lu bytes > 1Mb)",
-                                    uri,
-                                    (gulong)size);
-
-                } else {
-                        result = gnome_vfs_open(&handle, uri, GNOME_VFS_OPEN_READ);
-                        if(result==GNOME_VFS_OK) {
-                                char *buffer = malloc(size+1);
-                                if(buffer!=NULL) {
-                                        result=read_into_string(handle, buffer, size);
-                                        if(result==GNOME_VFS_OK) {
-                                                retval = gnome_desktop_file_new_from_string(buffer, &gnome_err);
-                                        }
-                                        free(buffer);
-                                } else {
-                                        g_set_error(err,
-                                                    LAUNCHER_ERROR,
-                                                    LAUNCHER_EXTERNAL_ERROR,
-                                                    "Failed to allocate buffer for parsing %s: not enough memory (for %lu bytes)",
-                                                    uri,
-                                                    (gulong)size);
-                                }
-                                gnome_vfs_close(handle);
-                        }
-                }
-        }
-
-        if(gnome_err!=NULL) {
+        retval = gnome_desktop_file_load_uri(uri, err==NULL ? NULL:&gnome_err);
+        if(gnome_err) {
                 g_set_error(err,
                             LAUNCHER_ERROR,
                             LAUNCHER_INVALID_URI,
-                            "Failed to parse application description in %s: %s",
+                            "Error parsing %s: %s",
                             uri,
                             gnome_err->message);
-        }
-        if(result!=GNOME_VFS_OK) {
-                g_set_error(err,
-                            LAUNCHER_ERROR,
-                            LAUNCHER_INVALID_URI,
-                            "I/O error when parsing application description in %s: %s",
-                            uri,
-                            gnome_vfs_result_to_string(result));
         }
         return retval;
 }
@@ -265,28 +219,4 @@ static void remove_exec_percents(char *str)
                 }
         }
         *to='\0';
-}
-
-/**
- * Read size characters from the file into the buffer and
- * add a '\0'
- * @param handle
- * @param buffer a buffer with size+1 bytes free
- * @param size number of bytes to read
- * @return gnome vfs result
- */
-static GnomeVFSResult read_into_string(GnomeVFSHandle *handle, char *buffer, GnomeVFSFileSize size)
-{
-        GnomeVFSResult result;
-        GnomeVFSFileSize sofar=0;
-        GnomeVFSFileSize read;
-
-        while( (result=gnome_vfs_read(handle, &buffer[sofar], size-sofar, &read)) == GNOME_VFS_OK ) {
-                if(read==0) {
-                        break;
-                }
-                sofar+=read;
-        }
-        buffer[sofar]='\0';
-        return result==GNOME_VFS_ERROR_EOF ? GNOME_VFS_OK:result;
 }

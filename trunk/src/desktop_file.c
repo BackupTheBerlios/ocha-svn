@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <locale.h>
 #include "desktop_file.h"
+#include <libgnome/gnome-url.h>
+#include <libgnomevfs/gnome-vfs.h>
 
 /**
  * \file handle gnome desktop entries (header file).
@@ -92,7 +94,7 @@ static GnomeDesktopFileLine *   lookup_line    (GnomeDesktopFile         *df,
                 GnomeDesktopFileSection  *section,
                 const char               *keyname,
                 const char               *locale);
-
+static GnomeVFSResult read_into_string(GnomeVFSHandle *handle, char *buffer, GnomeVFSFileSize size);
 
 
 
@@ -1240,5 +1242,83 @@ gboolean gnome_desktop_file_get_boolean       (GnomeDesktopFile  *df,
                 retval=TRUE;
         }
         g_free(str);
+        return retval;
+}
+
+/**
+ * Read size characters from the file into the buffer and
+ * add a '\0'
+ * @param handle
+ * @param buffer a buffer with size+1 bytes free
+ * @param size number of bytes to read
+ * @return gnome vfs result
+ */
+static GnomeVFSResult read_into_string(GnomeVFSHandle *handle, char *buffer, GnomeVFSFileSize size)
+{
+        GnomeVFSResult result;
+        GnomeVFSFileSize sofar=0;
+        GnomeVFSFileSize read;
+
+        while( (result=gnome_vfs_read(handle, &buffer[sofar], size-sofar, &read)) == GNOME_VFS_OK ) {
+                if(read==0) {
+                        break;
+                }
+                sofar+=read;
+        }
+        buffer[sofar]='\0';
+        return result==GNOME_VFS_ERROR_EOF ? GNOME_VFS_OK:result;
+}
+
+/**
+ * Load the .desktop file using GNOME VFS.
+ * @param uri
+ * @param err if non-null, this will contain an error in the domain LAUNCHER_ERROR
+ * @return desktop file or null
+ */
+GnomeDesktopFile *gnome_desktop_file_load_uri(const char *uri, GError **err)
+{
+        GnomeVFSResult result;
+        GnomeVFSFileSize size;
+        GnomeVFSHandle *handle;
+        GnomeVFSFileInfo info;
+        GnomeDesktopFile *retval = NULL;
+
+        g_return_val_if_fail(uri!=NULL, NULL);
+        g_return_val_if_fail(err==NULL || *err==NULL, NULL);
+
+        result = gnome_vfs_get_file_info(uri, &info, GNOME_VFS_FILE_INFO_FOLLOW_LINKS);
+        if(result==GNOME_VFS_OK) {
+                size=info.size;
+                if(size>(1024*1024)) {
+                        g_set_error(err,
+                                    GNOME_DESKTOP_PARSE_ERROR,
+                                    GNOME_DESKTOP_PARSE_ERROR_IO_ERROR,
+                                    "Failed to parse desktop file in %s: it's too large (%lu bytes > 1Mb)",
+                                    uri,
+                                    (gulong)size);
+
+                } else {
+                        result = gnome_vfs_open(&handle, uri, GNOME_VFS_OPEN_READ);
+                        if(result==GNOME_VFS_OK) {
+                                char *buffer = g_malloc(size+1);
+                                result=read_into_string(handle, buffer, size);
+                                if(result==GNOME_VFS_OK) {
+                                        retval = gnome_desktop_file_new_from_string(buffer, err);
+                                }
+                                g_free(buffer);
+
+                                gnome_vfs_close(handle);
+                        }
+                }
+        }
+
+        if(result!=GNOME_VFS_OK) {
+                g_set_error(err,
+                            GNOME_DESKTOP_PARSE_ERROR,
+                            GNOME_DESKTOP_PARSE_ERROR_IO_ERROR,
+                            "I/O error when parsing application description in %s: %s",
+                            uri,
+                            gnome_vfs_result_to_string(result));
+        }
         return retval;
 }
