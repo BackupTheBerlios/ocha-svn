@@ -71,7 +71,6 @@ class Catalog:
             self.__createdb()
         self.__query_base="SELECT id,filename,directory,display_name,command_id FROM entries"
         self.__like_query=self.__query_base+" WHERE display_name LIKE %s ORDER BY lastuse DESC, id ASC"
-        self.__dir_query=self.__query_base+" WHERE directory = %s"
         self.__loadcommand_query="SELECT id,display_name,execute FROM command WHERE id=%s"
         self.__cursor=self.__c.cursor()
         self.__closed=False
@@ -136,7 +135,9 @@ class Catalog:
     def entriesInDirectory(self, dir):
         """find all the entries in a certain directory"""
         cursor=self.__cursor
-        cursor.execute(self.__dir_query, dir)
+        if dir.endswith('/'):
+            dir=dir[0:-1]
+        cursor.execute(self.__query_base+" WHERE directory = '"+dir+"'")
         retval=[]
         def collect(catalog, entry):
             retval.append(entry)

@@ -60,7 +60,8 @@ class Query:
         return [] + self.__results
 
     def addResult(self, display_name, path, result):
-        self.__results.append(QueryResult(self, display_name=display_name, path=path, result=result))
+        if os.path.exists(path):
+            self.__results.append(QueryResult(self, display_name=display_name, path=path, result=result))
 
     def set(self, str):
         self.__query=str
