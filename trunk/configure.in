@@ -33,11 +33,11 @@ dnl Checks for typedefs, structures, and compiler characteristics.
 dnl Checks for library functions.
 
 dnl Configuration
-CFLAGS="-std=c99 $GLIB_CFLAGS -O"
+CFLAGS="-std=c99 $GLIB_CFLAGS -O -D_REENTRANT"
 LIBS="$GLIB_LIBS $LIBS"
 
-TEST_CFLAGS="-g -Ddmalloc $CHECK_CFLAGS"
-TEST_LIBS="-ldmallocth $CHECK_LIBS"
+TEST_CFLAGS="-g $CHECK_CFLAGS"
+TEST_LIBS="$CHECK_LIBS"
 AC_SUBST([TEST_CFLAGS])
 AC_SUBST([TEST_LIBS])
 
