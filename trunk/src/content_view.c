@@ -28,6 +28,7 @@ struct content_view
 
         /** The tree model, only if attached (but not always) */
         ContentList *treemodel;
+
 };
 
 struct fill_contentlist_userdata
@@ -49,6 +50,11 @@ static gboolean fill_contentlist_cb(struct catalog *catalog,
                                     const char *source_type,
                                     const char *launcher,
                                     void *userdata);
+static void cell_data_func(GtkTreeViewColumn* col,
+                           GtkCellRenderer* renderer,
+                           GtkTreeModel* model,
+                           GtkTreeIter* iter,
+                           gpointer userdata);
 
 /* ------------------------- definitions */
 
@@ -70,7 +76,6 @@ struct content_view *content_view_new(struct catalog *catalog)
 void content_view_destroy(struct content_view *view)
 {
         g_return_if_fail(view);
-
         g_free(view);
 }
 
@@ -124,6 +129,8 @@ static void init_widget(struct content_view *view)
 {
         GtkWidget *scroll;
         GtkWidget *treeview;
+        GtkTreeViewColumn *col;
+        GtkCellRenderer *renderer;
 
         scroll = gtk_scrolled_window_new (NULL, NULL);
         gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scroll),
@@ -135,18 +142,20 @@ static void init_widget(struct content_view *view)
         gtk_container_add (GTK_CONTAINER (scroll),
                            treeview);
         gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(treeview), FALSE);
-        gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(treeview),
-                        0,
-                        "Label",
-                        gtk_cell_renderer_text_new(),
-                        "text", CONTENTLIST_COL_NAME,
-                        NULL);
-        gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(treeview),
-                        1,
-                        "Description",
-                        gtk_cell_renderer_text_new(),
-                        "text", CONTENTLIST_COL_LONG_NAME,
-                        NULL);
+
+        col = gtk_tree_view_column_new();
+        renderer = gtk_cell_renderer_text_new();
+        gtk_tree_view_column_pack_start(col,
+                                        renderer,
+                                        TRUE/*expand*/);
+
+        gtk_tree_view_column_set_cell_data_func(col,
+                                                renderer,
+                                                cell_data_func,
+                                                view/*userdata*/,
+                                                NULL/*destroy data*/);
+        gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), col);
+
 
         view->treeview=GTK_TREE_VIEW(treeview);
         view->widget=scroll;
@@ -199,4 +208,39 @@ static gboolean fill_contentlist_cb(struct catalog *catalog,
                         long_name);
         userdata->index++;
         return userdata->index<userdata->size;
+}
+
+
+static void cell_data_func(GtkTreeViewColumn* col,
+                           GtkCellRenderer* renderer,
+                           GtkTreeModel* model,
+                           GtkTreeIter* iter,
+                           gpointer userdata)
+{
+        char *name;
+        char *long_name;
+        if(contentlist_get_at_iter(CONTENTLIST(model),
+                                   iter,
+                                   NULL/*id_out*/,
+                                   &name/*name_out*/,
+                                   &long_name/*long_name_out*/))
+        {
+                char *markup;
+                markup = g_markup_printf_escaped("<big><b>%s</b></big>\n"
+                                                 "<small>%s</small>",
+                                                 name,
+                                                 long_name);
+                g_object_set(renderer,
+                             "markup",
+                             markup,
+                             NULL);
+                g_free(markup);
+        }
+        else
+        {
+                g_object_set(renderer,
+                             "markup",
+                             "...",
+                             NULL);
+        }
 }
