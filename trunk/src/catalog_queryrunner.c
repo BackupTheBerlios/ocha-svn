@@ -137,8 +137,8 @@ struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queu
 {
    if(!try_connect(path))
       {
-         printf("connection to catalog in %s failed\n", path);
-         return NULL;
+          fprintf(stderr, "connection to catalog in %s failed\n", path);
+          return NULL;
       }
    struct catalog_queryrunner *queryrunner = g_new(struct catalog_queryrunner, 1);
 
@@ -170,14 +170,17 @@ static void release(struct queryrunner *_self)
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
 
    stop(QUERYRUNNER(self));
-
-   printf("stopping");
+#ifdef DEBUG
+   printf("%s:%d stopping", __FILE__, __LINE__);
+#endif
    lock(self->mutex);
    self->stopping=TRUE;
    g_cond_broadcast(self->cond);
    unlock(self->mutex);
 
-   printf("released\n");
+#ifdef DEBUG
+   printf("%s:%s released\n", __FILE__, __LINE__);
+#endif
    /* the real release will be done by the
     * thread when it notices self->stopping==TRUE
     */
@@ -192,7 +195,9 @@ static gpointer runquery_thread(gpointer userdata)
    struct catalog_queryrunner *queryrunner
       = (struct catalog_queryrunner *)userdata;
 
-   printf("thread\n");
+#ifdef DEBUG
+   printf("%s:%d thread started\n", __FILE__, __LINE__);
+#endif
    lock(queryrunner->mutex);
    while(!queryrunner->stopping)
       {
@@ -204,8 +209,12 @@ static gpointer runquery_thread(gpointer userdata)
                      struct catalog *catalog=catalog_connect(queryrunner->path, NULL/*errmsg*/);
                      if(!catalog)
                         {
-                           printf("connection to catalog %s failed\n",
+#ifdef DEBUG
+                           printf("%s:%d connection to catalog %s failed\n",
+                                  __FILE__,
+                                  __LINE__,
                                   queryrunner->path);
+#endif
                            lock(queryrunner->mutex);
                            continue;
                         }
@@ -219,8 +228,12 @@ static gpointer runquery_thread(gpointer userdata)
                                      queryrunner->query->str);
 
                      catalog_restart(queryrunner->catalog);
-                     printf("execute query: %s\n",
+#ifdef DEBUG
+                     printf("%s:%d execute query: %s\n",
+                            __FILE__,
+                            __LINE__,
                             queryrunner->running_query->str);
+#endif
                      queryrunner->count=0;
                      unlock(queryrunner->mutex);
                      if(!catalog_executequery(queryrunner->catalog,
@@ -228,10 +241,13 @@ static gpointer runquery_thread(gpointer userdata)
                                               result_callback,
                                               queryrunner/*userdata*/))
                         {
-                           printf("run_query(%s,%s) failed: %s\n",
-                                  queryrunner->path,
-                                  queryrunner->running_query->str,
-                                  catalog_error(queryrunner->catalog));
+                            fprintf(stderr,
+                                    "%s:%d run_query(%s,%s) failed: %s\n",
+                                    __FILE__,
+                                    __LINE__,
+                                    queryrunner->path,
+                                    queryrunner->running_query->str,
+                                    catalog_error(queryrunner->catalog));
                         }
                      lock(queryrunner->mutex);
                      continue; /*recheck without waiting */
@@ -247,18 +263,24 @@ static gpointer runquery_thread(gpointer userdata)
                continue; /*recheck without waiting */
             }
 
-         printf("thread: waiting on cond\n");
+#ifdef DEBUG
+         printf("%s:%d thread: waiting on condition\n", __FILE__, __LINE__);
+#endif
          g_cond_wait(queryrunner->cond,
                      queryrunner->mutex);
       }
    unlock(queryrunner->mutex);
 
-   printf("thread cleanup\n");
+#ifdef DEBUG
+   printf("%s:%d thread cleanup\n", __FILE__, __LINE__);
+#endif
    g_string_free(queryrunner->query, TRUE/*free content*/);
    g_string_free(queryrunner->running_query, TRUE/*free content*/);
    g_free((gpointer)queryrunner->path);
    g_free(queryrunner);
-   printf("thread done\n");
+#ifdef DEBUG
+   printf("%s:%d thread done\n", __FILE__, __LINE__);
+#endif
    return NULL;
 }
 
@@ -270,11 +292,16 @@ static gpointer runquery_thread(gpointer userdata)
 static void start(struct queryrunner *_self)
 {
    g_return_if_fail(_self!=NULL);
+#ifdef DEBUG
+   printf("%s:%d start\n", __FILE__, __LINE__);
+#endif
+
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
    lock(self->mutex);
    self->started=TRUE;
    g_cond_broadcast(self->cond);
    unlock(self->mutex);
+
 }
 
 static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
@@ -325,7 +352,9 @@ static gboolean result_callback(struct catalog *catalog,
                                                  name,
                                                  long_name,
                                                  entry_id);
+#ifdef DEBUG
    printf("%s:%d add %s\n", __FILE__, __LINE__);
+#endif
    result_queue_add(self->queue,
                     QUERYRUNNER(self),
                     self->running_query->str,
@@ -339,15 +368,23 @@ static gboolean result_callback(struct catalog *catalog,
 
    if(count==FIRST_BUNCH_SIZE)
        {
+#ifdef DEBUG
            printf("%s:wait (1st bunch)\n", __FILE__, __LINE__);
+#endif
            wait_on_condition(self, AFTER_FIRST_BUNCH_TIMEOUT);
+#ifdef DEBUG
            printf("%s:wait (1st bunch) done\n", __FILE__, __LINE__);
+#endif
        }
    else if(count%LATER_BUNCH_SIZE==0)
        {
-           printf("%s:wait (later bunch)\n", __FILE__, __LINE__);
+#ifdef DEBUG
+           printf("%s:%d wait (later bunch)\n", __FILE__, __LINE__);
+#endif
            wait_on_condition(self, LATER_BUNCH_TIMEOUT);
-           printf("%s:wait (later bunch) done\n", __FILE__, __LINE__);
+#ifdef DEBUG
+           printf("%s:%d wait (later bunch) done\n", __FILE__, __LINE__);
+#endif
        }
    return TRUE;
 }
@@ -357,14 +394,17 @@ static void run_query(struct queryrunner *_self, const char *query)
    g_return_if_fail(_self!=NULL);
    g_return_if_fail(query!=NULL);
 
-   printf("run_query(%s):enter\n", query);
+#ifdef DEBUG
+   printf("%s:%d run_query(%s):enter\n", __FILE__, __LINE__, query);
+#endif
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
    lock(self->mutex);
-   printf("run_query(%s):locked\n", query);
    if(self->catalog)
       {
-         printf("interrupt...\n");
-         catalog_interrupt(self->catalog);
+#ifdef DEBUG
+          printf("%s:%d interrupt previous query...\n", __FILE__, __LINE__);
+#endif
+          catalog_interrupt(self->catalog);
       }
    char stripped_query[strlen(query)+1];
    strcpy(stripped_query, query);
@@ -373,9 +413,10 @@ static void run_query(struct queryrunner *_self, const char *query)
    if(self->query->len>0)
       g_cond_broadcast(self->cond);
 
-   printf("run_query(%s):unlock\n", query);
    unlock(self->mutex);
-   printf("run_query(%s):done\n", query);
+#ifdef DEBUG
+   printf("%s:%d run_query(%s):done\n", __FILE__, __LINE__, query);
+#endif
 }
 
 static void consolidate(struct queryrunner *_self)
@@ -388,18 +429,19 @@ static void consolidate(struct queryrunner *_self)
 static void stop(struct queryrunner *_self)
 {
    g_return_if_fail(_self!=NULL);
+#ifdef DEBUG
+   printf("%s:%d stop\n", __FILE__, __LINE__);
+#endif
+
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
 
-   printf("stop (in)\n");
    lock(self->mutex);
-   printf("locked\n");
    self->started=FALSE;
    g_string_truncate(self->query, 0);
    if(self->catalog)
       catalog_interrupt(self->catalog);
    g_cond_broadcast(self->cond);
    unlock(self->mutex);
-   printf("stop (out)\n");
 }
 
 static struct indexer *find_indexer(const char *type)
