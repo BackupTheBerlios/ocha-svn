@@ -11,6 +11,7 @@
  */
 
 #include "catalog.h"
+#include <gtk/gtk.h>
 
 /**
  * An indexer maintains a collection of catalog entries
@@ -123,6 +124,18 @@ struct indexer_source
     * @return TRUE for success, FALSE for failure
     */
    gboolean (*index)(struct indexer_source *self, struct catalog *dest, GError **err);
+
+   /**
+    * Create a widget to edit source properties.
+    *
+    * The source must not be released until this widget
+    * is not in use anymore.
+    *
+    * @param source
+    * @return a new widget that can be added into
+    * a window to edit the source
+    */
+   GtkWidget *(*editor_widget)(struct indexer_source *source);
 
    /**
     * Release the source structure.

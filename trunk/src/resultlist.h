@@ -34,12 +34,29 @@ GtkWidget *resultlist_get_widget(void);
 struct result *resultlist_get_selected(void);
 
 /**
+ * Remove all results from the list.
+ */
+void resultlist_clear(void);
+
+/**
  * Add a result to the list.
  *
+ * @param query query for this result
  * @param pertinence
  * @param result
  */
-void resultlist_add_result(float pertinence, struct result *);
+void resultlist_add_result(const char *query, float pertinence, struct result *);
+
+/**
+ * Tell the list that the given result has been executed.
+ * <P>
+ * The result should be on the list. It's usually the
+ * one that's selected. (but there's no guarantee). The
+ * result list may choose to display it differently.
+ *
+ * @param result the result
+ */
+void resultlist_executed(struct result *result);
 
 /**
  * Set the current query, for highlighting it on

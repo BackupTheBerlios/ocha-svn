@@ -3,6 +3,7 @@
 #include "indexers.h"
 #include <check.h>
 #include <stdio.h>
+#include <string.h>
 
 static gboolean discover(struct indexer *, struct catalog *catalog);
 static struct indexer_source *load_source(struct indexer *self, struct catalog *catalog, int id);
@@ -12,6 +13,7 @@ static gboolean validate(struct indexer *, const char *name, const char *long_na
 static struct indexer mock_indexer =
 {
     "test",
+    "Test Indexer",
     discover,
     load_source,
     execute,

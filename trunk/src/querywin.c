@@ -33,8 +33,9 @@ static void result_handler_cb(struct queryrunner *caller,
                               gpointer userdata);
 static gboolean run_query(gpointer userdata);
 static void set_query_string(void);
+static void reset_query_string(void);
 static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata);
-static void execute_result(struct result *result);
+static gboolean execute_result(struct result *result);
 
 #define assert_initialized() g_return_if_fail(result_queue)
 #define assert_queryrunner_set() g_return_if_fail(queryrunner);
@@ -105,6 +106,8 @@ void querywin_stop()
    queryrunner->stop(queryrunner);
    gtk_widget_hide(querywin);
    shown=FALSE;
+
+   reset_query_string();
 }
 
 /* ------------------------- private functions */
@@ -146,7 +149,7 @@ static void result_handler_cb(struct queryrunner *caller,
 {
    g_return_if_fail(result);
 
-   resultlist_add_result(pertinence, result);
+   resultlist_add_result(query, pertinence, result);
 }
 
 /**
@@ -177,6 +180,18 @@ static void set_query_string()
    resultlist_set_current_query(query_str->str);
    g_timeout_add(300, run_query, NULL/*userdata*/);
 }
+/**
+ * Empty the query string and the result list
+ */
+static void reset_query_string()
+{
+   g_string_assign(query_str, "");
+   g_string_assign(running_query, "");
+   *query_label_text='\0';
+   gtk_label_set_text(GTK_LABEL(query_label), query_label_text);
+   resultlist_clear();
+}
+
 
 /** Gtk callback for "release-event" */
 static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata)
@@ -202,6 +217,7 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
             struct result *selected = resultlist_get_selected();
             if(selected!=NULL)
                {
+                  resultlist_executed(selected);
                   querywin_stop();
                   execute_result(selected);
                }
@@ -264,7 +280,7 @@ static void querywin_create(GtkWidget *list)
   treeview=list;
 }
 
-static void execute_result(struct result *result)
+static gboolean execute_result(struct result *result)
 {
    GError *errs = NULL;
    if(!result->execute(result, &errs))
@@ -276,6 +292,7 @@ static void execute_result(struct result *result)
                  errs->message,
                  errs->code==RESULT_ERROR_INVALID_RESULT ? "(result was invalid)":"");
          g_error_free(errs);
+         return FALSE;
       }
-
+   return TRUE;
 }

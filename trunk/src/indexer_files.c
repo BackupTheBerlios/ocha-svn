@@ -29,6 +29,7 @@ static gboolean discover(struct indexer *, struct catalog *catalog);
 static gboolean has_gnome_mime_command(const char *path);
 static char *display_name(struct catalog *catalog, int id);
 static void release_source(struct indexer_source *source);
+static GtkWidget *editor_widget(struct indexer_source *source);
 #define INDEXER_NAME "files"
 
 /** Definition of the indexer */
@@ -61,6 +62,7 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
    retval->index=index;
    retval->release=release_source;
    retval->display_name=display_name(catalog, id);
+   retval->editor_widget=editor_widget;
    return retval;
 }
 static void release_source(struct indexer_source *source)
@@ -272,11 +274,11 @@ static char *display_name(struct catalog *catalog, int id)
         if(path)
         {
             const char *home = g_get_home_dir();
-            if(strcmp(home, path))
+            if(strcmp(home, path)==0)
                 retval=g_strdup("Home");
-            else if(g_str_has_prefix(path, home) && strcmp(&path[strlen(home)], "/Desktop"))
+            else if(g_str_has_prefix(path, home) && strcmp(&path[strlen(home)], "/Desktop")==0)
                 retval=g_strdup("Desktop");
-            else if(g_str_has_prefix(path, home) && strcmp(&path[strlen(home)], "/.gnome-desktop"))
+            else if(g_str_has_prefix(path, home) && strcmp(&path[strlen(home)], "/.gnome-desktop")==0)
                 retval=g_strdup("GNOME Desktop");
             else if(g_str_has_prefix(path, home))
                 retval=g_strdup(&path[strlen(home)+1]);
@@ -295,4 +297,9 @@ static char *display_name(struct catalog *catalog, int id)
     if(uri)
         g_free(uri);
     return retval;
+}
+
+static GtkWidget *editor_widget(struct indexer_source *source)
+{
+    return gtk_label_new(source->display_name);
 }

@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static void destroy_cb( GtkWidget *widget, gpointer userdata)
+static void destroy_cb(GtkWidget *widget, gpointer userdata)
 {
     gtk_main_quit();
 }

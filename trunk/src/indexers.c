@@ -4,6 +4,7 @@
 #include "indexer_files.h"
 #include "indexer_applications.h"
 #include "indexer_mozilla.h"
+#include <string.h>
 
 static struct indexer *indexers[] =
    {

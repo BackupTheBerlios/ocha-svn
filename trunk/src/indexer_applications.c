@@ -24,6 +24,7 @@ static gboolean index(struct indexer_source *, struct catalog *, GError **);
 static void release(struct indexer_source *);
 static gboolean discover(struct indexer *, struct catalog *catalog);
 static char *display_name(struct catalog *catalog, int id);
+static GtkWidget *editor_widget(struct indexer_source *source);
 
 #define INDEXER_NAME "applications"
 struct indexer indexer_applications =
@@ -43,6 +44,7 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
    retval->index=index;
    retval->release=release;
    retval->display_name=display_name(catalog, id);
+   retval->editor_widget=editor_widget;
    return retval;
 }
 static void release(struct indexer_source *source)
@@ -359,4 +361,9 @@ static char *display_name(struct catalog *catalog, int id)
     if(uri)
         g_free(uri);
     return retval;
+}
+
+static GtkWidget *editor_widget(struct indexer_source *source)
+{
+    return gtk_label_new(source->display_name);
 }
