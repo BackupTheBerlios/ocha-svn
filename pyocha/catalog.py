@@ -19,6 +19,12 @@ class Entry:
         self.display_name=display_name
         self.command_id=command_id
 
+    def exists(self):
+        return os.path.exists(self.path)
+
+    def delete(self):
+        catalog.removeEntry(self.id)
+
     def __repr__(self):
         return "entry "+str(self.id)+"="+self.path
 
@@ -63,10 +69,18 @@ class Catalog:
         self.__c=sqlite.connect(path, encoding="utf-8", mode=0700)
         if createdb:
             self.__createdb()
-        self.__like_query="SELECT id,filename,directory,display_name,command_id FROM entries WHERE display_name LIKE %s ORDER BY lastuse DESC, id ASC"
+        self.__query_base="SELECT id,filename,directory,display_name,command_id FROM entries"
+        self.__like_query=self.__query_base+" WHERE display_name LIKE %s ORDER BY lastuse DESC, id ASC"
+        self.__dir_query=self.__query_base+" WHERE directory = %s"
         self.__loadcommand_query="SELECT id,display_name,execute FROM command WHERE id=%s"
         self.__cursor=self.__c.cursor()
         self.__closed=False
+
+    def commit(self):
+        self.__c.commit()
+
+    def rollback(self):
+        self.__c.rollback()
 
     def loadCommand(self, id):
         """Load a command, given its id or return None"""
@@ -76,6 +90,17 @@ class Catalog:
         if not row:
             return None
         return Command(catalog=self, id=row[0], display_name=row[1], execute=row[2])
+
+    def removeEntry(self, id):
+        self.__cursor.execute("DELETE FROM entries WHERE id=%s", id)
+
+    def commands(self):
+        self.__cursor.execute("SELECT id,display_name,execute FROM command")
+        retval=[]
+        for row in self.__cursor:
+            retval.append(Command(catalog=self, id=row[0], display_name=row[1], execute=row[2]))
+        return retval
+
 
     def insertEntry(self, path, display_name=None, command=None):
         command_id=None
@@ -108,6 +133,18 @@ class Catalog:
     def __escape_query(self, query):
         return query
 
+    def entriesInDirectory(self, dir):
+        """find all the entries in a certain directory"""
+        cursor=self.__cursor
+        cursor.execute(self.__dir_query, dir)
+        retval=[]
+        def collect(catalog, entry):
+            retval.append(entry)
+            return True
+        self.__parse_results(cursor, collect)
+        return retval
+
+
     def query(self, query, callback):
         """execute a query and call callback on all the results, in
         the correct order.
@@ -123,17 +160,17 @@ class Catalog:
         try:
             sofar=[]
             cursor.execute(self.__like_query, (query+"%"))
-            ret=self.__parse_results(cursor,query, callback, sofar)
+            ret=self.__parse_results(cursor,callback, sofar)
             if not ret:
                 return False
 
             cursor.execute(self.__like_query, ("%"+query+"%"))
-            ret=self.__parse_results(cursor,query, callback, sofar)
+            ret=self.__parse_results(cursor,callback, sofar)
             return ret
         finally:
             cursor.close()
 
-    def __parse_results(self, cursor, query, callback, sofar):
+    def __parse_results(self, cursor, callback, sofar=None):
         """Call callback on all the results, in
         the correct order.
 
@@ -142,8 +179,9 @@ class Catalog:
 
         for row in cursor:
             id=row[0]
-            if id not in sofar:
-                sofar.append(id)
+            if not sofar or id not in sofar:
+                if sofar:
+                    sofar.append(id)
                 entry=Entry(self, id, filename=row[1], directory=row[2], display_name=row[3], command_id=row[4])
                 if not callback(self, entry):
                     return False
@@ -167,6 +205,7 @@ class Catalog:
                                                   +"command_id INTEGER NOT NULL, "
                                                   +"lastuse TIMESTAMP NOT NULL, "
                                                   +"frequence FLOAT NOT NULL)")
+            self.__c.commit()
         finally:
             cursor.close()
 
