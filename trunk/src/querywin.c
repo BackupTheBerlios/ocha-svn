@@ -237,7 +237,7 @@ static void querywin_create(GtkWidget *list)
 
   querywin = gtk_window_new (GTK_WINDOW_TOPLEVEL);
   gtk_widget_set_size_request (querywin, 320, 200);
-  gtk_window_set_title (GTK_WINDOW (querywin), "window1");
+  gtk_window_set_title (GTK_WINDOW (querywin), "Ocha Query");
   gtk_window_set_position (GTK_WINDOW (querywin), GTK_WIN_POS_CENTER_ALWAYS);
   gtk_window_set_resizable (GTK_WINDOW (querywin), FALSE);
   gtk_window_set_decorated (GTK_WINDOW (querywin), FALSE);

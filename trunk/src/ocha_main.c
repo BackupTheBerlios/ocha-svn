@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
 {
     struct configuration config;
     ocha_init(argc, argv, TRUE/*has gui*/, &config);
+    ocha_init_requires_catalog(config.catalog_path);
 
     for(int i=1; i<argc; i++)
     {
@@ -100,11 +101,6 @@ int main(int argc, char *argv[])
    querywin_init();
 
    const char *catalog_path = config.catalog_path;
-   if(!g_file_test(catalog_path, G_FILE_TEST_EXISTS))
-      {
-         fprintf(stderr, "No catalog: please start the indexer first\n");
-         exit(10);
-      }
 
    struct result_queue *queue = querywin_get_result_queue();
    struct queryrunner *runners[] =

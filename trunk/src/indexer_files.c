@@ -27,13 +27,15 @@ static gboolean validate(struct indexer *self, const char *name, const char *lon
 static gboolean index(struct indexer_source *self, struct catalog *catalog, GError **err);
 static gboolean discover(struct indexer *, struct catalog *catalog);
 static gboolean has_gnome_mime_command(const char *path);
-
+static char *display_name(struct catalog *catalog, int id);
+static void release_source(struct indexer_source *source);
 #define INDEXER_NAME "files"
 
 /** Definition of the indexer */
 struct indexer indexer_files =
 {
    .name = INDEXER_NAME,
+   .display_name = "Files and Directories",
    .execute = execute,
    .validate = validate,
    .load_source = load,
@@ -57,8 +59,15 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
    struct indexer_source *retval = g_new(struct indexer_source, 1);
    retval->id=id;
    retval->index=index;
-   retval->release=(void (*)(struct indexer_source *))g_free;
+   retval->release=release_source;
+   retval->display_name=display_name(catalog, id);
    return retval;
+}
+static void release_source(struct indexer_source *source)
+{
+    g_return_if_fail(source!=NULL);
+    g_free((gpointer)source->display_name);
+    g_free(source);
 }
 
 static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore)
@@ -245,4 +254,45 @@ static gboolean has_gnome_mime_command(const char *path)
       }
    g_string_free(uri, TRUE/*free content*/);
    return retval;
+}
+
+static char *display_name(struct catalog *catalog, int id)
+{
+    char *uri=NULL;
+    char *retval=NULL;
+    if(!catalog_get_source_attribute(catalog, id, "path", &uri) || uri==NULL)
+        retval=g_strdup("Invalid");
+    else
+    {
+        char *path=NULL;
+        if(g_str_has_prefix(uri, "file://"))
+            path=&uri[strlen("file://")];
+        else if(*uri=='/')
+            path=uri;
+        if(path)
+        {
+            const char *home = g_get_home_dir();
+            if(strcmp(home, path))
+                retval=g_strdup("Home");
+            else if(g_str_has_prefix(path, home) && strcmp(&path[strlen(home)], "/Desktop"))
+                retval=g_strdup("Desktop");
+            else if(g_str_has_prefix(path, home) && strcmp(&path[strlen(home)], "/.gnome-desktop"))
+                retval=g_strdup("GNOME Desktop");
+            else if(g_str_has_prefix(path, home))
+                retval=g_strdup(&path[strlen(home)+1]);
+            else
+            {
+                retval=path;
+                uri=NULL;
+            }
+        }
+        if(!retval)
+        {
+            retval=uri;
+            uri=NULL;
+        }
+    }
+    if(uri)
+        g_free(uri);
+    return retval;
 }

@@ -25,4 +25,9 @@ struct configuration
  */
 void ocha_init(int argc, char **argv, gboolean ui, struct configuration *config);
 
+/**
+ * Stop the program is no catalog file is available.
+ * @param catalog_path catalog location
+ */
+void ocha_init_requires_catalog(const char *catalog_path);
 #endif /*OCHA_INIT_H*/

@@ -94,9 +94,6 @@ int main(int argc, char *argv[])
        indexer_ptr++)
       {
          struct indexer *indexer = *indexer_ptr;
-         if(verbose)
-            printf("indexing %s...\n",
-                   indexer->name);
          int *source_ids = NULL;
          int source_ids_len = 0;
          if(catalog_list_sources(catalog, indexer->name, &source_ids, &source_ids_len))
@@ -110,16 +107,17 @@ int main(int argc, char *argv[])
                      if(source)
                         {
                            if(verbose)
-                              printf("indexing source %s-%d...\n",
-                                     indexer->name,
+                              printf("indexing %s: %s...\n",
+                                     indexer->display_name,
+                                     source->display_name,
                                      source_id);
 
                            GError *err = NULL;
                            if(!source->index(source, catalog, &err))
                               {
                                  fprintf(stderr,
-                                         "error indexing list for %s-%d: %s\n",
-                                         indexer->name,
+                                         "error indexing list for %s (ID %d): %s\n",
+                                         source->display_name,
                                          source_id,
                                          err->message);
                                  g_error_free(err);
@@ -134,7 +132,7 @@ int main(int argc, char *argv[])
             {
                fprintf(stderr,
                        "error getting source list for %s: %s",
-                       indexer->name,
+                       indexer->display_name,
                        catalog_error(catalog));
                retval++;
             }

@@ -8,6 +8,8 @@
 #include <libgnome/gnome-program.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 
 /** \file Generic initialization */
@@ -43,4 +45,12 @@ void ocha_init(int argc, char **argv, gboolean ui, struct configuration *config)
                        argv,
                        NULL);
    config->catalog_path=get_catalog_path();
+}
+void ocha_init_requires_catalog(const char *catalog_path)
+{
+    if(!g_file_test(catalog_path, G_FILE_TEST_EXISTS))
+      {
+          fprintf(stderr, "No catalog: please start the indexer first\n");
+          exit(10);
+      }
 }

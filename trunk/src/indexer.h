@@ -29,6 +29,11 @@ struct indexer
    const char *name;
 
    /**
+    * Name of this indexer to be displayed to the users
+    */
+   const char *display_name;
+
+   /**
     * Examine the current environment and try to figure out
     * what to index.
     *
@@ -105,6 +110,9 @@ struct indexer_source
 {
    /** unique indexer_source id */
    int id;
+
+   /** Name to be displayed to the user */
+   const char *display_name;
 
    /**
     * (re)-index the entries in this indexer_source.

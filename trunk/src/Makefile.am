@@ -1,5 +1,5 @@
 noinst_HEADERS=result.h result_queue.h queryrunner.h mock_queryrunner.h querywin.h resultlist.h catalog_queryrunner.h
-bin_PROGRAMS=ocha ocha_indexer
+bin_PROGRAMS=ocha ocha_indexer ocha_preferences
 
 noinst_PROGRAMS=result_queue_check catalog_check query_check indexer_various_check catalog_queryrunner_check
 
@@ -38,6 +38,11 @@ indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.
 ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS)
 ocha_LDADD=$(GTK_LIBS) $(SQLITE_LIBS) $(GNOME_LIBS)
 
+
+
+ocha_preferences_SOURCES=preferences_main.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c preferences_catalog.h preferences_catalog.c
+ocha_preferences_CFLAGS=$(GNOME_CFLAGS) $(SQLITE_CFLAGS)
+ocha_preferences_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 
 xref:
 	cd @top_srcdir@ && if [ -d @top_srcdir@/Xrefs ] ; then xref -update; else xref -create; fi

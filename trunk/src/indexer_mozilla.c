@@ -19,11 +19,13 @@ static gboolean bookmarks_read_line(FILE *, GString *, GError **err);
 static char *html_expand_common_entities(const char *orig);
 static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, const char *bookmark_file, GError **err);
 static gboolean discover(struct indexer *, struct catalog *catalog);
+static char *display_name(struct catalog *catalog, int id);
 
 #define INDEXER_NAME "mozilla"
 struct indexer indexer_mozilla =
 {
    .name=INDEXER_NAME,
+   .display_name="Mozilla/Firefox",
    .load_source=load,
    .execute=execute,
    .validate=validate,
@@ -36,10 +38,13 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
    retval->id=id;
    retval->index=index;
    retval->release=release;
+   retval->display_name=display_name(catalog, id);
+   return retval;
 }
 static void release(struct indexer_source *source)
 {
    g_return_if_fail(source);
+   g_free((gpointer)source->display_name);
    g_free(source);
 }
 
@@ -288,4 +293,58 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
          g_free(path);
       }
    return retval;
+}
+
+static char *display_name(struct catalog *catalog, int id)
+{
+    char *uri=NULL;
+    char *retval=NULL;
+    if(!catalog_get_source_attribute(catalog, id, "path", &uri) || uri==NULL)
+        retval=g_strdup("Invalid");
+    else
+    {
+        char *path=NULL;
+        if(g_str_has_prefix(uri, "file://"))
+            path=&uri[strlen("file://")];
+        else if(*uri=='/')
+            path=uri;
+
+        if(path)
+        {
+            const char *home = g_get_home_dir();
+            if(g_str_has_prefix(path, home))
+            {
+                GString *gstr = g_string_new("Mozilla ");
+                if(strstr(path, "firefox")
+                   || strstr(path, "Firefox")
+                   || strstr(path, "firebird")
+                   || strstr(path, "phoenix"))
+                {
+                    g_string_append(gstr, "Firefox ");
+                }
+                if(!strstr(path, "default"))
+                {
+                    /* not the default, print the path instead of the
+                     * profile name...
+                     */
+                    g_string_append(gstr, &path[strlen(home)+1]);
+                }
+                retval=g_strdup(gstr->str);
+                g_string_free(gstr, TRUE);
+            }
+            else
+            {
+                retval=path;
+                uri=NULL;
+            }
+        }
+        if(!retval)
+        {
+            retval=uri;
+            uri=NULL;
+        }
+    }
+    if(uri)
+        g_free(uri);
+    return retval;
 }

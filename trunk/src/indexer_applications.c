@@ -23,11 +23,13 @@ static gboolean validate(struct indexer *, const char *name, const char *long_na
 static gboolean index(struct indexer_source *, struct catalog *, GError **);
 static void release(struct indexer_source *);
 static gboolean discover(struct indexer *, struct catalog *catalog);
+static char *display_name(struct catalog *catalog, int id);
 
 #define INDEXER_NAME "applications"
 struct indexer indexer_applications =
 {
    .name=INDEXER_NAME,
+   .display_name="Applications",
    .load_source=load,
    .execute=execute,
    .validate=validate,
@@ -40,10 +42,13 @@ static struct indexer_source *load(struct indexer *self, struct catalog *catalog
    retval->id=id;
    retval->index=index;
    retval->release=release;
+   retval->display_name=display_name(catalog, id);
+   return retval;
 }
 static void release(struct indexer_source *source)
 {
    g_return_if_fail(source);
+   g_free((gpointer)source->display_name);
    g_free(source);
 }
 
@@ -311,4 +316,47 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
  error:
    g_free(home);
    return retval;
+}
+
+static char *display_name(struct catalog *catalog, int id)
+{
+    char *uri=NULL;
+    char *retval=NULL;
+    if(!catalog_get_source_attribute(catalog, id, "path", &uri) || uri==NULL)
+        retval=g_strdup("Invalid");
+    else
+    {
+        char *path=NULL;
+        if(g_str_has_prefix(uri, "file://"))
+            path=&uri[strlen("file://")];
+        else if(*uri=='/')
+            path=uri;
+        if(path)
+        {
+            const char *home = g_get_home_dir();
+            if(g_str_has_prefix(path, home) && strcmp(&path[strlen(home)], "/.local/share")==0)
+                retval=g_strdup("User Applications");
+            else if(strcmp("/usr/share", path)==0)
+                retval=g_strdup("System Applications");
+            else if(strcmp("/usr/local/share", path)==0)
+                retval=g_strdup("System Applications (/usr/local)");
+            else if(g_str_has_prefix(path, "/opt") && strstr(path, "gnome"))
+                retval=g_strdup("GNOME Applications");
+            else if(g_str_has_prefix(path, "/opt") && strstr(path, "kde"))
+                retval=g_strdup("KDE Applications");
+            else
+            {
+                retval=path;
+                uri=NULL;
+            }
+        }
+        if(!retval)
+        {
+            retval=uri;
+            uri=NULL;
+        }
+    }
+    if(uri)
+        g_free(uri);
+    return retval;
 }
