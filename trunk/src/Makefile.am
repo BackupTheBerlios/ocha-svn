@@ -42,7 +42,7 @@ querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h catal
 query.c query.h resultlist.h resultlist.c netwm.h netwm.c netwm_queryrunner.c \
 netwm_queryrunner.h compound_queryrunner.h compound_queryrunner.c \
 launchers.c launcher_open.c launcher_openurl.c launcher_application.c desktop_file.c \
-string_utils.h string_utils.c 
+string_utils.h string_utils.c ocha_gconf.c ocha_gconf.h
 ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS)
 ocha_LDADD=$(GTK_LIBS) $(SQLITE_LIBS) $(GNOME_LIBS)
 

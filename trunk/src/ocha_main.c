@@ -11,6 +11,7 @@
 #include "query.h"
 #include "resultlist.h"
 #include "ocha_init.h"
+#include "ocha_gconf.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
@@ -27,9 +28,22 @@
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
 
+struct keygrab_data
+{
+        GdkModifierType modifiers;
+        KeyCode keycode;
+        guint keyval;
+};
+
+
+
 /* ------------------------- prototypes */
+static gboolean configure_keygrab(struct keygrab_data *data);
+static void reconfigure_keygrab(GConfClient *caller, guint id, GConfEntry *entry, gpointer userdata);
 static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_unused, gpointer data);
-static void install_keygrab(void);
+static void install_keygrab_filters(struct keygrab_data *data);
+static gboolean install_keygrab(const char *accelerator, struct keygrab_data *data);
+static void uninstall_keygrab(void);
 
 /* ------------------------- main */
 
@@ -41,6 +55,7 @@ int main(int argc, char *argv[])
         struct result_queue *queue;
         struct queryrunner *runners[3];
         struct queryrunner *compound;
+        struct keygrab_data keygrab_data;
 
         ocha_init(argc, argv, TRUE/*has gui*/, &config);
         ocha_init_requires_catalog(config.catalog_path);
@@ -73,8 +88,9 @@ int main(int argc, char *argv[])
         querywin_set_queryrunner(compound);
         querywin_start();
 
-        install_keygrab();
-
+        if(!configure_keygrab(&keygrab_data)) {
+                return 10;
+        }
         gtk_main();
 
         return 0;
@@ -82,28 +98,100 @@ int main(int argc, char *argv[])
 
 /* ------------------------- static functions */
 
-static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_unused, gpointer data)
+static gboolean configure_keygrab(struct keygrab_data *data)
 {
-        int keycode;
+        GError *err = NULL;
+        gchar *accelerator;
+        gboolean success;
+
+        accelerator = gconf_client_get_string(ocha_gconf_get_client(),
+                                              OCHA_GCONF_ACCELERATOR_KEY,
+                                              &err);
+        if(err) {
+                fprintf(stderr,
+                        "error: error accessing gconf configuration : %s",
+                        err->message);
+                g_error_free(err);
+                return FALSE;
+        }
+
+        success=install_keygrab(accelerator ? accelerator:OCHA_GCONF_ACCELERATOR_KEY_DEFAULT,
+                                data);
+        g_free(accelerator);
+
+        if(!success) {
+                return FALSE;
+        }
+        install_keygrab_filters(data);
+
+        gconf_client_notify_add(ocha_gconf_get_client(),
+                                OCHA_GCONF_ACCELERATOR_KEY,
+                                reconfigure_keygrab,
+                                data,
+                                NULL/*free_func*/,
+                                &err);
+        if(err) {
+                fprintf(stderr,
+                        "warning: gconf failed: '%s'\n"
+                        "         ocha will have to be restarted for configuration changes to be taken into account\n",
+                        err->message);
+                g_error_free(err);
+        }
+
+        return TRUE;
+}
+static void reconfigure_keygrab(GConfClient *caller, guint id, GConfEntry *entry, gpointer userdata)
+{
+        const char *accelerator = gconf_value_get_string(gconf_entry_get_value(entry));
+        struct keygrab_data *data = (struct keygrab_data *)userdata;
+        uninstall_keygrab();
+        if(!install_keygrab(accelerator, data)) {
+                gtk_main_quit();
+        }
+}
+
+static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_unused, gpointer _data)
+{
         XEvent *xev;
         XKeyEvent *key;
+        struct keygrab_data *data;
 
-        keycode = GPOINTER_TO_INT(data);
+        g_return_val_if_fail(_data, GDK_FILTER_CONTINUE);
+
+        data = (struct keygrab_data *)_data;
         xev = (XEvent *) xevent;
-        if (xev->type != KeyPress)
-                return GDK_FILTER_CONTINUE;
 
-        key = (XKeyEvent *) xevent;
-        if (keycode == key->keycode)
-                querywin_start();
+        if (xev->type == KeyPress || xev->type == KeyRelease) {
+                key = (XKeyEvent *) xevent;
+                if (key->keycode == data->keycode
+                    && (key->state&data->modifiers)==(data->modifiers) ) {
+                        if (xev->type == KeyPress) {
+                                querywin_start();
+                        }
+                        return GDK_FILTER_REMOVE;
+                }
+        }
         return GDK_FILTER_CONTINUE;
 }
 
-static void install_keygrab()
+static gboolean install_keygrab(const char *accelerator, struct keygrab_data *data)
 {
         GdkDisplay *display = gdk_display_get_default();
-        int keycode = XKeysymToKeycode(GDK_DISPLAY(), XK_space);
         int i;
+
+        g_return_val_if_fail(accelerator, FALSE);
+        g_return_val_if_fail(data, FALSE);
+
+        gtk_accelerator_parse(accelerator,
+                              &data->keyval,
+                              &data->modifiers);
+        if(data->keyval==0) {
+                fprintf(stderr,
+                        "error: invalid accelerator: '%s'\n",
+                        accelerator);
+                return FALSE;
+        }
+        data->keycode=XKeysymToKeycode(GDK_DISPLAY(), data->keyval);
         for (i = 0; i < gdk_display_get_n_screens (display); i++) {
                 GdkScreen *screen;
                 GdkWindow *root;
@@ -113,12 +201,56 @@ static void install_keygrab()
                         continue;
                 }
                 root = gdk_screen_get_root_window (screen);
-                XGrabKey(GDK_DISPLAY(), keycode,
-                         Mod1Mask,
+                XGrabKey(GDK_DISPLAY(),
+                         data->keycode,
+                         data->modifiers,
                          GDK_WINDOW_XID(root),
                          True,
                          GrabModeAsync,
                          GrabModeAsync);
-                gdk_window_add_filter(root, filter_keygrab, GINT_TO_POINTER(keycode)/*userdata*/);
+        }
+        printf("ocha: Type %s to open the seach window.\n",
+               accelerator);
+        return TRUE;
+}
+
+static void install_keygrab_filters(struct keygrab_data *data)
+{
+        GdkDisplay *display = gdk_display_get_default();
+        int i;
+
+        for (i = 0; i < gdk_display_get_n_screens (display); i++) {
+                GdkScreen *screen;
+                GdkWindow *root;
+
+                screen = gdk_display_get_screen (display, i);
+                if (!screen) {
+                        continue;
+                }
+                root = gdk_screen_get_root_window (screen);
+                gdk_window_add_filter(root,
+                                      filter_keygrab,
+                                      data/*userdata*/);
+        }
+}
+
+static void uninstall_keygrab(void)
+{
+        GdkDisplay *display = gdk_display_get_default();
+        int i;
+
+        for (i = 0; i < gdk_display_get_n_screens (display); i++) {
+                GdkScreen *screen;
+                GdkWindow *root;
+
+                screen = gdk_display_get_screen (display, i);
+                if (!screen) {
+                        continue;
+                }
+                root = gdk_screen_get_root_window (screen);
+                XUngrabKey(GDK_DISPLAY(),
+                           AnyKey,
+                           AnyModifier,
+                           GDK_WINDOW_XID(root));
         }
 }

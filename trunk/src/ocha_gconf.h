@@ -9,13 +9,15 @@
 #define OCHA_GCONF_INDEXERS OCHA_GCONF_PREFIX "/indexer"
 #define OCHA_GCONF_INDEXER(name) OCHA_INDEXERS_PREFIX "/" ##name
 #define OCHA_GCONF_INDEXER_KEY(indexer, key) OCHA_INDEXERS_PREFIX "/" ##indexer "/" ##key
-
+#define OCHA_GCONF_ACCELERATOR_KEY OCHA_GCONF_PREFIX "/accelerator"
+#define OCHA_GCONF_ACCELERATOR_KEY_DEFAULT "<Alt>space"
 /**
  * Get a properly initialized GConf client.
  * The client will be available for as long
  * as the program is running and it won't change.
  */
 GConfClient *ocha_gconf_get_client(void);
+
 
 /**
  * Check whether configuration exists.
