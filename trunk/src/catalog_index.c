@@ -11,24 +11,10 @@
 
 /** \file implementation of the API defined in catalog_index.h */
 
-/** default patterns, as strings */
-static const char *DEFAULT_IGNORE_STRINGS[] = { "CVS", "*~", "*.bak", "#*#", NULL };
-
-/** pattern spec created the 1st time catalog_index_directory() is called (and never freed) */
-static GPatternSpec **DEFAULT_IGNORE;
-
 /** callback set by catalog_index_set_callback() */
 static catalog_index_trace_callback_f trace_callback;
 /** callback userdata passed to catalog_index_set_callback() */
 static gpointer trace_callback_userdata;
-
-static gboolean getmode(const char *path, mode_t *mode);
-static gboolean is_accessible_directory(mode_t mode);
-static gboolean is_accessible_file(mode_t mode);
-static gboolean is_readable(mode_t mode);
-static gboolean is_executable(mode_t mode);
-
-static gboolean to_ignore(const char *filename, GPatternSpec **patterns);
 
 static gboolean catalog_index_applications_recursive(struct catalog *catalog, const char *directory, int maxdepth, gboolean slow, int cmd);
 static GPatternSpec **create_patterns(const char **patterns);
@@ -39,22 +25,10 @@ static gboolean bookmarks_read_line(FILE *, GString *, GError **err);
 
 static char *html_expand_common_entities(const char *orig);
 
-static void doze_off(gboolean really);
+
 
 static gboolean catalog_addcommand_witherrors(struct catalog *catalog, const char *name, const char *execute, int *cmd, GError **err);
-static gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, const char *long_name, int cmd_id, GError **err);
-static DIR *opendir_witherrors(const char *path, GError **err);
 
-typedef gboolean (*handle_file_f)(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
-static gboolean recurse(struct catalog *catalog,
-                    const char *directory,
-                    GPatternSpec **ignore_patterns,
-                    int maxdepth,
-                    gboolean slow,
-                    int cmd,
-                    handle_file_f callback,
-                    gpointer userdata,
-                    GError **err);
 static gboolean index_directory_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
 static gboolean index_application_entry(struct catalog *catalog, int cmd, const char *path, const char *filename, GError **err, gpointer userdata);
 

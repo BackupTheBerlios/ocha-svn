@@ -16,4 +16,12 @@
  */
 struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queue *queue);
 
+/**
+ * Get the list of indexers.
+ *
+ * @return a null-terminated array, which will be
+ * valid for the lifetime of the application
+ */
+struct indexer **catalog_queryrunner_get_indexers(void);
+
 #endif /*CATALOG_QUERYRUNNER_H*/

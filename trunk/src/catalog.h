@@ -49,7 +49,8 @@ void catalog_disconnect(struct catalog *catalog);
  * @param name entry name, in UTF-8. released by the caller after the function returns
  * @param long_name long entry name, in UTF-8. released by the caller after the function returns
  * @param path path/uri, in UTF-8. released by the caller after the function returns
- * @param execute execute string
+ * @param source_id ID of the source this entry belongs to
+ * @param source_type type of the source this entry belongs to
  * @param userdata pointer passed to catalog_executequery()
  * @return TRUE to continue adding results, FALSE to stop looking for results
  */
@@ -59,7 +60,8 @@ typedef gboolean (*catalog_callback_f)(struct catalog *catalog,
                                        const char *name,
                                        const char *long_name,
                                        const char *path,
-                                       const char *execute,
+                                       int source_id,
+                                       const char *source_type,
                                        void *userdata);
 
 /**
@@ -139,32 +141,52 @@ void catalog_interrupt(struct catalog *catalog);
 void catalog_restart(struct catalog *catalog);
 
 /**
- * Add a command into the catalog.
+ * Add a source into the catalog.
  * @param catalog
- * @param name command name (used to find it afterwards)
- * @param execute command to execute, with %s to replace with the file name
- * @param id_out if non-null, this variable will be set to the generated ID of the command
- * @return TRUE if the command was added, FALSE otherwise
+ * @param type source type
+ * @param id_out this variable will be set to the generated ID of the new source. must not be null.
+ * @return TRUE if source was added, FALSE otherwise
  */
-gboolean catalog_addcommand(struct catalog *catalog, const char *name, const char *execute, int *id_out);
+gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_out);
 
 /**
- * Find a command by name.
+ * List sources in the catalog for a given type.
+ *
  * @param catalog
- * @param name command name (used to find it afterwards)
- * @param id_out if non-null, this variable will be set to the generated ID of the command
- * @return TRUE if the command was found, FALSE otherwise
+ * @param type source type
+ * @param ids_out if non-null this array will contain the ids
+ * of the sources of the given type. The array will have
+ * to be released using g_free() by the caller. If there
+ * are no sources of this type, *ids_out  will be null and
+ * *ids_len_out will be 0
+ * @param ids_len_out this integer will be set to the
+ * number of entries in ids_out. Must not be null.
+ * @return TRUE if it worked, in which case ids_out and ids_len_out
+ * have been set and ids_out. FALSE if it
+ * failed. check catalog_error() in this case.
  */
-gboolean catalog_findcommand(struct catalog *catalog, const char *name, int *id_out);
+gboolean catalog_list_sources(struct catalog *catalog, const char *type, int **ids_out, int *ids_len_out);
 
 /**
- * Find an entry by path.
+ * Get a source attribute
  * @param catalog
- * @param path entry path
- * @param id_out if non-null, this variable will be set to the generated ID of the command
- * @return TRUE if the command was found, FALSE otherwise
+ * @param attribute
+ * @param value_out must not be NULL. This will contain the value of the attribute, in UTF-8.
+ * The pointer will have to be freed by the caller using g_free()
+ * @return TRUE if it worked. FALSE
+ * if there was an error. Note that if there was no such attribute, the function
+ * will return TRUE and *value_out will have been set to NULL, so you need to check both.
  */
-gboolean catalog_findentry(struct catalog *catalog, const char *path, int *id_out);
+gboolean catalog_get_source_attribute(struct catalog *catalog, int source_id, const char *attribute, char **value_out);
+
+/**
+ * Set a source atttribute
+ * @param catalog
+ * @param source_id
+ * @param attribute attribute name
+ * @param value attribute value, NULL to remove
+ */
+gboolean catalog_set_source_attribute(struct catalog *catalog, int source_id, const char *attribute, const char *value);
 
 /**
  * Add an entry into the catalog.
@@ -172,11 +194,11 @@ gboolean catalog_findentry(struct catalog *catalog, const char *path, int *id_ou
  * @param path local path or URI
  * @param name short name for the entry (what will be searched)
  * @param long_name long name for the entry/description. For a file it's often a path.
- * @param command_id id of a command to use to execute the file
+ * @param source_id id of the source that is responsible for this entry
  * @param id_out if non-null, this variable will be set to the generated ID of the entry
  * @return TRUE if the entry was added, FALSE otherwise
  */
-gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int command_id, int *id_out);
+gboolean catalog_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int source_id, int *id_out);
 
 /**
  * Get a pointer on the last error that happened with

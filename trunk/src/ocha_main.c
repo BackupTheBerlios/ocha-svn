@@ -22,9 +22,12 @@
 #include <X11/keysym.h>
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
+#include <libgnome/gnome-init.h>
 
 static struct result_queue *result_queue;
 
+#define PROGRAM_NAME "ocha"
+#define PROGRAM_VERSION "0.1"
 
 static GdkFilterReturn filter_keygrab (GdkXEvent *xevent,
                                        GdkEvent *gdk_event_unused,
@@ -72,6 +75,12 @@ static void install_keygrab()
 int main(int argc, char *argv[])
 {
    g_thread_init(NULL/*vtable*/);
+   gnome_program_init (PROGRAM_NAME,
+                       PROGRAM_VERSION,
+                       LIBGNOME_MODULE,
+                       argc,
+                       argv,
+                       NULL);
    gtk_init(&argc, &argv);
 
    for(int i=1; i<argc; i++)

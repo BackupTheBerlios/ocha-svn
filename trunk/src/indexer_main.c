@@ -3,7 +3,10 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "catalog_index.h"
+#include "catalog.h"
+#include "indexer.h"
+#include "catalog_queryrunner.h"
+#include <libgnome/gnome-init.h>
 
 /** \file run the indexer
  */
@@ -11,28 +14,7 @@
 static void usage(FILE *out)
 {
    fprintf(out,
-           "USAGE: indexer [--quiet] [--slow] [--maxdepth=integer] directory|applications|bookmarks path\n");
-}
-
-static void print_indexing_error(const char *type, const char *path, GError **err)
-{
-   const char *message = (*err)==NULL?"unknown error":(*err)->message;
-   fprintf(stderr,
-           "error indexing %s in %s: %s\n",
-           type,
-           path,
-           message);
-   if(*err)
-      g_error_free(*err);
-   *err=NULL;
-}
-
-static void trace_cb(const char *path, const char *name, const char *long_name, gpointer userdata)
-{
-   gint *entry_count = (gint *)userdata;
-   g_return_if_fail(entry_count);
-   printf("added entry: %s \"%s\" (%s)\n", path, name, long_name);
-   (*entry_count)++;
+           "USAGE: indexer [--quiet]\n");
 }
 
 int main(int argc, char *argv[])
@@ -41,7 +23,14 @@ int main(int argc, char *argv[])
    gboolean verbose=TRUE;
    int maxdepth=-1;
 
-   catalog_index_init();
+
+   gnome_program_init ("ocha_indexer",
+                       "0.1",
+                       LIBGNOME_MODULE,
+                       argc,
+                       argv,
+                       NULL);
+
 
    int curarg;
    for(curarg=1; curarg<argc; curarg++)
@@ -53,21 +42,8 @@ int main(int argc, char *argv[])
                usage(stdout);
                exit(0);
             }
-         else if(strcmp("--slow", arg)==0)
-            slow=TRUE;
          else if(strcmp("--quiet", arg)==0)
             verbose=FALSE;
-         else if(strncmp("--maxdepth=", arg, strlen("--maxdepth="))==0)
-            {
-               maxdepth=atoi(arg+strlen("--maxdepth="));
-               if(maxdepth<=0)
-                  {
-                     fprintf(stderr,
-                             "error: invalid value for --maxdepth: %s. maxdepth should be a positive integer\n",
-                             arg);
-                     exit(109);
-                  }
-            }
          else if(*arg=='-')
             {
                fprintf(stderr,
@@ -80,16 +56,13 @@ int main(int argc, char *argv[])
             break;
       }
 
-   if((curarg+2)>argc)
+   if(curarg!=argc)
       {
          fprintf(stderr,
-                 "error: expected at least two arguments\n");
+                 "error: too many arguments\n");
          usage(stderr);
          exit(111);
       }
-
-   char *type=argv[curarg];
-   curarg++;
 
    GString *catalog_path = g_string_new(getenv("HOME"));
    g_string_append(catalog_path, "/.ocha");
@@ -106,64 +79,56 @@ int main(int argc, char *argv[])
          exit(114);
       }
 
-   int entry_count=0;
-   if(verbose)
-      catalog_index_set_trace_callback(trace_cb, &entry_count);
-
-   GError *err=NULL;
-   if(strcmp("applications", type)==0)
+   for(struct indexer **indexer_ptr = catalog_queryrunner_get_indexers();
+       *indexer_ptr;
+       indexer_ptr++)
       {
-         for(int i=curarg; i<argc; i++)
+         struct indexer *indexer = *indexer_ptr;
+         if(verbose)
+            printf("indexing %s...\n",
+                   indexer->name);
+         int *source_ids = NULL;
+         int source_ids_len = 0;
+         if(catalog_list_sources(catalog, indexer->name, &source_ids, &source_ids_len))
             {
-               if(verbose)
-                  printf("indexing applications in %s...\n", argv[i]);
-               if(!catalog_index_applications(catalog, argv[i], maxdepth, slow, &err))
+               for(int i=0; i<source_ids_len; i++)
                   {
-                     print_indexing_error(type, argv[i], &err);
-                     retval++;
+                     int source_id = source_ids[i];
+                     struct indexer_source *source = indexer->load_indexer_source(indexer,
+                                                                                  catalog,
+                                                                                  source_id);
+                     if(source)
+                        {
+                           if(verbose)
+                              printf("indexing source %s-%d...\n",
+                                     indexer->name,
+                                     source_id);
+
+                           GError *err = NULL;
+                           if(!source->index(source, catalog, &err))
+                              {
+                                 fprintf(stderr,
+                                         "error indexing list for %s-%d: %s\n",
+                                         indexer->name,
+                                         source_id,
+                                         err->message);
+                                 g_error_free(err);
+                                 retval++;
+                              }
+                        }
                   }
+               if(source_ids)
+                  g_free(source_ids);
+            }
+         else
+            {
+               fprintf(stderr,
+                       "error getting source list for %s: %s",
+                       indexer->name,
+                       catalog_error(catalog));
+               retval++;
             }
       }
-   else if(strcmp("directory", type)==0)
-      {
-         for(int i=curarg; i<argc; i++)
-            {
-               if(verbose)
-                  printf("indexing files in %s...\n", argv[i]);
-               if(!catalog_index_directory(catalog, argv[i], maxdepth, NULL/*ignore*/, slow, &err))
-                  {
-                     print_indexing_error(type, argv[i], &err);
-                     retval++;
-                  }
-            }
-      }
-   else if(strcmp("bookmarks", type)==0)
-      {
-         for(int i=curarg; i<argc; i++)
-            {
-               if(verbose)
-                  printf("indexing bookmarks in %s...\n", argv[i]);
-               if(!catalog_index_bookmarks(catalog, argv[i], &err))
-                  {
-                     print_indexing_error(type, argv[i], &err);
-                     retval++;
-                  }
-            }
-      }
-   else
-      {
-         fprintf(stderr,
-                 "error: invalid type '%s'. Type should be 'applications', 'directory' or 'bookmarks'.\n",
-                 type);
-         usage(stderr);
-         retval=12;
-      }
-
-   catalog_disconnect(catalog);
-
-   if(verbose)
-      printf("%d entries were added or refreshed by this call.\n",
-             entry_count);
 
    return retval;
 }

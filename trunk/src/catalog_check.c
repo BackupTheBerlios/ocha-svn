@@ -16,11 +16,9 @@
 
 /** database file */
 #define PATH ".catalog_check.db"
-/** named pipe */
-#define PIPE ".catalog_check.pipe"
 
 static struct catalog *catalog;
-static int command_id;
+static int source_id;
 struct entry_definition
 {
    const char *path;
@@ -45,7 +43,7 @@ static void catalog_cmd(struct catalog *catalog, const char *comment, gboolean r
       return;
    GString *msg = g_string_new("");
    g_string_printf(msg,
-                   "catalog command %s failed: %s\n",
+                   "catalog function %s failed: %s\n",
                    comment,
                    catalog_error(catalog));
    fail(msg->str);
@@ -84,18 +82,17 @@ static void setup_query()
    setup();
    catalog=catalog_connect(PATH, NULL);
 
-   fail_unless(catalog_addcommand(catalog,
-                                  "command",
-                                  "echo %f",
-                                  &command_id),
-               "command could not be created");
+   fail_unless(catalog_add_source(catalog,
+                                  "test",
+                                  &source_id),
+               "source could not be created");
    for(int i=0; i<entries_length; i++)
       {
          fail_unless(catalog_addentry(catalog,
                                       entries[i].path,
                                       entries[i].filename,
                                       entries[i].path/*long_name*/,
-                                      command_id,
+                                      source_id,
                                       &entries[i].id),
                      "entry could not be created");
       }
@@ -110,35 +107,6 @@ static void teardown_query()
 }
 
 
-static void setup_execute()
-{
-   setup();
-
-   unlink_if_exists(PIPE);
-   fail_unless(mkfifo(PIPE, 0600)==0, "pipe creation failed");
-
-   catalog=catalog_connect(PATH, NULL);
-
-   fail_unless(catalog_addcommand(catalog,
-                                  "command",
-                                  "echo execute %f >" PIPE,
-                                  &command_id),
-               "command could not be created");
-
-   fail_unless(catalog_addentry(catalog,
-                                "/tmp/hello.c",
-                                "hello.c",
-                                "/tmp/hello.c",
-                                command_id,
-                                NULL),
-               "entry could not be created");
-}
-
-static void teardown_execute()
-{
-   teardown();
-}
-
 START_TEST(test_create)
 {
    printf("--- test_create\n");
@@ -150,56 +118,191 @@ START_TEST(test_create)
 END_TEST
 
 
-START_TEST(test_addcommand)
+START_TEST(test_add_source)
 {
-   printf("--- test_addcommand\n");
+   printf("--- test_add_source\n");
    struct catalog *catalog=catalog_connect(PATH, NULL);
    int id = -1;
-   fail_unless(!catalog_findcommand(catalog, "edit", &id),
-               "found edit command that shouldn't be there");
+   int count = -1;
+   catalog_cmd(catalog,
+               "list_sources('test')",
+               catalog_list_sources(catalog, "test", NULL/*ids_out*/, &count));
+   fail_unless(count==0,
+               "found test source(s) that shouldn't be there");
+
    id=-1;
    catalog_cmd(catalog,
-               "addcommand(edit)",
-               catalog_addcommand(catalog, "edit", "edit %s", &id));
+               "add_source(edit)",
+               catalog_add_source(catalog, "test", &id));
    fail_unless(id!=-1,
                "id not modified");
 
-   int find_id = -1;
+   int *all_sources = NULL;
    catalog_cmd(catalog,
-               "findcommand(edit)",
-               catalog_findcommand(catalog, "edit", &find_id));
+               "list_sources('test')",
+               catalog_list_sources(catalog, "test", &all_sources, &count));
+   fail_unless(count==1,
+               g_strdup_printf("expected add_source to have added one 'test' source, not %d", count));
+   fail_unless(all_sources!=NULL,
+               "source array not set");
+   fail_unless(all_sources[0]==id,
+               "expected one source with the id of the one I just added");
 
-   fail_unless(find_id==id,
-               "wrong id for findcommand");
+   g_free(all_sources);
+
    catalog_disconnect(catalog);
+
+   printf("--- test_add_source_OK\n");
 }
 END_TEST
 
-START_TEST(test_addcommand_escape)
+START_TEST(test_add_source_escape)
 {
-   printf("--- test_addcommand_escape\n");
+   printf("--- test_add_source_escape\n");
    struct catalog *catalog=catalog_connect(PATH, NULL);
-   fail_unless(catalog_addcommand(catalog, "ed'it", "edit '%s'", NULL),
-               "addcommand failed");
+   int id;
+   fail_unless(catalog_add_source(catalog, "te'st", &id),
+               "addsource failed");
    catalog_disconnect(catalog);
+   printf("--- test_add_source_escape_OK\n");
 }
 END_TEST
 
-START_TEST(test_addcommand_noduplicate)
+START_TEST(test_list_sources)
 {
-   printf("--- test_addcommand_noduplicate\n");
-   struct catalog *catalog=catalog_connect(PATH, NULL);
-   int id_1 = -1;
-   fail_unless(catalog_addcommand(catalog, "edit", "edit %s", &id_1),
-               "1st addcommand failed");
-   int id_2 = -1;
-   fail_unless(catalog_addcommand(catalog, "edit", "edit2 %s", &id_2),
-               "2nd addcommand failed");
-   fail_unless(id_1==id_2, "different ids");
+   printf("--- test_list_sources\n");
 
-   int id_found = -1;
-   catalog_findcommand(catalog, "edit", &id_found);
-   fail_unless(id_1==id_found, "different ids");
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+
+   int test1_source_1 = -1;
+   int test1_source_2 = -1;
+   int test2_source_1 = -1;
+   catalog_cmd(catalog,
+               "add_source(test1 (1st))",
+               catalog_add_source(catalog, "test1", &test1_source_1));
+   catalog_cmd(catalog,
+               "add_source(test1 (2nd))",
+               catalog_add_source(catalog, "test1", &test1_source_2));
+   catalog_cmd(catalog,
+               "add_source(test2)",
+               catalog_add_source(catalog, "test2", &test2_source_1));
+
+   int *test1_sources;
+   int test1_sources_count;
+   catalog_cmd(catalog,
+               "list_sources('test1')",
+               catalog_list_sources(catalog, "test1", &test1_sources, &test1_sources_count));
+   fail_unless(test1_sources!=NULL,
+               "test1_sources not set");
+   fail_unless(test1_sources_count==2,
+               "wrong count for test1 sources (2 added before)");
+   fail_unless((test1_sources[0]==test1_source_1 && test1_sources[1]==test1_source_2)
+               || (test1_sources[0]==test1_source_2 && test1_sources[1]==test1_source_1),
+               "expected [test1_source1, test1_source2]");
+   g_free(test1_sources);
+
+   int *test2_sources;
+   int test2_sources_count;
+   catalog_cmd(catalog,
+               "list_sources('test2')",
+               catalog_list_sources(catalog, "test2", &test2_sources, &test2_sources_count));
+   fail_unless(test2_sources!=NULL,
+               "test2_sources not set");
+   fail_unless(test2_sources_count==1,
+               "wrong count for test2 sources (1 added before)");
+   fail_unless(test2_sources[0]==test2_source_1,
+               "expected test2_source1");
+
+
+   int *test3_sources = (int *)0xf001;
+   int test3_sources_count = 92;
+   catalog_cmd(catalog,
+               "list_sources('test3')",
+               catalog_list_sources(catalog, "test3", &test3_sources, &test3_sources_count));
+   fail_unless(test3_sources==NULL,
+               "test3_sources not set to NULL");
+   fail_unless(test3_sources_count!=1,
+               "wrong count for test3 sources (expected 0)");
+
+   printf("--- test_list_sources_OK\n");
+}
+END_TEST
+
+START_TEST(test_source_attributes)
+{
+   printf("--- test_source_attributes\n");
+
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+
+   int source1 = -1;
+   int source2 = -1;
+   catalog_cmd(catalog,
+               "add_source(test1, source1)",
+               catalog_add_source(catalog, "test", &source1));
+   catalog_cmd(catalog,
+               "add_source(test1, source2)",
+               catalog_add_source(catalog, "test", &source2));
+
+
+   catalog_cmd(catalog,
+               "set(index, 1)",
+               catalog_set_source_attribute(catalog,
+                                            source1,
+                                            "index",
+                                            "1"));
+   catalog_cmd(catalog,
+               "set(index, 2)",
+               catalog_set_source_attribute(catalog,
+                                            source2,
+                                            "index",
+                                            "2"));
+   catalog_cmd(catalog,
+               "set(is_source1, yes)",
+               catalog_set_source_attribute(catalog,
+                                            source1,
+                                            "is_source1",
+                                            "yes"));
+   char *index_from_1 = NULL;
+   char *index_from_2 = NULL;
+   char *is_source1_from_1 = NULL;
+   char *is_source1_from_2 = (char *)0xf001;
+
+   catalog_cmd(catalog,
+               "get(1, index)",
+               catalog_get_source_attribute(catalog,
+                                            source1,
+                                            "index",
+                                            &index_from_1));
+   catalog_cmd(catalog,
+               "get(2, index)",
+               catalog_get_source_attribute(catalog,
+                                            source2,
+                                            "index",
+                                            &index_from_2));
+
+   catalog_cmd(catalog,
+               "get(1, is_source1)",
+               catalog_get_source_attribute(catalog,
+                                            source1,
+                                            "is_source1",
+                                            &is_source1_from_1));
+   catalog_cmd(catalog,
+               "get(2, is_source1)",
+               catalog_get_source_attribute(catalog,
+                                            source2,
+                                            "is_source1",
+                                            &is_source1_from_2));
+
+   fail_unless(strcmp(index_from_1, "1")==0,
+               "wrong index_from_1");
+   fail_unless(strcmp(index_from_2, "2")==0,
+               "wrong index_from_2");
+   fail_unless(strcmp(is_source1_from_1, "yes")==0,
+               "wrong is_source1_from_1");
+   fail_unless(is_source1_from_2==NULL,
+               "wrong is_source1_from_2");
+
+   printf("--- test_source_attributes OK\n");
 }
 END_TEST
 
@@ -208,13 +311,13 @@ START_TEST(test_addentry)
    printf("--- test_addentry\n");
    struct catalog *catalog=catalog_connect(PATH, NULL);
 
-   int command_id=-1;
-   catalog_addcommand(catalog, "edit", "edit %s", &command_id);
+   int source_id=-1;
+   catalog_add_source(catalog, "test", &source_id);
 
    int entry_id=-1;
    catalog_cmd(catalog,
                "1st addentry(/tmp/toto.txt)",
-               catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", command_id, &entry_id));
+               catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", source_id, &entry_id));
 
    catalog_disconnect(catalog);
 }
@@ -227,7 +330,7 @@ START_TEST(test_addentry_escape)
 
    catalog_cmd(catalog,
                "1st addentry(/tmp/toto.txt)",
-               catalog_addentry(catalog, "/tmp/to'to.txt", "To'to", "/tmp/toto.txt", command_id, NULL));
+               catalog_addentry(catalog, "/tmp/to'to.txt", "To'to", "/tmp/toto.txt", source_id, NULL));
 
    catalog_disconnect(catalog);
 }
@@ -238,54 +341,56 @@ START_TEST(test_addentry_noduplicate)
    printf("--- test_addentry_noduplicate\n");
    struct catalog *catalog=catalog_connect(PATH, NULL);
 
-   int command_id=-1;
-   catalog_addcommand(catalog, "edit", "edit %s", &command_id);
+   int source_id=-1;
+   catalog_add_source(catalog, "test", &source_id);
 
    int entry_id_1=-1;
-   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", command_id, &entry_id_1),
+   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", source_id, &entry_id_1),
                "1st addentry failed");
    int entry_id_2=-1;
-   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", command_id, &entry_id_2),
+   fail_unless(catalog_addentry(catalog, "/tmp/toto.txt", "Toto", "/tmp/toto.txt", source_id, &entry_id_2),
                "2nd addentry failed");
 
    catalog_disconnect(catalog);
+   printf("--- test_addentry_noduplicate OK\n");
 }
 END_TEST
 
 /**
- * Keep the result into the list
+ * Add the result name into a GArray
  * @param catalog ignored
  * @param pertinence ignored
  * @param name
  * @param long_name
  * @param path
- * @param list the list itself (passed by catalog_executequery as userdata)
+ * @param userdata an array of strings (passed by catalog_executequery as userdata)
  * @see #results
  */
-static gboolean collect_results_callback(struct catalog *catalog,
-                                         float pertinence,
-                                         int entry_id,
-                                         const char *name,
-                                         const char *long_name,
-                                         const char *path,
-                                         const char *execute,
-                                         void *userdata)
+static gboolean collect_result_names_callback(struct catalog *catalog,
+                                              float pertinence,
+                                              int entry_id,
+                                              const char *name,
+                                              const char *long_name,
+                                              const char *path,
+                                              int source_id,
+                                              const char *source_type,
+                                              void *userdata)
 {
-   GList **results = (GList **)userdata;
+   GArray **results = (GArray **)userdata;
    g_return_val_if_fail(results, FALSE);
 
-   struct result *result = catalog_result_create(PATH,
-                                                 path,
-                                                 name,
-                                                 long_name,
-                                                 execute,
-                                                 entry_id);
-   *results=g_list_append(*results,
-                          result);
    fail_unless(name!=NULL, "missing name");
    fail_unless(long_name!=NULL, "missing long name");
    fail_unless(path!=NULL, "missing long path/uri");
-   printf("result %d: %s\n", g_list_length(*results), name);
+
+   mark_point();
+   char *name_dup = g_strdup(name);
+   mark_point();
+   g_array_append_val(*results,
+                      name_dup);
+   mark_point();
+   printf("result[%u]: %s\n", (*results)->len-1, name_dup);
+   mark_point();
    return TRUE;/*continue*/
 }
 
@@ -303,24 +408,26 @@ static void free_result(gpointer data, gpointer userdata)
 }
 static void execute_query_and_expect(const char *query, int goal_length, char *goal[], gboolean ordered)
 {
-   GList *list = NULL;
+   GArray *array = g_array_new(TRUE/*zero_terminated*/, TRUE/*clear*/, sizeof(char *));
    catalog_cmd(catalog,
                "executequery()",
-               catalog_executequery(catalog, query, collect_results_callback, &list));
-   int found_length = g_list_length(list);
-   const char *found[found_length];
-   for(int i=0; i<found_length; i++)
-      found[i]=((struct result *)g_list_nth_data(list, i))->name;
-
+               catalog_executequery(catalog, query, collect_result_names_callback, &array));
+   mark_point();
+   int found_length = array->len;
+   mark_point();
+   char **found = (char **)array->data;
+   mark_point();
    GString* msg = g_string_new("");
    g_string_append(msg, "query: '");
    g_string_append(msg, query);
    g_string_append(msg, "' found: [");
+   mark_point();
    for(int i=0; i<found_length; i++)
       {
          g_string_append_c(msg, ' ');
          g_string_append(msg, found[i]);
       }
+   mark_point();
    g_string_append(msg, " ] expected: [");
    for(int i=0; i<goal_length; i++)
       {
@@ -369,41 +476,12 @@ static void execute_query_and_expect(const char *query, int goal_length, char *g
                   }
             }
       }
-   g_list_foreach(list, free_result, NULL/*userdata*/);
-   g_list_free(list);
+   mark_point();
+   for(int i=0; i<found_length; i++)
+      g_free(found[i]);
+   g_free(array);
 }
 
-static struct result  *get_one_result(const char *query) {
-   struct result  *result;
-   GList *list = NULL;
-   catalog_cmd(catalog,
-               "executequery()",
-               catalog_executequery(catalog, query, collect_results_callback, &list));
-   fail_unless(g_list_length(list)==1, "expected 1 result exactly");
-
-   result = (struct result *)list->data;
-   g_list_free(list);
-   return(result);
-}
-
-
-START_TEST(test_validate)
-{
-   struct result *result;
-   printf("--- test_execute_query\n");
-   result = get_one_result("toto.c");
-   fail_unless(!result->validate(result),
-               "result should not be valid (file does not exist)");
-
-   catalog_cmd(catalog,
-               "addentry(catalog_check.c)",
-               catalog_addentry(catalog, "catalog_check.c", "catalog_check.c", "catalog_check.c", command_id, NULL/*id_out*/));
-
-   result = get_one_result("catalog_check.c");
-   fail_unless(result->validate(result),
-               "result should be valid (file exists)");
-}
-END_TEST
 
 START_TEST(test_execute_query)
 {
@@ -415,16 +493,46 @@ START_TEST(test_execute_query)
 }
 END_TEST
 
-static gboolean execute_result(GList *list, const char *name)
+static gboolean test_source_callback(struct catalog *catalog,
+                                     float pertinence,
+                                     int entry_id,
+                                     const char *name,
+                                     const char *long_name,
+                                     const char *path,
+                                     int result_source_id,
+                                     const char *source_type,
+                                     void *userdata)
+{
+   gboolean *checked = (gboolean *)userdata;
+   fail_unless(source_id==result_source_id,
+               "wrong source id");
+   fail_unless(strcmp("test", source_type)==0,
+               "wrong source type");
+   *checked=TRUE;
+}
+
+START_TEST(test_execute_query_test_source)
+{
+   printf("--- test_execute_query_test_source\n");
+   gboolean checked = FALSE;
+   catalog_cmd(catalog,
+               "executequery()",
+               catalog_executequery(catalog, "t", test_source_callback, &checked));
+   fail_unless(checked, "no source checked (query did not match anything)");
+   printf("--- test_execute_query_test_source OK\n");
+}
+END_TEST
+
+static gboolean contains_result(GList *list, const char *name)
 {
    gboolean executed=FALSE;
    for(GList *current = list; current; current=g_list_next(current))
       {
-         struct result *result=current->data;
-         if(strcmp(name, result->name)==0)
+         char *result_name=(char *)current->data;
+         if(strcmp(name, result_name)==0)
             {
                executed=TRUE;
-               result->execute(result, NULL/*errors*/);
+               printf("execute: %s\n");
             }
       }
    return executed;
@@ -434,12 +542,8 @@ static gboolean execute_result(GList *list, const char *name)
 START_TEST(test_lastexecuted_first)
 {
    printf("--- test_lastexecuted_first\n");
-   GList *list = NULL;
-   catalog_cmd(catalog,
-               "test_lastexecuted_first()",
-               catalog_executequery(catalog, "tot", collect_results_callback, &list));
-   fail_unless(execute_result(list, "total.h"), "total.h");
-   fail_unless(execute_result(list, "toto.h"), "toto.h");
+   catalog_update_entry_timestamp(catalog, entries[2].id/*total.h*/);
+   catalog_update_entry_timestamp(catalog, entries[1].id/*toto.h*/);
    execute_query_and_expect("tot",
                             3,
                             (char *[]){ "toto.h", "total.h", "toto.c" },
@@ -471,7 +575,8 @@ static gboolean countdown_callback(struct catalog *catalog,
                                    const char *name,
                                    const char *long_name,
                                    const char *path,
-                                   const char *execute,
+                                   int source_id,
+                                   const char *source_type,
                                    void *userdata)
 {
    int *counter = (int *)userdata;
@@ -508,7 +613,8 @@ static gboolean countdown_interrupt_callback(struct catalog *catalog,
                                              const char *name,
                                              const char *long_name,
                                              const char *path,
-                                             const char *execute,
+                                             int source_id,
+                                             const char *source_type,
                                              void *userdata)
 {
    int *counter = (int *)userdata;
@@ -541,17 +647,17 @@ START_TEST(test_recover_from_interruption)
                catalog_executequery(catalog, "t", countdown_interrupt_callback, &count));
    fail_unless(count==0, "wrong count");
 
-   GList *list = NULL;
+   GArray *array = g_array_new(TRUE, TRUE, sizeof(char *));
    catalog_cmd(catalog,
                "executequery(t)",
-               catalog_executequery(catalog, "t", collect_results_callback, &list));
-   fail_unless(list==NULL, "a result has been added after the catalog has been interrupted");
+               catalog_executequery(catalog, "t", collect_result_names_callback, &array));
+   fail_unless(array->len==0, "a result has been added after the catalog has been interrupted");
 
    catalog_restart(catalog);
    catalog_cmd(catalog,
                "executequery(t)",
-               catalog_executequery(catalog, "t", collect_results_callback, &list));
-   fail_unless(list!=NULL, "catalog has not recovered from an interruption");
+               catalog_executequery(catalog, "t", collect_result_names_callback, &array));
+   fail_unless(array->len>0, "catalog has not recovered from an interruption");
 }
 END_TEST
 
@@ -662,44 +768,6 @@ START_TEST(test_busy)
 }
 END_TEST
 
-START_TEST(test_execute)
-{
-   printf("--- test_execute\n");
-   GList *list = NULL;
-   catalog_executequery(catalog, "hello", collect_results_callback, &list);
-   fail_unless(g_list_length(list)>=1, "result not available");
-
-   printf("open pipe\n");
-   int pipe_fd = open(PIPE, O_NONBLOCK);
-
-   printf("execute result\n");
-   /* child */
-   struct result *result = (struct result *)g_list_nth_data(list, 0);
-   result->execute(result, NULL/*errors*/);
-
-   printf("read from pipe\n");
-   int buffer_len=1024;
-   char buffer[buffer_len+1];
-   int sofar=0;
-
-   while(TRUE)
-      {
-         ssize_t bytes = read(pipe_fd, &buffer[sofar], buffer_len-sofar);
-         if(bytes>0)
-            {
-               sofar+=bytes;
-               buffer[sofar]='\0';
-               if(strchr(buffer, '\n'))
-                  break;
-            }
-      }
-   close(pipe_fd);
-
-   printf("read: '%s'\n", buffer);
-   fail_unless(strcmp("execute /tmp/hello.c\n", buffer)==0,
-               "wrong content for pipe");
-}
-END_TEST
 
 Suite *catalog_check_suite(void)
 {
@@ -711,9 +779,10 @@ Suite *catalog_check_suite(void)
    tcase_add_checked_fixture(tc_core, setup, teardown);
    suite_add_tcase(s, tc_core);
    tcase_add_test(tc_core, test_create);
-   tcase_add_test(tc_core, test_addcommand);
-   tcase_add_test(tc_core, test_addcommand_noduplicate);
-   tcase_add_test(tc_core, test_addcommand_escape);
+   tcase_add_test(tc_core, test_add_source);
+   tcase_add_test(tc_core, test_add_source_escape);
+   tcase_add_test(tc_core, test_list_sources);
+   tcase_add_test(tc_core, test_source_attributes);
    tcase_add_test(tc_core, test_addentry);
    tcase_add_test(tc_core, test_addentry_noduplicate);
    tcase_add_test(tc_core, test_addentry_escape);
@@ -722,16 +791,12 @@ Suite *catalog_check_suite(void)
    suite_add_tcase(s, tc_query);
    tcase_add_test(tc_query, test_execute_query);
    tcase_add_test(tc_query, test_execute_query_with_space);
+   tcase_add_test(tc_query, test_execute_query_test_source);
    tcase_add_test(tc_query, test_callback_stops_query);
    tcase_add_test(tc_query, test_interrupt_stops_query);
    tcase_add_test(tc_query, test_recover_from_interruption);
    tcase_add_test(tc_query, test_busy);
    tcase_add_test(tc_query, test_lastexecuted_first);
-   tcase_add_test(tc_query, test_validate);
-
-   tcase_add_checked_fixture(tc_execute, setup_execute, teardown_execute);
-   suite_add_tcase(s, tc_execute);
-   tcase_add_test(tc_execute, test_execute);
 
    return s;
 }
@@ -741,6 +806,7 @@ int main(void)
    int nf;
    Suite *s = catalog_check_suite ();
    SRunner *sr = srunner_create (s);
+   srunner_set_log(sr, "catalog_check.log");
    srunner_run_all (sr, CK_NORMAL);
    nf = srunner_ntests_failed (sr);
    srunner_free (sr);

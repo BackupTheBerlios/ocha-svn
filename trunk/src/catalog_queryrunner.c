@@ -7,6 +7,8 @@
 #include "catalog.h"
 #include "catalog_result.h"
 #include "result_queue.h"
+#include "indexer.h"
+#include "indexer_files.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -91,6 +93,12 @@ struct catalog_queryrunner
 /** queryrunner to catalog_queryrunner */
 #define CATALOG_QUERYRUNNER(catalog) ((struct catalog_queryrunner *)(catalog))
 
+static struct indexer *indexers[] =
+   {
+      &indexer_files,
+      NULL
+   };
+
 static void start(struct queryrunner *self);
 static void run_query(struct queryrunner *self, const char *query);
 static void consolidate(struct queryrunner *self);
@@ -103,10 +111,22 @@ static gboolean result_callback(struct catalog *catalog,
                                 const char *name,
                                 const char *long_name,
                                 const char *path,
-                                const char *execute,
+                                int source_id,
+                                const char *source_type,
                                 void *userdata);
 static gboolean query_has_changed(struct catalog_queryrunner *self);
 static void wait_on_condition(struct catalog_queryrunner *self, int wait_ms);
+static struct indexer *find_indexer(const char *type);
+
+static struct result *result_create(struct catalog_queryrunner *runner,
+                                    struct indexer *indexer,
+                                    const char *name,
+                                    const char *long_name,
+                                    const char *path,
+                                    int entry_id);
+static gboolean result_execute(struct result *result, GError **err);
+static gboolean result_validate(struct result *result);
+static void result_free(struct result *result);
 
 static gboolean try_connect(const char *path)
 {
@@ -117,6 +137,10 @@ static gboolean try_connect(const char *path)
    return TRUE;
 }
 
+struct indexer **catalog_queryrunner_get_indexers()
+{
+   return &indexers[0];
+}
 struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queue *queue)
 {
    if(!try_connect(path))
@@ -270,22 +294,27 @@ static gboolean result_callback(struct catalog *catalog,
                                 const char *name,
                                 const char *long_name,
                                 const char *path,
-                                const char *execute,
+                                int source_id,
+                                const char *source_type,
                                 void *userdata)
 {
    g_return_val_if_fail(userdata!=NULL, FALSE);
    g_return_val_if_fail(name!=NULL, FALSE);
    g_return_val_if_fail(long_name!=NULL, FALSE);
    g_return_val_if_fail(path!=NULL, FALSE);
-   g_return_val_if_fail(execute!=NULL, FALSE);
+   g_return_val_if_fail(source_type!=NULL, FALSE);
 
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(userdata);
 
+   struct indexer *indexer = find_indexer(source_type);
+   if(!indexer)
+      return TRUE; /* this one doesn't count */
+
    struct result *result = catalog_result_create(self->path,
+                                                 indexer,
                                                  path,
                                                  name,
                                                  long_name,
-                                                 execute,
                                                  entry_id);
    result_queue_add(self->queue,
                     QUERYRUNNER(self),
@@ -353,5 +382,15 @@ static void stop(struct queryrunner *_self)
    g_cond_broadcast(self->cond);
    unlock(self->mutex);
    printf("stop (out)\n");
+}
+
+static struct indexer *find_indexer(const char *type)
+{
+   for(struct indexer **ptr=indexers; *ptr; ptr++)
+      {
+         if(strcmp(type, (*ptr)->name)==0)
+            return *ptr;
+      }
+   return NULL;
 }
 

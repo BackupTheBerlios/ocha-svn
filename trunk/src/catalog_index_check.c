@@ -522,7 +522,7 @@ static void createfile(const char *path, const char *content)
    fwrite(content, sizeof(char), strlen(content), handle);
    fclose(handle);
 }
-
+xo
 /* ------------------------- test index */
 
 Suite *catalog_index_check_suite(void)

@@ -16,6 +16,8 @@ struct catalog
    GHashTable *expected_addcommand;
    /** char* x addentry_args, path -> expected calls */
    GHashTable *expected_addentry;
+   /** char* x char * */
+   GHashTable *source_attrs;
 };
 
 struct expectation
@@ -52,6 +54,7 @@ struct catalog *mock_catalog_new(void)
    struct catalog *retval = g_new(struct catalog, 1);
    retval->expected_addcommand=g_hash_table_new(g_str_hash, g_str_equal);
    retval->expected_addentry=g_hash_table_new(g_str_hash, g_str_equal);
+   retval->source_attrs=g_hash_table_new(g_str_hash, g_str_equal);
    return retval;
 }
 
@@ -71,7 +74,12 @@ void mock_catalog_expect_addcommand(struct catalog *catalog, const char *name, c
                        (gpointer)expect);
 }
 
-void mock_catalog_expect_addentry(struct catalog *catalog, const char *path, const char *name, const char *long_name, int command_id, int id)
+void mock_catalog_expect_addentry(struct catalog *catalog,
+                                  const char *path,
+                                  const char *name,
+                                  const char *long_name,
+                                  int command_id,
+                                  int id)
 {
    fail_unless(path!=NULL, "no path");
    fail_unless(name!=NULL, "no name");
@@ -185,6 +193,17 @@ gboolean catalog_addcommand(struct catalog *catalog, const char *name, const cha
    return TRUE;
 }
 
+gboolean catalog_set_source_attribute(struct catalog *catalog, int source_id, const char *attribute, const char *value)
+{
+   g_hash_table_insert(catalog->source_attrs, g_strdup(attribute), g_strdup(value));
+   return TRUE;
+}
+
+gboolean catalog_get_source_attribute(struct catalog *catalog, int source_id, const char *attribute, char **value_out)
+{
+   *value_out=g_hash_table_lookup(catalog->source_attrs, attribute);
+   return TRUE;
+}
 
 /* ------------------------- static */
 static void expectation_init(struct expectation *ex, const char *description)
