@@ -35,8 +35,6 @@ struct keygrab_data
         guint keyval;
 };
 
-
-
 /* ------------------------- prototypes */
 static gboolean configure_keygrab(struct keygrab_data *data);
 static void reconfigure_keygrab(GConfClient *caller, guint id, GConfEntry *entry, gpointer userdata);

@@ -704,6 +704,7 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
                         properties_frame,
                         TRUE/*resize*/,
                         TRUE/*shrink*/);
+        gtk_container_set_border_width(GTK_CONTAINER(twopanes), 12);
 
         return twopanes;
 }
