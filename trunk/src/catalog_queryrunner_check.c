@@ -7,6 +7,7 @@
 #include <string.h>
 #include "catalog_queryrunner.h"
 #include "catalog.h"
+#include "mock_launchers.h"
 
 #define CATALOG_PATH ".catalog.test"
 
@@ -80,6 +81,7 @@ static void setup()
         for(i=0; i<entries_len; i++) {
                 fail_unless(catalog_add_entry(catalog,
                                               source_id,
+                                              TEST_LAUNCHER,
                                               entries[i]/*path*/,
                                               entries[i]/*name*/,
                                               entries[i]/*long_name*/,

@@ -1,6 +1,7 @@
 #include "indexer_mozilla.h"
 #include "indexer_utils.h"
 #include "ocha_gconf.h"
+#include "launcher_openurl.h"
 #include <libgnome/gnome-url.h>
 #include <libgnome/gnome-exec.h>
 #include <libgnome/gnome-util.h>
@@ -349,6 +350,7 @@ static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, 
                                                                                         expanded_label,
                                                                                         href_start,
                                                                                         source_id,
+                                                                                        &launcher_openurl,
                                                                                         err)) {
                                                                 error=TRUE;
                                                         }

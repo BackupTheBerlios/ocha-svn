@@ -1,5 +1,6 @@
 
 #include "indexer_applications.h"
+#include "launcher_application.h"
 #include "indexer_utils.h"
 #include "ocha_gconf.h"
 #include <sys/types.h>
@@ -375,6 +376,7 @@ static gboolean index_application_cb(struct catalog *catalog,
                                                    name==NULL ? filename:name,
                                                    long_name,
                                                    source_id,
+                                                   &launcher_application,
                                                    err);
         }
 

@@ -3,6 +3,7 @@
 #include "indexer_files_view.h"
 #include "result.h"
 #include "ocha_gconf.h"
+#include "launcher_open.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -324,6 +325,7 @@ static gboolean index_file_cb(struct catalog *catalog,
                                              filename,
                                              path/*long_name*/,
                                              source_id,
+                                             &launcher_open,
                                              err);
         g_free(uri);
         return retval;

@@ -21,7 +21,7 @@ string_utils_check_SOURCES=string_utils_check.c string_utils.h string_utils.c
 string_utils_check_CFLAGS=$(TEST_CFLAGS)
 string_utils_check_LDADD=$(TEST_LIBS)
 
-catalog_queryrunner_check_SOURCES=catalog_queryrunner_check.c catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h catalog_result.c catalog_result.h result.h result_queue.c result_queue.h indexer.h indexers.h mock_indexers.c string_utils.h string_utils.c
+catalog_queryrunner_check_SOURCES=catalog_queryrunner_check.c catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h catalog_result.c catalog_result.h result.h result_queue.c result_queue.h launcher.h launchers.h mock_launchers.h mock_launchers.c string_utils.h string_utils.c
 catalog_queryrunner_check_CFLAGS=$(TEST_CFLAGS) $(SQLITE_CFLAGS)  
 catalog_queryrunner_check_LDADD=$(TEST_LIBS) $(SQLITE_LIBS) 
 
@@ -33,12 +33,11 @@ ocha_indexer_SOURCES=indexer_main.c catalog.c catalog.h catalog_result.c catalog
 ocha_indexer_CFLAGS=$(GNOME_CFLAGS) $(SQLITE_CFLAGS)
 ocha_indexer_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 
-ocha_SOURCES=ocha_main.c result_queue.c result_queue.h querywin.h querywin.c \
+ocha_SOURCES=ocha_main.c ocha_init.c result_queue.c result_queue.h querywin.h querywin.c \
 querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h catalog_result.c catalog_result.h \
 query.c query.h resultlist.h resultlist.c netwm.h netwm.c netwm_queryrunner.c \
 netwm_queryrunner.h compound_queryrunner.h compound_queryrunner.c \
-indexer_files.c indexer_files_view.c indexer_utils.c  indexer_applications.c indexer_applications.h desktop_file.c desktop_file.h \
-indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c ocha_gconf.h ocha_gconf.c \
+launchers.c launcher_open.c launcher_openurl.c launcher_application.c desktop_file.c \
 string_utils.h string_utils.c 
 ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS)
 ocha_LDADD=$(GTK_LIBS) $(SQLITE_LIBS) $(GNOME_LIBS)

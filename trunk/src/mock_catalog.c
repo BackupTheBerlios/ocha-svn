@@ -128,7 +128,7 @@ const char *catalog_error(struct catalog *catalog)
 {
         return "mock error";
 }
-gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *path, const char *name, const char *long_name, int *id_out)
+gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *launcher, const char *path, const char *name, const char *long_name, int *id_out)
 {
         struct addentry_args *args =
                                         (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,

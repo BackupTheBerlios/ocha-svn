@@ -114,7 +114,7 @@ struct indexer
         gboolean (*execute)(struct indexer *self, const char *name, const char *long_name, const char *path, GError **err);
 
         /**
-         * Execute an entry added by a indexer_source of this indexer.
+         * Validate an entry added by a indexer_source of this indexer.
          *
          * @param name entry name
          * @param long_name long entry name

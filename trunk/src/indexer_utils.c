@@ -44,7 +44,7 @@ static gboolean is_readable(mode_t mode);
 static gboolean is_executable(mode_t mode);
 static gboolean to_ignore(const char *filename, GPatternSpec **patterns);
 static void doze_off(gboolean really);
-static gboolean remove_invalid_cb(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, void *userdata);
+static gboolean remove_invalid_cb(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, const char *launcher, void *userdata);
 static void attribute_change_notify_cb(GConfClient *client, guint id, GConfEntry *entry, gpointer _userdata);
 
 /* ------------------------- public functions */
@@ -91,9 +91,11 @@ gboolean catalog_addentry_witherrors(struct catalog *catalog,
                                      const char *name,
                                      const char *long_name,
                                      int source_id,
+                                     struct launcher *launcher,
                                      GError **err)
 {
-        if(!catalog_add_entry(catalog, source_id, path, name, long_name, NULL/*id_out*/))
+        g_return_val_if_fail(launcher, FALSE);
+        if(!catalog_add_entry(catalog, source_id, launcher->id, path, name, long_name, NULL/*id_out*/))
         {
                 g_set_error(err,
                             INDEXER_ERROR,
@@ -505,6 +507,7 @@ static gboolean remove_invalid_cb(struct catalog *catalog,
                                   const char *path,
                                   int source_id,
                                   const char *source_type,
+                                  const char *launcher,
                                   void *userdata)
 {
         struct indexer *indexer = (struct indexer *)userdata;

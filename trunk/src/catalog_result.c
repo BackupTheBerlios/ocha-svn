@@ -19,7 +19,7 @@ struct catalog_result
         /** catalog_result are result */
         struct result base;
         int entry_id;
-        struct indexer *indexer;
+        struct launcher *launcher;
         const char *catalog_path;
 };
 
@@ -33,22 +33,22 @@ static void catalog_result_free(struct result *self);
 /* ------------------------- public function */
 
 struct result *catalog_result_create(const char *catalog_path,
-                                                             struct indexer *indexer,
-                                                             const char *path,
-                                                             const char *name,
-                                                             const char *long_name,
-                                                             int entry_id)
+                                     struct launcher *launcher,
+                                     const char *path,
+                                     const char *name,
+                                     const char *long_name,
+                                     int entry_id)
 {
         struct catalog_result *result;
 
         g_return_val_if_fail(catalog_path, NULL);
         g_return_val_if_fail(path, NULL);
         g_return_val_if_fail(name, NULL);
-        g_return_val_if_fail(indexer, NULL);
+        g_return_val_if_fail(launcher, NULL);
 
         result =  g_new(struct catalog_result, 1);
         result->entry_id=entry_id;
-        result->indexer=indexer;
+        result->launcher=launcher;
         result->base.path=g_strdup(path);
         result->base.name=g_strdup(name);
         result->base.long_name=g_strdup(long_name);
@@ -68,12 +68,10 @@ static gboolean catalog_result_validate(struct result *_self)
 {
         struct catalog_result *self = (struct catalog_result *)_self;
         g_return_val_if_fail(self, FALSE);
-        g_return_val_if_fail(self->indexer, FALSE);
+        g_return_val_if_fail(self->launcher, FALSE);
 
-        return indexer_validate(self->indexer,
-                                self->base.name,
-                                self->base.long_name,
-                                self->base.path);
+        return launcher_validate(self->launcher,
+                                 self->base.path);
 }
 
 static void update_entry_timestamp(const char *catalog_path, int entry_id)
@@ -93,13 +91,13 @@ static gboolean catalog_result_execute(struct result *_self, GError **err)
 {
         struct catalog_result *self = (struct catalog_result *)_self;
         g_return_val_if_fail(self, FALSE);
-        g_return_val_if_fail(self->indexer, FALSE);
+        g_return_val_if_fail(self->launcher, FALSE);
 
-        if(indexer_execute(self->indexer,
-                           self->base.name,
-                           self->base.long_name,
-                           self->base.path,
-                           err))
+        if(launcher_execute(self->launcher,
+                            self->base.name,
+                            self->base.long_name,
+                            self->base.path,
+                            err))
         {
                 update_entry_timestamp(self->catalog_path, self->entry_id);
                 return TRUE;

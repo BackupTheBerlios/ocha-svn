@@ -7,8 +7,8 @@
 #include "catalog.h"
 #include "catalog_result.h"
 #include "result_queue.h"
-#include "indexer.h"
-#include "indexers.h"
+#include "launcher.h"
+#include "launchers.h"
 #include <stdio.h>
 #include <string.h>
 #include "string_utils.h"
@@ -102,7 +102,7 @@ static gboolean query_has_changed(struct catalog_queryrunner *queryrunner);
 static gpointer runquery_thread(gpointer userdata);
 static void catalog_queryrunner_start(struct queryrunner *_self);
 static void wait_on_condition(struct catalog_queryrunner *self, int time_ms);
-static gboolean result_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, void *userdata);
+static gboolean result_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, const char *launcher, void *userdata);
 static void catalog_queryrunner_run_query(struct queryrunner *_self, const char *query);
 static void catalog_queryrunner_consolidate(struct queryrunner *_self);
 static void catalog_queryrunner_stop(struct queryrunner *_self);
@@ -429,10 +429,11 @@ static gboolean result_callback(struct catalog *catalog,
                                 const char *path,
                                 int source_id,
                                 const char *source_type,
+                                const char *launcher_id,
                                 void *userdata)
 {
         struct catalog_queryrunner *self;
-        struct indexer *indexer;
+        struct launcher *launcher;
         const char *query;
         struct result *result;
         int count;
@@ -444,22 +445,22 @@ static gboolean result_callback(struct catalog *catalog,
         g_return_val_if_fail(source_type!=NULL, FALSE);
 
         self = CATALOG_QUERYRUNNER(userdata);
-        indexer = indexers_get(source_type);
-        if(!indexer)
+        launcher = launchers_get(launcher_id);
+        if(!launcher)
         {
-                /* it can happen, because indexers may be removed, but it's
-                 * unusual and it might be ok. However, after an indexer is removed,
+                /* it can happen, because launchers may be removed, but it's
+                 * unusual and it might be ok. However, after an launcher is removed,
                  * the catalog should be cleaned. I want to know about unclean
                  * catalogs.
                  */
-                g_warning("unclean catalog: no indexer for source referenced "
-                          "in catalog with id=%d type=%s\n",
-                          source_id, source_type);
+                g_warning("unclean catalog: no launcher for source referenced "
+                          "in catalog with source_id=%d source_type=%s launcher=%s\n",
+                          source_id, source_type, launcher_id);
                 return TRUE;
         }
 
         result = catalog_result_create(self->path,
-                                       indexer,
+                                       launcher,
                                        path,
                                        name,
                                        long_name,

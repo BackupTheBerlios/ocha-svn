@@ -53,6 +53,7 @@ static gboolean findentry(struct catalog *catalog, const char *path, int source_
 
 gboolean catalog_add_entry(struct catalog *catalog,
                            int source_id,
+                           const char *launcher,
                            const char *path,
                            const char *name,
                            const char *long_name,
@@ -61,6 +62,7 @@ gboolean catalog_add_entry(struct catalog *catalog,
         int old_id=-1;
 
         g_return_val_if_fail(catalog!=NULL, FALSE);
+        g_return_val_if_fail(launcher!=NULL, FALSE);
         g_return_val_if_fail(path!=NULL, FALSE);
         g_return_val_if_fail(name!=NULL, FALSE);
         g_return_val_if_fail(long_name!=NULL, FALSE);
@@ -69,22 +71,24 @@ gboolean catalog_add_entry(struct catalog *catalog,
         {
                 return execute_update_printf(catalog, TRUE/*autocommit*/,
                                              "UPDATE entries "
-                                             "SET name='%q', long_name='%q', source_id=%d "
+                                             "SET name='%q', long_name='%q', source_id=%d, launcher='%q' "
                                              "WHERE id=%d",
                                              name,
                                              long_name,
                                              source_id,
+                                             launcher,
                                              old_id);
         } else
         {
                 if(execute_update_printf(catalog, TRUE/*autocommit*/,
                                          "INSERT INTO entries "
-                                         " (id, path, name, long_name, source_id) "
-                                         " VALUES (NULL, '%q', '%q', '%q', %d)",
+                                         " (id, path, name, long_name, source_id, launcher) "
+                                         " VALUES (NULL, '%q', '%q', '%q', %d, '%q')",
                                          path,
                                          name,
                                          long_name,
                                          source_id,
+                                         launcher,
                                          NULL)) {
                         get_id(catalog, id_out);
                         return TRUE;
@@ -193,7 +197,7 @@ gboolean catalog_executequery(struct catalog *catalog,
         /* the order of the columns is important, see result_sqlite_callback() */
 
         sql = g_string_new("SELECT e.id, e.path, e.name, e.long_name, "
-                           "       s.id, s.type, e.lastuse "
+                           "       s.id, s.type, e.launcher, e.lastuse "
                            "FROM entries e, sources s "
                            "WHERE e.name LIKE '%%");
 
@@ -274,7 +278,7 @@ gboolean catalog_get_source_content(struct catalog *catalog,
                                    result_sqlite_callback,
                                    catalog/*userdata*/,
                                    "SELECT e.id, e.path, e.name, e.long_name, "
-                                   " s.id, s.type, e.lastuse "
+                                   " s.id, s.type, e.launcher, e.lastuse "
                                    "FROM entries e, sources s "
                                    "WHERE e.source_id=%d and s.id=%d "
                                    "ORDER BY e.path",
@@ -541,6 +545,7 @@ static gboolean create_tables(sqlite *db, char **errmsg)
                                               "name VARCHAR NOT NULL, "
                                               "long_name VARCHAR NOT NULL, "
                                               "source_id INTEGER, "
+                                              "launcher VARCHAR NOT NULL, "
                                               "lastuse TIMESTAMP, UNIQUE (id, path));"
                                               "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
                                               "CREATE INDEX path_idx ON entries (path);"
@@ -579,15 +584,16 @@ static int result_sqlite_callback(void *userdata,
                                   char **col_data,
                                   char **col_names)
 {
-        int entry_id ;
-        const char *path ;
-        const char *name ;
-        const char *long_name ;
-        int source_id ;
-        const char *source_type ;
-        struct catalog *catalog ;
-        catalog_callback_f callback ;
-        gboolean go_on ;
+        int entry_id;
+        const char *path;
+        const char *name;
+        const char *long_name;
+        int source_id;
+        const char *source_type;
+        const char *launcher;
+        struct catalog *catalog;
+        catalog_callback_f callback;
+        gboolean go_on;
 
         catalog =  (struct catalog *)userdata;
         callback =  catalog->callback;
@@ -604,19 +610,21 @@ static int result_sqlite_callback(void *userdata,
         long_name = col_data[3];
         source_id = atoi(col_data[4]);
         source_type = col_data[5];
+        launcher = col_data[6];
 
         if(catalog->stop)
                 return 1;
 
         go_on = catalog->callback(catalog,
-                                           0.5/*pertinence*/,
-                                           entry_id,
-                                           name,
-                                           long_name,
-                                           path,
-                                           source_id,
-                                           source_type,
-                                           catalog->callback_userdata);
+                                  0.5/*pertinence*/,
+                                  entry_id,
+                                  name,
+                                  long_name,
+                                  path,
+                                  source_id,
+                                  source_type,
+                                  launcher,
+                                  catalog->callback_userdata);
         return go_on && !catalog->stop ? 0:1;
 }
 
