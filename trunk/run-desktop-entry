@@ -1,0 +1,8 @@
+#!/usr/bin/python
+from xdg.DesktopEntry import DesktopEntry
+import sys
+import os
+
+entry=DesktopEntry()
+entry.parse(sys.argv[1])
+os.execlp("/bin/sh", "/bin/sh", "-c", entry.getExec())
