@@ -32,7 +32,7 @@ static void querywin_start()
 {
    last_keypress=0;
    queryrunner->start(queryrunner);
-   gtk_widget_show(win_data.querywin);
+   gtk_window_reshow_with_initial_size(GTK_WINDOW(win_data.querywin));
 }
 static void querywin_stop()
 {
@@ -240,8 +240,8 @@ static void init_ui(void)
    GtkWidget* querywin = win_data.querywin;
 
    gtk_window_stick(GTK_WINDOW(querywin));
-   gtk_window_set_keep_above(GTK_WINDOW(querywin), 
-			     true);
+   gtk_window_set_keep_above(GTK_WINDOW(querywin),
+                 true);
    querywin_init_list();
 
    g_signal_connect(querywin,
