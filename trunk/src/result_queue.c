@@ -52,6 +52,7 @@ static gboolean source_prepare(GSource *source, gint *timeout);
 static gboolean source_check(GSource *source);
 static gboolean source_dispatch(GSource *source, GSourceFunc callback, gpointer user_data);
 static void source_finalize(GSource *source);
+static void result_handler(struct queryrunner *, const char *, float, struct result *, gpointer);
 
 /** Definition of a source */
 static GSourceFuncs source_functions = {

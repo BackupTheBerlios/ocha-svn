@@ -8,9 +8,7 @@
 #include "catalog_result.h"
 #include "result_queue.h"
 #include "indexer.h"
-#include "indexer_files.h"
-#include "indexer_applications.h"
-#include "indexer_mozilla.h"
+#include "indexers.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -50,6 +48,7 @@
  */
 #define MAXIMUM 200
 
+#define DEBUG 1
 #ifdef DEBUG
 # define lock(m) printf("%s:%d query_lock\n", __FILE__, __LINE__);g_mutex_lock(m)
 # define unlock(m) printf("%s:%d query_unlock\n", __FILE__, __LINE__);g_mutex_unlock(m)
@@ -95,13 +94,6 @@ struct catalog_queryrunner
 /** queryrunner to catalog_queryrunner */
 #define CATALOG_QUERYRUNNER(catalog) ((struct catalog_queryrunner *)(catalog))
 
-static struct indexer *indexers[] =
-   {
-      &indexer_files,
-      &indexer_mozilla,
-      &indexer_applications,
-      NULL
-   };
 
 static void start(struct queryrunner *self);
 static void run_query(struct queryrunner *self, const char *query);
@@ -141,10 +133,6 @@ static gboolean try_connect(const char *path)
    return TRUE;
 }
 
-struct indexer **catalog_queryrunner_get_indexers()
-{
-   return &indexers[0];
-}
 struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queue *queue)
 {
    if(!try_connect(path))
@@ -169,7 +157,7 @@ struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queu
    queryrunner->stopping=FALSE;
    queryrunner->thread=g_thread_create(runquery_thread,
                                        queryrunner/*userdata*/,
-                                       TRUE/*joinable*/,
+                                       FALSE/*not joinable*/,
                                        NULL/*error*/);
 
 
@@ -183,16 +171,16 @@ static void release(struct queryrunner *_self)
 
    stop(QUERYRUNNER(self));
 
+   printf("stopping");
    lock(self->mutex);
    self->stopping=TRUE;
    g_cond_broadcast(self->cond);
    unlock(self->mutex);
 
-   g_thread_join(self->thread);
-   g_string_free(self->query, TRUE/*free content*/);
-   g_string_free(self->running_query, TRUE/*free content*/);
-   g_free((gpointer)self->path);
-   g_free(self);
+   printf("released\n");
+   /* the real release will be done by the
+    * thread when it notices self->stopping==TRUE
+    */
 }
 static gboolean query_has_changed(struct catalog_queryrunner *queryrunner)
 {
@@ -262,6 +250,13 @@ static gpointer runquery_thread(gpointer userdata)
                      queryrunner->mutex);
       }
    unlock(queryrunner->mutex);
+
+   printf("thread cleanup\n");
+   g_string_free(queryrunner->query, TRUE/*free content*/);
+   g_string_free(queryrunner->running_query, TRUE/*free content*/);
+   g_free((gpointer)queryrunner->path);
+   g_free(queryrunner);
+   printf("thread done\n");
    return NULL;
 }
 
@@ -312,7 +307,15 @@ static gboolean result_callback(struct catalog *catalog,
 
    struct indexer *indexer = find_indexer(source_type);
    if(!indexer)
-      return TRUE; /* this one doesn't count */
+       {
+           /* it can happen, because indexers may be removed, but it's
+            * unusual and it might be ok. However, after an indexer is removed,
+            * the catalog should be cleaned. I want to know about unclean
+            * catalogs.
+            */
+           g_warning("unclean catalog: no indexer for source referenced in catalog with id=%d type=%s\n", source_id, source_type);
+           return TRUE;
+       }
 
    struct result *result = catalog_result_create(self->path,
                                                  indexer,
@@ -320,6 +323,7 @@ static gboolean result_callback(struct catalog *catalog,
                                                  name,
                                                  long_name,
                                                  entry_id);
+   printf("%s:%d add %s\n", __FILE__, __LINE__);
    result_queue_add(self->queue,
                     QUERYRUNNER(self),
                     self->running_query->str,
@@ -332,9 +336,17 @@ static gboolean result_callback(struct catalog *catalog,
       return FALSE;
 
    if(count==FIRST_BUNCH_SIZE)
-      wait_on_condition(self, AFTER_FIRST_BUNCH_TIMEOUT);
+       {
+           printf("%s:wait (1st bunch)\n", __FILE__, __LINE__);
+           wait_on_condition(self, AFTER_FIRST_BUNCH_TIMEOUT);
+           printf("%s:wait (1st bunch) done\n", __FILE__, __LINE__);
+       }
    else if(count%LATER_BUNCH_SIZE==0)
-      wait_on_condition(self, LATER_BUNCH_TIMEOUT);
+       {
+           printf("%s:wait (later bunch)\n", __FILE__, __LINE__);
+           wait_on_condition(self, LATER_BUNCH_TIMEOUT);
+           printf("%s:wait (later bunch) done\n", __FILE__, __LINE__);
+       }
    return TRUE;
 }
 
@@ -390,6 +402,7 @@ static void stop(struct queryrunner *_self)
 
 static struct indexer *find_indexer(const char *type)
 {
+    struct indexer **indexers = indexers_list();
    for(struct indexer **ptr=indexers; *ptr; ptr++)
       {
          if(strcmp(type, (*ptr)->name)==0)

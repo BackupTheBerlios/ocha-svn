@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include "catalog.h"
 #include "indexer.h"
+#include "indexers.h"
 #include "catalog_queryrunner.h"
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
@@ -106,7 +107,7 @@ int main(int argc, char *argv[])
             }
       }
 
-   for(struct indexer **indexer_ptr = catalog_queryrunner_get_indexers();
+   for(struct indexer **indexer_ptr = indexers_list();
        *indexer_ptr;
        indexer_ptr++)
       {
@@ -170,7 +171,7 @@ static gboolean first_time(gboolean verbose, struct catalog *catalog)
          printf("Configuring catalog...\n");
       }
 
-   for(struct indexer **indexer_ptr = catalog_queryrunner_get_indexers();
+   for(struct indexer **indexer_ptr = indexers_list();
        *indexer_ptr;
        indexer_ptr++)
       {
