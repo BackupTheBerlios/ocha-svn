@@ -1,0 +1,4 @@
+#! /bin/sh
+set -x
+aclocal -I macros && libtoolize --force --copy && autoheader && automake --add-missing --copy && autoconf
+./configure --enable-maintainer-mode
