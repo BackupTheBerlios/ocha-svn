@@ -312,8 +312,9 @@ gboolean catalog_addentry(struct catalog *catalog, const char *path, const char 
    if(catalog_findentry(catalog, path, &old_id))
       {
          return execute_update_printf(catalog,
-                                      "UPDATE entries SET name='%q', command_id=%d WHERE id=%d",
+                                      "UPDATE entries SET name='%q', long_name='%q', command_id=%d WHERE id=%d",
                                       name,
+                                      long_name,
                                       command_id,
                                       old_id);
       }
