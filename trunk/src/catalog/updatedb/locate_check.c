@@ -5,11 +5,13 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <check.h>
 #include <glib.h>
 #include "locate.h"
 
 #define DBFILE "updatedb.tmp"
+#define VERBOSE false
 
 static GString *buffer;
 static struct locate *locate;
@@ -25,7 +27,15 @@ static void setup()
    fail_unless(retval==0, "updatedb of " DBFILE " failed");
 
    buffer = g_string_new("");
-   locate = locate_new("updatedb.h");
+
+   const char *locate_cmd[] = {
+      "locate",
+      "--database",
+      DBFILE,
+      "updatedb.h",
+      NULL
+   };
+   locate = locate_new_cmd(locate_cmd);
 }
 
 static void teardown()
@@ -60,12 +70,55 @@ START_TEST(test_append)
 }
 END_TEST
 
+START_TEST(test_path)
+{
+   struct stat buf;
+   int existing=0;
+   while(locate_next(locate, buffer)) {
+      if(stat(buffer->str, &buf)==0)
+         existing++;
+      g_string_set_size(buffer, 0);
+   }
+   fail_unless(existing>0, "no files returned by locate_next existed");
+}
+END_TEST
+
 START_TEST(test_has_more)
 {
-   do {
-      while(!locate_has_more(locate));
-      g_string_set_size(buffer, 0);
-   }while(locate_next(locate, buffer));
+   fail_unless(!locate_has_more(locate),
+               "there can't be more data until locate_next has been called at least once");
+   locate_next(locate, buffer);
+}
+END_TEST
+
+START_TEST(test_after_end)
+{
+   while(locate_next(locate, NULL));
+   for(int i=0; i<10; i++) {
+      fail_unless(!locate_next(locate, NULL), "more to read ?");
+      fail_unless(locate_has_more(locate), "locate_has_more must return true when end reached");
+   }
+}
+END_TEST
+
+START_TEST(test_lotsofdata)
+{
+   GString *str = g_string_new("");
+   struct locate *locate = locate_new("a");
+   int count=0;
+   while(locate_next(locate, str)) {
+      count++;
+      if(VERBOSE) {
+         if(count<10) {
+            printf("[%d]: %20.20s\n", count, str->str);
+         } else if(count==10) {
+            printf("...\n");
+         }
+      }
+      g_string_set_size(str, 0);
+   }
+   fail_unless(count>0, "nothing read ? nothing containing 'a' ?");
+   locate_delete(locate);
 }
 END_TEST
 
@@ -81,6 +134,12 @@ Suite *locate_check_suite(void)
    tcase_add_test(tc_core, test_new_read_and_delete);
    tcase_add_test(tc_core, test_append);
    tcase_add_test(tc_core, test_has_more);
+   tcase_add_test(tc_core, test_after_end);
+   tcase_add_test(tc_core, test_path);
+
+   TCase *tc_lots = tcase_create("locate_lots");
+   suite_add_tcase(s, tc_lots);
+   tcase_add_test(tc_lots, test_lotsofdata);
    return s;
 }
 

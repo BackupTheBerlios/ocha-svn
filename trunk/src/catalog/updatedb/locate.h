@@ -29,9 +29,18 @@ struct locate
  * Run a new locate child process.
  *
  * @param query the string to search for
- * @return a new locate structure or NULL
+ * @return a new locate structure or NULL upon failure
  */
 struct locate *locate_new(const char *query);
+
+
+/**
+ * Run a new locate child process (specify the full locate command).
+ *
+ * @param full command line of locate, null-terminated, suitable for exec()
+ * @return a new locate structure or NULL upon failure
+ */
+struct locate *locate_new_cmd(const char *cmdline[]);
 
 /**
  * Get rid of a locate child process and everything associated with it.
@@ -40,9 +49,20 @@ struct locate *locate_new(const char *query);
 void locate_delete(struct locate *locate);
 
 /**
- * Check whether more data is available on the pipe.
+ * Check whether more data is available without needing
+ * to read anything from the file descriptor.
+ *
+ * Make sure this function returns false before waiting
+ * on the file descriptor with select()
+ *
+ * When the end of the stream has been reached, this
+ * function always returs true, which should make
+ * the called call locate_next() and discover there's
+ * nothing else to read.
+ *
  * @param locate
  * @return true if there's more data to be read without blocking
+ * false otherwise. at the end of stream.
  */
 bool locate_has_more(struct locate *locate);
 
