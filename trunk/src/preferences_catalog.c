@@ -279,6 +279,29 @@ static void row_activated_cb(GtkTreeView *view,
         }
 }
 
+static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer userdata)
+{
+    struct indexer *indexer = (struct indexer *)userdata;
+    g_return_if_fail(indexer);
+    indexer->new_source(indexer,
+                        NULL/*no parent*/,
+                        NULL/*no callback: don't do anything for now*/,
+                        NULL/*userdata*/);
+}
+static void new_source_popup_cb(GtkButton *button, gpointer userdata)
+{
+   GtkMenu *menu = GTK_MENU(userdata);
+   g_return_if_fail(menu);
+
+   printf("popup\n");
+   gtk_menu_popup(menu,
+                  NULL,
+                  NULL/*parent_menu_item*/,
+                  NULL/*position_func*/,
+                  NULL/*userdata*/,
+                  0/*button*/,
+                  gtk_get_current_event_time());
+}
 
 /* ------------------------- public functions */
 struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
@@ -316,14 +339,70 @@ GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
     gtk_button_box_set_layout(GTK_BUTTON_BOX(buttons),
                               GTK_BUTTONBOX_END);
 
+    int new_source_count = 0;
+    struct indexer **indexers = indexers_list();
+    for(int i=0; indexers[i]; i++)
+    {
+        struct indexer *indexer = indexers[i];
+        if(indexer->new_source)
+        {
+            new_source_count++;
+        }
+    }
+    if(new_source_count>0)
+    {
+        GtkWidget *add = gtk_button_new_from_stock(GTK_STOCK_NEW);
+        gtk_widget_show(add);
+        gtk_container_add(GTK_CONTAINER(buttons), add);
 
-    GtkWidget *reload = gtk_button_new_with_label("Reload");
+        if(new_source_count==1)
+           {
+              for(int i=0; indexers[i]; i++)
+                 {
+                    struct indexer *indexer = indexers[i];
+                    if(indexer->new_source)
+                       {
+                          g_signal_connect(add,
+                                           "clicked",
+                                           G_CALLBACK(new_source_button_or_item_cb),
+                                           indexer);
+                          break;
+                       }
+                 }
+           }
+        else
+           {
+              GtkWidget *popup = gtk_menu_new();
+              gtk_widget_show(popup);
+              for(int i=0; indexers[i]; i++)
+                 {
+                    struct indexer *indexer = indexers[i];
+                    if(indexer->new_source)
+                       {
+                          GtkWidget *item=gtk_menu_item_new_with_label(indexer->display_name);
+                          gtk_widget_show(item);
+                          gtk_menu_append(GTK_MENU(popup), item);
+                          g_signal_connect(item,
+                                           "activate",
+                                           G_CALLBACK(new_source_button_or_item_cb),
+                                           indexer);
+                       }
+                 }
+              g_signal_connect(add,
+                               "pressed",
+                               G_CALLBACK(new_source_popup_cb),
+                               popup);
+           }
+    }
+
+    GtkWidget *reload = gtk_button_new_from_stock(GTK_STOCK_REFRESH);
     gtk_widget_show(reload);
     gtk_container_add(GTK_CONTAINER(buttons), reload);
     g_signal_connect(reload,
                      "clicked",
                      G_CALLBACK(reload_cb),
                      prefs/*userdata*/);
+
 
     GtkWidget *vbox = gtk_vbox_new(FALSE/*not homogeneous*/, 4/*spacing*/);
     gtk_widget_show(vbox);

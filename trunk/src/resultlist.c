@@ -280,12 +280,13 @@ static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* rendere
 {
    struct resultholder *holder = NULL;
    gtk_tree_model_get(model, iter, 0, &holder, -1);
-   g_return_if_fail(holder);
-
-   g_object_set(renderer,
-                "markup",
-                holder->label_markup,
-                NULL);
+   if(holder)
+       {
+           g_object_set(renderer,
+                        "markup",
+                        holder->label_markup,
+                        NULL);
+       }
 }
 
 /* ------------------------- resultholder functions */

@@ -31,6 +31,7 @@ static gboolean has_gnome_mime_command(const char *path);
 static char *display_name(struct catalog *catalog, int id);
 static void release_source(struct indexer_source *source);
 static GtkWidget *editor_widget(struct indexer_source *source);
+static void new_source(struct indexer *indexer, GtkWindow *parent, indexer_new_source_cb callback, gpointer userdata);
 #define INDEXER_NAME "files"
 
 /** Definition of the indexer */
@@ -42,6 +43,7 @@ struct indexer indexer_files =
    .validate = validate,
    .load_source = load,
    .discover = discover,
+   .new_source = new_source,
 
    .description =
     "This indexer looks recursively into directories for files "
@@ -259,13 +261,13 @@ static gboolean has_gnome_mime_command(const char *path)
    char *mimetype = gnome_vfs_get_mime_type(uri->str);
    if(mimetype)
       {
-         char *app = gnome_vfs_mime_get_default_desktop_entry(mimetype);
-         if(app)
-            {
-               g_free(app);
-               retval=TRUE;
-            }
-         g_free(mimetype);
+          char *app = gnome_vfs_mime_get_default_desktop_entry(mimetype);
+          if(app)
+              {
+                  g_free(app);
+                  retval=TRUE;
+              }
+          g_free(mimetype);
       }
    g_string_free(uri, TRUE/*free content*/);
    return retval;
@@ -606,4 +608,9 @@ static GtkWidget *editor_widget(struct indexer_source *source)
     include_content_disable_cb(GTK_TOGGLE_BUTTON(include_contents), bottom_table);
 
     return retval;
+}
+
+static void new_source(struct indexer *indexer, GtkWindow *parent, indexer_new_source_cb callback, gpointer userdata)
+{
+    printf("new source %s\n", indexer->display_name);
 }

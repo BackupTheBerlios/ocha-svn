@@ -13,6 +13,20 @@
 #include "catalog.h"
 #include <gtk/gtk.h>
 
+struct indexer;
+
+/**
+ * Function called by new_source just after the new source
+ * has been created.
+ *
+ * The source must be valid and ready to be indexed.
+ *
+ * @param indexer
+ * @param source id
+ * @param userdata
+ */
+typedef void (*indexer_new_source_cb)(struct indexer *, int source_id, gpointer userdata);
+
 /**
  * An indexer maintains a collection of catalog entries
  * that it's then able to execute.
@@ -111,6 +125,20 @@ struct indexer
     */
    gboolean (*validate)(struct indexer *, const char *name, const char *long_name, const char *path);
 
+   /**
+    * Create a dialog that, when done, will create a new source.
+    *
+    * Some indexers will not allow the creation of
+    * new sources, in which case this function may
+    * be null.
+    *
+    * @param indexer
+    * @param parent parent window (may be null)
+    * @param callback a function to be called just
+    * after the new source has been created (may be null)
+    * @param userdata pointer to pass to the callback
+    */
+   void (*new_source)(struct indexer *, GtkWindow *parent, indexer_new_source_cb callback, gpointer userdata);
 };
 
 /**

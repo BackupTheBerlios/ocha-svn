@@ -83,23 +83,30 @@ static gboolean execute(struct indexer *self, const char *name, const char *long
 
    printf("opening %s...\n", url);
    GError *gnome_err = NULL;
-   const char *argv[] = { "gnome-moz-remote", url };
-   errno=0;
+   gboolean shown;
+    shown = gnome_url_show(url, &gnome_err);
+   if(!shown)
+   {
+       /* use the good old  gnome-moz-remote
+        * if url_show fails.
+        */
+       const char *argv[] = { "gnome-moz-remote", url };
+       errno=0;
 
-   if(!gnome_execute_async(NULL/*dir*/,
-                           2,
-                           (char * const *)argv))
-      {
-         g_set_error(err,
-                     RESULT_ERROR,
-                     RESULT_ERROR_MISSING_RESOURCE,
-                     "error opening %s: %s",
-                     url,
-                     errno==0 ? "unknown error":strerror(errno));
-         return FALSE;
-      }
+       gboolean executed = gnome_execute_async(NULL/*dir*/,
+                                               2,
+                                               (char * const *)argv);
+       if(!executed)
+           g_set_error(err,
+                       RESULT_ERROR,
+                       RESULT_ERROR_MISSING_RESOURCE,
+                       "error opening %s: %s",
+                       url,
+                       gnome_err->message);
+       g_error_free(gnome_err);
+       return FALSE;
+   }
    return TRUE;
-
 }
 
 static gboolean validate(struct indexer *self, const char *name, const char *long_name, const char *text_uri)

@@ -149,7 +149,10 @@ static void result_handler_cb(struct queryrunner *caller,
 {
    g_return_if_fail(result);
 
-   resultlist_add_result(query, pertinence, result);
+   if(strcmp(running_query->str, query)==0)
+       resultlist_add_result(query, pertinence, result);
+   else
+       result->release(result);
 }
 
 /**
