@@ -132,6 +132,20 @@ class Catalog:
     def __escape_query(self, query):
         return query
 
+    def entryForPath(self, path):
+        """find an entry with the given path"""
+        dir=os.path.dirname(path)
+        file=os.path.basename(path)
+        cursor=self.__cursor
+        cursor.execute(self.__query_base+" WHERE directory = %s and filename=%s", dir, file)
+        retval=None
+        def collect(catalog, entry):
+            retval=entry
+            return False
+        self.__parse_results(cursor, collect)
+        return retval
+
+
     def entriesInDirectory(self, dir):
         """find all the entries in a certain directory"""
         cursor=self.__cursor

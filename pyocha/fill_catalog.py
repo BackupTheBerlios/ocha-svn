@@ -12,12 +12,20 @@ def findOrCreateXEmacs(catalog):
             return command
     return catalog.insertCommand("xemacs-remote", "xemacs-remote %f")
 
+
 def findOrCreateRun(catalog):
     commands=catalog.commands()
     for command in commands:
         if command.execute.startswith("run"):
             return command
     return catalog.insertCommand("run", "run-desktop-entry %f")
+
+def findOrCreateProject(catalog):
+    commands=catalog.commands()
+    for command in commands:
+        if command.execute.startswith("project"):
+            return command
+    return catalog.insertCommand("project", "project %f")
 
 
 FORBIDDEN_DIR=[".svn", "CVS", "build"]
@@ -38,6 +46,7 @@ catalog=Catalog(conf.catalog_path())
 
 xemacs=findOrCreateXEmacs(catalog)
 run=findOrCreateRun(catalog)
+project=findOrCreateProject(catalog)
 
 args=sys.argv[1:]
 wait=False
@@ -55,7 +64,7 @@ def addDesktopEntry(file):
     entry=DesktopEntry()
     try:
         entry.parse(file)
-    except ParsingError, e:
+    except:
         return
     if entry.getNoDisplay():
         return
@@ -71,10 +80,25 @@ def addDesktopEntry(file):
 def addTextEntry(file):
     catalog.insertEntry(file, command=xemacs)
 
+def addProject(file):
+    name=os.path.basename(file)
+    parent=os.path.dirname(file)
+    while os.path.exists(os.path.join(parent, "CVS")):
+        name=os.path.join(os.path.basename(parent), name)
+        parent=os.path.dirname(parent)
+    if name.startswith("trunk") or file[0] in ( '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' ):
+        name=os.path.join(os.path.basename(parent), name)
+    print "add project: "+name+" ("+file+")"
+    catalog.insertEntry(path=file, display_name=name, command=project)
+
 for dir in args:
     for root, dirs, files in os.walk(dir):
         if isforbidden(root):
             continue
+        if "project.xml" in files:
+            if not catalog.entryForPath(root):
+                addProject(root)
+
         existing=catalog.entriesInDirectory(dir)
         existing_files=map(lambda x: x.path, existing)
         for file in files:
