@@ -9,6 +9,9 @@
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define QUERY_TIMEOUT 800
 
@@ -233,7 +236,12 @@ int main(int argc, char *argv[])
    result_queue=result_queue_new(NULL/*default context*/,
                                  result_handler_cb,
                                  NULL/*userdata*/);
-   queryrunner = catalog_queryrunner_new("/home/stephane/.ocha/catalog",
+
+   GString *catalog_path = g_string_new(getenv("HOME"));
+   g_string_append(catalog_path, "/.ocha");
+   mkdir(catalog_path->str, 0600);
+   g_string_append(catalog_path, "/catalog");
+   queryrunner = catalog_queryrunner_new(catalog_path->str,
                                          result_queue);
    init_ui();
    querywin_start();
