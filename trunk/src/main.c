@@ -15,6 +15,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <X11/Xlib.h>
+#include <X11/keysym.h>
+#include <gdk/gdk.h>
+#include <gdk/gdkx.h>
 
 #define QUERY_TIMEOUT 3000
 
@@ -29,16 +33,23 @@ static struct result* selected;
 static guint32 last_keypress;
 #define query_label_text_len 256
 static char query_label_text[256];
+bool shown;
 static void querywin_start()
 {
+   if(shown)
+      return;
+   printf("show\n");
    last_keypress=0;
    queryrunner->start(queryrunner);
    gtk_window_reshow_with_initial_size(GTK_WINDOW(win_data.querywin));
+   shown=true;
 }
 static void querywin_stop()
 {
-   gtk_widget_hide(win_data.querywin);
+   printf("hide\n");
    queryrunner->stop(queryrunner);
+   gtk_widget_hide(win_data.querywin);
+   shown=false;
 }
 
 static gboolean focus_out_cb(GtkWidget* widget, GdkEventFocus* ev, gpointer userdata)
@@ -166,9 +177,9 @@ static void g_string_append_markup_escaped(GString *gstr, const char *str)
 }
 static void g_string_append_query_pango_highlight(GString *gstr, const char *query, const char *str, const char *on, const char *off)
 {
-   char *markup = query_pango_highlight(query, str, on, off);
+   const char *markup = query_pango_highlight(query, str, on, off);
    g_string_append(gstr, markup);
-   g_free(markup);
+   g_free((void *)markup);
 }
 static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, GtkTreeModel* model, GtkTreeIter* iter, gpointer userdata)
 {
@@ -279,6 +290,50 @@ static void install_sighandler()
    sigaction(SIGUSR1, &act, NULL/*oldact*/);
 }
 
+
+static GdkFilterReturn filter_keygrab (GdkXEvent *xevent,
+                                       GdkEvent *event,
+                                       gpointer data)
+{
+   int keycode = GPOINTER_TO_INT(data);
+   XEvent *xev = (XEvent *) xevent;
+   if (xev->type != KeyPress)
+      return GDK_FILTER_CONTINUE;
+
+   XKeyEvent *key = (XKeyEvent *) xevent;
+   if (keycode == key->keycode)
+      querywin_start();
+   return GDK_FILTER_CONTINUE;
+}
+
+static void install_keygrab()
+{
+   GdkDisplay *display = gdk_display_get_default();
+   int keycode = XKeysymToKeycode(GDK_DISPLAY(), XK_space);
+   for (int i = 0; i < gdk_display_get_n_screens (display); i++)
+      {
+         GdkScreen *screen = gdk_display_get_screen (display, i);
+         if (!screen)
+            continue;
+         GdkWindow *root = gdk_screen_get_root_window (screen);
+         gdk_error_trap_push ();
+
+         XGrabKey(GDK_DISPLAY(), keycode,
+                  Mod1Mask,
+                  GDK_WINDOW_XID(root),
+                  True,
+                  GrabModeAsync,
+                  GrabModeAsync);
+         gdk_flush ();
+         if (gdk_error_trap_pop ())
+            {
+               fprintf (stderr, "Error grabbing key %d, %p\n", keycode, root);
+               exit(88);
+            }
+         gdk_window_add_filter(root, filter_keygrab, GINT_TO_POINTER(keycode)/*userdata*/);
+      }
+}
+
 int main(int argc, char *argv[])
 {
    g_thread_init(NULL/*vtable*/);
@@ -323,6 +378,8 @@ int main(int argc, char *argv[])
                                          result_queue);
    init_ui();
    querywin_start();
+
+   install_keygrab();
 
    install_sighandler();
    gtk_main();

@@ -45,6 +45,15 @@
  */
 #define MAXIMUM 200
 
+#ifdef DEBUG
+# define lock(m) printf("%s:%d query_lock\n", __FILE__, __LINE__);g_mutex_lock(m)
+# define unlock(m) printf("%s:%d query_unlock\n", __FILE__, __LINE__);g_mutex_unlock(m)
+#else
+# define lock(m) g_mutex_lock(m)
+# define unlock(m) g_mutex_unlock(m)
+#endif
+
+
 /**
  * Extension of the structure queryrunner for this implementation
  */
@@ -138,10 +147,10 @@ static void release(struct queryrunner *_self)
 
    stop(QUERYRUNNER(self));
 
-   g_mutex_lock(self->mutex);
+   lock(self->mutex);
    self->stopping=true;
    g_cond_broadcast(self->cond);
-   g_mutex_unlock(self->mutex);
+   unlock(self->mutex);
 
    g_thread_join(self->thread);
    g_string_free(self->query, true/*free content*/);
@@ -160,65 +169,63 @@ static gpointer runquery_thread(gpointer userdata)
       = (struct catalog_queryrunner *)userdata;
 
    printf("thread\n");
-   g_mutex_lock(queryrunner->mutex);
+   lock(queryrunner->mutex);
    while(!queryrunner->stopping)
       {
          if(queryrunner->started)
             {
                if(!queryrunner->catalog)
                   {
-                     g_mutex_unlock(queryrunner->mutex);
+                     unlock(queryrunner->mutex);
                      struct catalog *catalog=catalog_connect(queryrunner->path, NULL/*errmsg*/);
                      if(!catalog)
                         {
                            printf("connection to catalog %s failed\n",
                                   queryrunner->path);
+                           lock(queryrunner->mutex);
                            continue;
                         }
-                     g_mutex_lock(queryrunner->mutex);
+                     lock(queryrunner->mutex);
                      queryrunner->catalog=catalog;
                   }
 
-               if(queryrunner->query->len>0)
+               while(query_has_changed(queryrunner) && queryrunner->query->len>0)
                   {
-                     while(query_has_changed(queryrunner))
-                        {
-                           g_string_assign(queryrunner->running_query,
-                                           queryrunner->query->str);
+                     g_string_assign(queryrunner->running_query,
+                                     queryrunner->query->str);
 
-                           catalog_restart(queryrunner->catalog);
-                           printf("execute query: %s\n",
-                                  queryrunner->running_query->str);
-                           queryrunner->count=0;
-                           g_mutex_unlock(queryrunner->mutex);
-                           if(!catalog_executequery(queryrunner->catalog,
-                                                    queryrunner->running_query->str,
-                                                    result_callback,
-                                                    queryrunner/*userdata*/))
-                              {
-                                 printf("run_query(%s,%s) failed: %s\n",
-                                        queryrunner->path,
-                                        queryrunner->running_query->str,
-                                        catalog_error(queryrunner->catalog));
-                              }
-                           g_mutex_lock(queryrunner->mutex);
+                     catalog_restart(queryrunner->catalog);
+                     printf("execute query: %s\n",
+                            queryrunner->running_query->str);
+                     queryrunner->count=0;
+                     unlock(queryrunner->mutex);
+                     if(!catalog_executequery(queryrunner->catalog,
+                                              queryrunner->running_query->str,
+                                              result_callback,
+                                              queryrunner/*userdata*/))
+                        {
+                           printf("run_query(%s,%s) failed: %s\n",
+                                  queryrunner->path,
+                                  queryrunner->running_query->str,
+                                  catalog_error(queryrunner->catalog));
                         }
+                     lock(queryrunner->mutex);
                   }
             }
          else if(queryrunner->catalog)
             {
                struct catalog *catalog = queryrunner->catalog;
                queryrunner->catalog=NULL;
-               g_mutex_unlock(queryrunner->mutex);
+               unlock(queryrunner->mutex);
                catalog_disconnect(catalog);
-               g_mutex_lock(queryrunner->mutex);
+               lock(queryrunner->mutex);
             }
 
          printf("thread: waiting on cond\n");
          g_cond_wait(queryrunner->cond,
                      queryrunner->mutex);
       }
-   g_mutex_unlock(queryrunner->mutex);
+   unlock(queryrunner->mutex);
    return NULL;
 }
 
@@ -231,10 +238,10 @@ static void start(struct queryrunner *_self)
 {
    g_return_if_fail(_self!=NULL);
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
-   g_mutex_lock(self->mutex);
+   lock(self->mutex);
    self->started=true;
    g_cond_broadcast(self->cond);
-   g_mutex_unlock(self->mutex);
+   unlock(self->mutex);
 }
 
 static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
@@ -243,10 +250,10 @@ static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
    g_get_current_time(&timeval);
    g_time_val_add(&timeval, time_ms*1000);
 
-   g_mutex_lock(self->mutex);
+   lock(self->mutex);
    if(!query_has_changed(self))
       g_cond_timed_wait(self->cond, self->mutex, &timeval);
-   g_mutex_unlock(self->mutex);
+   unlock(self->mutex);
 
 }
 static bool result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
@@ -281,17 +288,22 @@ static void run_query(struct queryrunner *_self, const char *query)
 
    printf("run_query(%s):enter\n", query);
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
-   g_mutex_lock(self->mutex);
+   lock(self->mutex);
    printf("run_query(%s):locked\n", query);
    if(self->catalog)
       {
          printf("interrupt...\n");
          catalog_interrupt(self->catalog);
       }
-   g_string_assign(self->query, query);
-   g_cond_broadcast(self->cond);
+   char stripped_query[strlen(query)+1];
+   strcpy(stripped_query, query);
+   g_strstrip(stripped_query);
+   g_string_assign(self->query, stripped_query);
+   if(self->query->len>0)
+      g_cond_broadcast(self->cond);
+
    printf("run_query(%s):unlock\n", query);
-   g_mutex_unlock(self->mutex);
+   unlock(self->mutex);
    printf("run_query(%s):done\n", query);
 }
 
@@ -307,12 +319,15 @@ static void stop(struct queryrunner *_self)
    g_return_if_fail(_self!=NULL);
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(_self);
 
-   g_mutex_lock(self->mutex);
+   printf("stop (in)\n");
+   lock(self->mutex);
+   printf("locked\n");
    self->started=false;
    g_string_truncate(self->query, 0);
    if(self->catalog)
       catalog_interrupt(self->catalog);
    g_cond_broadcast(self->cond);
-   g_mutex_unlock(self->mutex);
+   unlock(self->mutex);
+   printf("stop (out)\n");
 }
 
