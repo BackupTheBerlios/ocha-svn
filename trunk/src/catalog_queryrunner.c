@@ -5,6 +5,7 @@
 
 #include "catalog_queryrunner.h"
 #include "catalog.h"
+#include "catalog_result.h"
 #include "result_queue.h"
 #include <stdio.h>
 #include <string.h>
@@ -96,7 +97,14 @@ static void consolidate(struct queryrunner *self);
 static void stop(struct queryrunner *self);
 static void release(struct queryrunner *self);
 static gpointer runquery_thread(gpointer);
-static gboolean result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata);
+static gboolean result_callback(struct catalog *catalog,
+                                float pertinence,
+                                int entry_id,
+                                const char *name,
+                                const char *long_name,
+                                const char *path,
+                                const char *execute,
+                                void *userdata);
 static gboolean query_has_changed(struct catalog_queryrunner *self);
 static void wait_on_condition(struct catalog_queryrunner *self, int wait_ms);
 
@@ -256,13 +264,29 @@ static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
    unlock(self->mutex);
 
 }
-static gboolean result_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
+static gboolean result_callback(struct catalog *catalog,
+                                float pertinence,
+                                int entry_id,
+                                const char *name,
+                                const char *long_name,
+                                const char *path,
+                                const char *execute,
+                                void *userdata)
 {
    g_return_val_if_fail(userdata!=NULL, FALSE);
-   g_return_val_if_fail(result!=NULL, FALSE);
+   g_return_val_if_fail(name!=NULL, FALSE);
+   g_return_val_if_fail(long_name!=NULL, FALSE);
+   g_return_val_if_fail(path!=NULL, FALSE);
+   g_return_val_if_fail(execute!=NULL, FALSE);
 
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(userdata);
 
+   struct result *result = catalog_result_create(self->path,
+                                                 path,
+                                                 name,
+                                                 long_name,
+                                                 execute,
+                                                 entry_id);
    result_queue_add(self->queue,
                     QUERYRUNNER(self),
                     self->running_query->str,

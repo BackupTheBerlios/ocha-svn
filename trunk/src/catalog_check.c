@@ -2,6 +2,7 @@
 #include <config.h>
 #endif
 #include "catalog.h"
+#include "catalog_result.h"
 #include <stdio.h>
 #include <check.h>
 #include <sys/types.h>
@@ -251,25 +252,40 @@ START_TEST(test_addentry_noduplicate)
 }
 END_TEST
 
-
 /**
  * Keep the result into the list
  * @param catalog ignored
  * @param pertinence ignored
- * @param result added into the list
+ * @param name
+ * @param long_name
+ * @param path
  * @param list the list itself (passed by catalog_executequery as userdata)
  * @see #results
  */
-static gboolean collect_results_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
+static gboolean collect_results_callback(struct catalog *catalog,
+                                         float pertinence,
+                                         int entry_id,
+                                         const char *name,
+                                         const char *long_name,
+                                         const char *path,
+                                         const char *execute,
+                                         void *userdata)
 {
    GList **results = (GList **)userdata;
    g_return_val_if_fail(results, FALSE);
+
+   struct result *result = catalog_result_create(PATH,
+                                                 path,
+                                                 name,
+                                                 long_name,
+                                                 execute,
+                                                 entry_id);
    *results=g_list_append(*results,
                           result);
-   fail_unless(result->name!=NULL, "missing name");
-   fail_unless(result->long_name!=NULL, "missing long name");
-   fail_unless(result->path!=NULL, "missing long path/uri");
-   printf("result %d: %s\n", g_list_length(*results), result->name);
+   fail_unless(name!=NULL, "missing name");
+   fail_unless(long_name!=NULL, "missing long name");
+   fail_unless(path!=NULL, "missing long path/uri");
+   printf("result %d: %s\n", g_list_length(*results), name);
    return TRUE;/*continue*/
 }
 
@@ -449,14 +465,20 @@ END_TEST
  * @param result released
  * @param userdata a pointer to an integer (the counter), which will be decremented to 0
  */
-static gboolean countdown_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
+static gboolean countdown_callback(struct catalog *catalog,
+                                   float pertinence,
+                                   int entry_id,
+                                   const char *name,
+                                   const char *long_name,
+                                   const char *path,
+                                   const char *execute,
+                                   void *userdata)
 {
    int *counter = (int *)userdata;
    g_return_val_if_fail(counter!=NULL, FALSE);
    fail_unless( (*counter)>0, "callback called once too many");
 
    (*counter)--;
-   result->release(result);
    return (*counter)>0;
 }
 START_TEST(test_callback_stops_query)
@@ -475,10 +497,19 @@ END_TEST
  *
  * @param catalog ignored
  * @param pertinence ignored
- * @param result released
+ * @param name
+ * @param long_name
+ * @param path
  * @param userdata a pointer to an integer (the counter), which will be decremented to 0
  */
-static gboolean countdown_interrupt_callback(struct catalog *catalog, float pertinence, struct result *result, void *userdata)
+static gboolean countdown_interrupt_callback(struct catalog *catalog,
+                                             float pertinence,
+                                             int entry_id,
+                                             const char *name,
+                                             const char *long_name,
+                                             const char *path,
+                                             const char *execute,
+                                             void *userdata)
 {
    int *counter = (int *)userdata;
    g_return_val_if_fail(counter!=NULL, FALSE);
@@ -486,7 +517,6 @@ static gboolean countdown_interrupt_callback(struct catalog *catalog, float pert
 
    (*counter)--;
 
-   result->release(result);
    if( (*counter) == 0 )
       catalog_interrupt(catalog);
    return TRUE/*continue*/;

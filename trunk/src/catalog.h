@@ -45,12 +45,22 @@ void catalog_disconnect(struct catalog *catalog);
  *
  * @param catalog
  * @param pertinence pertinence of the result, between 0.0 and 1.0
- * @param result the result itself. the callback is responsible for
- * releasing it eventually
+ * @param entry_id ID of the entry
+ * @param name entry name, in UTF-8. released by the caller after the function returns
+ * @param long_name long entry name, in UTF-8. released by the caller after the function returns
+ * @param path path/uri, in UTF-8. released by the caller after the function returns
+ * @param execute execute string
  * @param userdata pointer passed to catalog_executequery()
  * @return TRUE to continue adding results, FALSE to stop looking for results
  */
-typedef gboolean (*catalog_callback_f)(struct catalog *catalog, float pertinence, struct result *result, void *userdata);
+typedef gboolean (*catalog_callback_f)(struct catalog *catalog,
+                                       float pertinence,
+                                       int entry_id,
+                                       const char *name,
+                                       const char *long_name,
+                                       const char *path,
+                                       const char *execute,
+                                       void *userdata);
 
 /**
  * Execute a query and add the results into
@@ -74,9 +84,22 @@ typedef gboolean (*catalog_callback_f)(struct catalog *catalog, float pertinence
  * disconnected.
  */
 gboolean catalog_executequery(struct catalog *catalog,
-                          const char *query,
-                          catalog_callback_f callback,
-                          void *userdata);
+                              const char *query,
+                              catalog_callback_f callback,
+                              void *userdata);
+
+/**
+ * Update the timestamp of the given entry, because it
+ * has just been chosen by the user.
+ *
+ * Entries with the most up-to-date timestamp will
+ * appear first.
+ *
+ * @param catalog
+ * @param entry_id
+ * @return true if updating worked
+ */
+gboolean catalog_update_entry_timestamp(struct catalog *catalog, int entry_id);
 
 /**
  * Interrupt any currently running query.

@@ -1,6 +1,7 @@
 /** \file implementation of the API defined in catalog.h */
 
 #include "catalog.h"
+#include "catalog_result.h"
 #include <sqlite.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -30,23 +31,6 @@ struct catalog
    char path[];
 };
 
-/**
- * Full structure of the results passed to the callback
- */
-struct catalog_result
-{
-   /** catalog_result are result */
-   struct result base;
-   int entry_id;
-   const char *execute;
-   const char *catalog_path;
-
-   /** buffer for the path, catalog path, display name and execute string */
-   char buffer[];
-};
-
-
-
 /* ------------------------- prototypes */
 static gboolean exists(const char *path);
 static gboolean handle_sqlite_retval(struct catalog *catalog, int retval, char *errmsg);
@@ -57,12 +41,9 @@ static int progress_callback(void *userdata);
 static gboolean execute_query_printf(struct catalog *catalog, sqlite_callback callback, void *userdata, const char *sql, ...);
 static gboolean create_tables(sqlite *db, char **errmsg);
 static int count(const char *str, char c);
-static void execute_parse(GString *gstr, const char *pattern, const char *path);
+
 static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id);
-static gboolean validate_result(struct result *_self);
-static gboolean execute_result(struct result *_self, GError **);
-static void free_result(struct result *self);
-static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *long_name, const char *execute, int entry_id);
+
 static int result_sqlite_callback(void *userdata, int col_count, char **col_data, char **col_names);
 static void get_id(struct catalog  *catalog, int *id_out);
 static int findid_callback(void *userdata, int column_count, char **result, char **names);
@@ -486,30 +467,8 @@ static int count(const char *str, char c)
    return count;
 }
 
-/**
- * Replace %f with the path.
- *
- * @param pattern pattern with %f
- * @param path path to replace %f with
- * @return a string to free with g_free
- */
-static void execute_parse(GString *gstr, const char *pattern, const char *path)
-{
-   const char *current=pattern;
-   const char *found;
-   while( (found=strstr(current, "%f")) != NULL )
-      {
-         gssize len = found-current;
-         g_string_append_len(gstr,
-                             current,
-                             len);
-         current+=len+2;
-         g_string_append(gstr, path);
-      }
-   g_string_append(gstr, current);
-}
 
-static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id)
+gboolean catalog_update_entry_timestamp(struct catalog *catalog, int entry_id)
 {
    g_return_val_if_fail(catalog, FALSE);
    GTimeVal timeval;
@@ -521,116 +480,6 @@ static gboolean update_entry_timestamp(struct catalog *catalog, int entry_id)
                                 (unsigned long)timeval.tv_usec,
                                 entry_id);
 }
-
-static gboolean validate_result(struct result *_self)
-{
-   struct catalog_result *self = (struct catalog_result *)_self;
-   g_return_val_if_fail(self, FALSE);
-
-   if(self->base.path[0]=='/')
-      {
-         /* it's a file */
-         gboolean retval = exists(self->base.path);
-         if(!retval)
-            printf("invalid result: %s\n", self->base.path);
-         return retval;
-      }
-   /* otherwise It's an URL and I can't check that... */
-   return TRUE;
-}
-static gboolean execute_result(struct result *_self, GError **err)
-{
-   struct catalog_result *self = (struct catalog_result *)_self;
-   g_return_val_if_fail(self, FALSE);
-   g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
-
-   pid_t pid = fork();
-   if(pid<0)
-      {
-         g_set_error(err,
-                     RESULT_ERROR,
-                     RESULT_ERROR_MISSING_RESOURCE,
-                     "failed at fork(): %s\n",
-                     strerror(errno));
-         return FALSE;
-      }
-
-   if(pid==0)
-      {
-         /* the child */
-         GString *gstr = g_string_new("");
-         execute_parse(gstr, self->execute, self->base.path);
-         printf("execute: /bin/sh -c '%s'\n", gstr->str);
-         execl("/bin/sh", "/bin/sh", "-c", gstr->str, NULL);
-         fprintf(stderr, "result.execute() failed at exec(%s): %s\n",
-                 gstr->str,
-                 strerror(errno));
-         exit(99);
-      }
-   /* the parent */
-
-   struct catalog *catalog = catalog_connect(self->catalog_path, NULL/*errmsg*/);
-   if(catalog)
-      {
-         if(!update_entry_timestamp(catalog, self->entry_id))
-            {
-               fprintf(stderr,
-                       "warning: lastuse timestamp update failed: %s\n",
-                       catalog_error(catalog));
-            }
-         catalog_disconnect(catalog);
-      }
-
-   return TRUE;
-}
-
-static void free_result(struct result *self)
-{
-   g_return_if_fail(self);
-   g_free(self);
-}
-static struct result *create_result(struct catalog *catalog, const char *path, const char *name, const char *long_name, const char *execute, int entry_id)
-{
-   g_return_val_if_fail(catalog, NULL);
-   g_return_val_if_fail(path, NULL);
-   g_return_val_if_fail(name, NULL);
-   g_return_val_if_fail(execute, NULL);
-
-   struct catalog_result *result = g_malloc(sizeof(struct catalog_result)
-                                            +strlen(path)+1
-                                            +strlen(name)+1
-                                            +strlen(long_name)+1
-                                            +strlen(execute)+1
-                                            +strlen(catalog->path)+1);
-   result->entry_id=entry_id;
-   char *buf = result->buffer;
-
-   result->base.path=buf;
-   strcpy(buf, path);
-   buf+=strlen(path)+1;
-
-   result->base.name=buf;
-   strcpy(buf, name);
-   buf+=strlen(name)+1;
-
-   result->base.long_name=buf;
-   strcpy(buf, long_name);
-   buf+=strlen(long_name)+1;
-
-   result->execute=buf;
-   strcpy(buf, execute);
-   buf+=strlen(execute)+1;
-
-   result->catalog_path=catalog->path;
-   strcpy(buf, catalog->path);
-
-   result->base.execute=execute_result;
-   result->base.validate=validate_result;
-   result->base.release=free_result;
-
-   return &result->base;
-}
-
 
 
 static int result_sqlite_callback(void *userdata, int col_count, char **col_data, char **col_names)
@@ -648,16 +497,14 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
    if(catalog->stop)
       return 1;
 
-   struct result *result = create_result(catalog,
-                                         path,
-                                         name,
-                                         long_name,
-                                         execute,
-                                         entry_id);
    gboolean go_on = catalog->callback(catalog,
-                                  0.5/*pertinence*/,
-                                  result,
-                                  catalog->callback_userdata);
+                                      0.5/*pertinence*/,
+                                      entry_id,
+                                      name,
+                                      long_name,
+                                      path,
+                                      execute,
+                                      catalog->callback_userdata);
    return go_on && !catalog->stop ? 0:1;
 }
 
