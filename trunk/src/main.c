@@ -215,7 +215,7 @@ static void init_ui(void)
 
 void sighandler(int signum)
 {
-   gtk_widget_show(win_data.querywin);
+   querywin_start();
 }
 static void install_sighandler()
 {
