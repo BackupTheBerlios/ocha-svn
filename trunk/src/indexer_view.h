@@ -66,4 +66,10 @@ void indexer_view_attach_source(struct indexer_view *view,
  */
 void indexer_view_detach(struct indexer_view *view);
 
+/**
+ * Refresh the view, after the content was modified (
+ * after a reload, for example)
+ */
+void indexer_view_refresh(struct indexer_view *view);
+
 #endif /* INDEXER_VIEW_H */

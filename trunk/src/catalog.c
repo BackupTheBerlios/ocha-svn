@@ -281,7 +281,7 @@ gboolean catalog_get_source_content(struct catalog *catalog,
                                    " s.id, s.type, e.launcher, e.lastuse "
                                    "FROM entries e, sources s "
                                    "WHERE e.source_id=%d and s.id=%d "
-                                   "ORDER BY e.path",
+                                   "ORDER BY UPPER(e.name), UPPER(e.long_name)",
                                    source_id,
                                    source_id);
         catalog->callback=NULL;

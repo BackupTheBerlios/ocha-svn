@@ -55,6 +55,7 @@ static void cell_data_func(GtkTreeViewColumn* col,
                            GtkTreeModel* model,
                            GtkTreeIter* iter,
                            gpointer userdata);
+static void attach_unconditionally(struct content_view *view, int source_id);
 
 /* ------------------------- definitions */
 
@@ -87,19 +88,15 @@ void content_view_attach(struct content_view *view, int source_id)
         if(view->attached && view->source_id==source_id) {
                 return;
         }
-        if(view->attached) {
-                content_view_detach(view);
+        attach_unconditionally(view, source_id);
+}
+void content_view_refresh(struct content_view *view)
+{
+        g_return_if_fail(view);
+        if(!view->attached) {
+                return;
         }
-        g_assert(!view->attached);
-
-        view->source_id=source_id;
-        view->attached=TRUE;
-        view->treemodel=run_query(view);
-        if(view->treemodel) {
-                gtk_tree_view_set_model(view->treeview,
-                                        GTK_TREE_MODEL(view->treemodel));
-        }
-        gtk_widget_show(view->widget);
+        attach_unconditionally(view, view->source_id);
 }
 
 void content_view_detach(struct content_view *view)
@@ -243,4 +240,21 @@ static void cell_data_func(GtkTreeViewColumn* col,
                              "...",
                              NULL);
         }
+}
+
+static void attach_unconditionally(struct content_view *view, int source_id)
+{
+        if(view->attached) {
+                content_view_detach(view);
+        }
+        g_assert(!view->attached);
+
+        view->source_id=source_id;
+        view->attached=TRUE;
+        view->treemodel=run_query(view);
+        if(view->treemodel) {
+                gtk_tree_view_set_model(view->treeview,
+                                        GTK_TREE_MODEL(view->treemodel));
+        }
+        gtk_widget_show(view->widget);
 }

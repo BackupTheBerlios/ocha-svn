@@ -139,6 +139,11 @@ void indexer_view_detach(struct indexer_view *view)
         content_view_detach(view->content);
 }
 
+void indexer_view_refresh(struct indexer_view *view)
+{
+        g_return_if_fail(view);
+        content_view_refresh(view->content);
+}
 /* ------------------------- static functions */
 static void init_widgets(struct indexer_view *view)
 {

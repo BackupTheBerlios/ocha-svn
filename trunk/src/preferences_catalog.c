@@ -304,6 +304,7 @@ static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current)
                                                            current,
                                                            source_id,
                                                            prefs->catalog);
+                                        indexer_view_refresh(prefs->properties);
                                 }
                         }
                         g_free(type);

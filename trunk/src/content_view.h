@@ -40,6 +40,12 @@ void content_view_destroy(struct content_view *view);
 void content_view_attach(struct content_view *view, int source_id);
 
 /**
+ * If the view is currently attached to a source,
+ * re-run the query and update the content.
+ */
+void content_view_refresh(struct content_view *view);
+
+/**
  * Detach the content view from any source.
  * @param view
  */
