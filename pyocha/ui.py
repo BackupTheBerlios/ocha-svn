@@ -239,7 +239,7 @@ class QueryWin(QueryObserver):
             else:
                 self.query.append(event.string)
 
-
+gtk.gtk_init()
 query=Query(conf.catalog_path())
 win=QueryWin(query, conf.timeout())
 

@@ -35,7 +35,7 @@ def isforbidden(path):
             return True
     return False
 
-EXTS=[ ".c", ".h", ".py", ".java", ".desktop"]
+EXTS=[ ".c", ".h", ".py", ".java", ".desktop", ".txt", ".xml", ".xsl", ".txt", ".jsp", ".inc", ".jspf" ]
 def isinteresting(path, file):
     for ext in EXTS:
         if file.endswith(ext):
@@ -74,45 +74,49 @@ def addDesktopEntry(file):
 
     entry.setLocale("C")
     display_name=entry.getName()
+    if not display_name:
+        display_name=os.path.basename(file)[0:-len(".desktop")]
     catalog.insertEntry(file, display_name, run)
 
 
 def addTextEntry(file):
     catalog.insertEntry(file, command=xemacs)
 
-def addProject(file):
-    name=os.path.basename(file)
-    parent=os.path.dirname(file)
-    while os.path.exists(os.path.join(parent, "CVS")):
-        name=os.path.join(os.path.basename(parent), name)
-        parent=os.path.dirname(parent)
-    if name.startswith("trunk") or file[0] in ( '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' ):
-        name=os.path.join(os.path.basename(parent), name)
-    print "add project: "+name+" ("+file+")"
-    catalog.insertEntry(path=file, display_name=name, command=project)
+def addProject(projectbase, path):
+    projectname=path[len(projectbase):]
+    if projectname.startswith("/"):
+        projectname=projectname[1:]
+    catalog.insertEntry(path=path,
+                        display_name=projectname,
+                        command=project)
+
+PROJECTPATH=[ "/work/cvsvap",
+              "/work/cvsapp",
+              "/work/blossom",
+              "/work/cvsoag",
+              "/opt/projects",
+              os.environ["HOME"]+"/projects" ]
+SPECIAL=[ "CVS", ".svn" ]
 
 for dir in args:
     for root, dirs, files in os.walk(dir):
         if isforbidden(root):
             continue
-        if "project.xml" in files:
-            if not catalog.entryForPath(root):
-                addProject(root)
-
-        existing=catalog.entriesInDirectory(dir)
-        existing_files=map(lambda x: x.path, existing)
+        for projectpath in PROJECTPATH:
+            if root.startswith(projectpath):
+                for dir in dirs:
+                    for special in SPECIAL:
+                        if not special in dirs and os.path.exists(os.path.join(root, dir, special)):
+                            addProject(projectpath, os.path.join(root, dir))
         for file in files:
             if isinteresting(root, file):
                 file=os.path.join(root, file)
-                if not file in existing_files:
-                    add(file)
-                    existing_files.append(file)
-        for old in existing:
-            if not old.exists():
-                existing.delete()
+                add(file)
+        catalog.commit()
         if wait:
-            catalog.commit()
             time.sleep(WAIT_UNIT)
+
+catalog.removeStaleEntries()
 
 catalog.commit()
 

@@ -93,6 +93,9 @@ class Catalog:
     def removeEntry(self, id):
         self.__cursor.execute("DELETE FROM entries WHERE id=%s", id)
 
+    def removeEntryByPath(self, path):
+        self.__cursor.execute("DELETE FROM entries WHERE path=%s", id)
+
     def commands(self):
         self.__cursor.execute("SELECT id,display_name,execute FROM command")
         retval=[]
@@ -110,8 +113,9 @@ class Catalog:
         directory=os.path.dirname(path)
         if not display_name:
             display_name=filename
-        self.__cursor.execute("INSERT INTO entries ( id, filename, directory, display_name, command_id ) VALUES ( NULL, %s, %s, %s, %s)",
-                              (filename, directory, display_name, command_id))
+        self.__cursor.execute("DELETE FROM entries WHERE path=%s", path)
+        self.__cursor.execute("INSERT INTO entries ( id, filename, directory, path, display_name, command_id ) VALUES ( NULL, %s, %s, %s, %s, %s)",
+                              (filename, directory, path, display_name, command_id))
         entry=Entry(self,
                     id=self.__cursor.lastrowid,
                     filename=filename,
@@ -134,10 +138,8 @@ class Catalog:
 
     def entryForPath(self, path):
         """find an entry with the given path"""
-        dir=os.path.dirname(path)
-        file=os.path.basename(path)
         cursor=self.__cursor
-        cursor.execute(self.__query_base+" WHERE directory = %s and filename=%s", dir, file)
+        cursor.execute(self.__query_base+" WHERE path=%s", path)
         retval=None
         def collect(catalog, entry):
             retval=entry
@@ -146,18 +148,17 @@ class Catalog:
         return retval
 
 
-    def entriesInDirectory(self, dir):
-        """find all the entries in a certain directory"""
+    def removeStaleEntries(self):
+        """go through all the entries and remove those with no corresponding file"""
         cursor=self.__cursor
-        if dir.endswith('/'):
-            dir=dir[0:-1]
-        cursor.execute(self.__query_base+" WHERE directory = '"+dir+"'")
-        retval=[]
-        def collect(catalog, entry):
-            retval.append(entry)
-            return True
-        self.__parse_results(cursor, collect)
-        return retval
+        todelete=[]
+        cursor.execute("SELECT path FROM entries")
+        for row in cursor:
+            path=row[0]
+            if not os.path.exists(path):
+                todelete.add(path)
+        for path in todelete:
+            cursor.execute("DELETE FROM entries WHERE path=%s", path)
 
 
     def query(self, query, callback):
@@ -209,6 +210,7 @@ class Catalog:
             cursor.execute("CREATE TABLE entries (id INTEGER PRIMARY KEY, "
                                                   +"filename VARCHAR NOT NULL, "
                                                   +"directory VARCHAR, "
+                                                  +"path VARCHAR UNIQUE NOT NULL, "
                                                   +"display_name VARCHAR NOT NULL, "
                                                   +"command_id INTEGER, "
                                                   +"lastuse TIMESTAMP)")
