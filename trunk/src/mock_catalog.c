@@ -205,6 +205,12 @@ gboolean catalog_get_source_attribute(struct catalog *catalog, int source_id, co
    return TRUE;
 }
 
+gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id)
+{
+   fail("unexpected call");
+   return FALSE;
+}
+
 /* ------------------------- static */
 static void expectation_init(struct expectation *ex, const char *description)
 {

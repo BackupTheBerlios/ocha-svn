@@ -49,7 +49,6 @@ gboolean          gnome_desktop_file_save            (GnomeDesktopFile          
                                                       const char                 *path,
                                                       int                         mode,
                                                       GError                    **error);
-char *            gnome_desktop_file_to_string       (GnomeDesktopFile           *df);
 void              gnome_desktop_file_free            (GnomeDesktopFile           *df);
 void              gnome_desktop_file_launch          (GnomeDesktopFile           *df,
                                                       char                      **argv,
@@ -70,9 +69,6 @@ gboolean                 gnome_desktop_file_add_section     (GnomeDesktopFile   
                                                              const char                  *name);
 gboolean                 gnome_desktop_file_remove_section  (GnomeDesktopFile            *df,
                                                              const char                  *name);
-void                     gnome_desktop_file_rename_section  (GnomeDesktopFile            *df,
-                                                             const char                  *old_name,
-                                                             const char                  *new_name);
 gboolean                 gnome_desktop_file_has_section     (GnomeDesktopFile            *df,
                                                              const char                  *name);
 
@@ -125,47 +121,11 @@ gboolean gnome_desktop_file_get_regexps        (GnomeDesktopFile   *df,
                                                 char             ***vals,
                                                 int                *len);
 
-void gnome_desktop_file_set_raw                (GnomeDesktopFile  *df,
-                                                const char        *section,
-                                                const char        *keyname,
-                                                const char        *locale,
-                                                const char        *value);
-gboolean gnome_desktop_file_set_string        (GnomeDesktopFile  *df,
-                                               const char        *section,
-                                               const char        *keyname,
-                                               const char        *value);
-void     gnome_desktop_file_set_strings       (GnomeDesktopFile  *df,
-                                               const char        *section,
-                                               const char        *keyname,
-                                               const char        *locale,
-                                               const char       **value);
-
-void gnome_desktop_file_merge_string_into_list  (GnomeDesktopFile *df,
-                                                 const char        *section,
-                                                 const char        *keyname,
-                                                 const char        *locale,
-                                                 const char        *value);
-void gnome_desktop_file_remove_string_from_list (GnomeDesktopFile *df,
-                                                 const char        *section,
-                                                 const char        *keyname,
-                                                 const char        *locale,
-                                                 const char        *value);
-
 
 const char* desktop_file_get_encoding_for_locale (const char *locale);
-
 void gnome_desktop_file_unset            (GnomeDesktopFile *df,
                                           const char       *section,
                                           const char       *keyname);
-void gnome_desktop_file_unset_for_locale (GnomeDesktopFile *df,
-                                          const char       *section,
-                                          const char       *keyname,
-                                          const char       *locale);
-
-void gnome_desktop_file_copy_key (GnomeDesktopFile *df,
-                                  const char       *section,
-                                  const char       *source_key,
-                                  const char       *dest_key);
 
 /* ... More setters ... */
 

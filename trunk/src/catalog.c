@@ -13,6 +13,9 @@
 #include <errno.h>
 #include <stdarg.h>
 
+#define SCHEMA_VERSION 1
+#define SCHEMA_REVISION 0
+
 /** Hidden catalog structure */
 struct catalog
 {
@@ -530,8 +533,12 @@ static gboolean create_tables(sqlite *db, char **errmsg)
                                              "attribute VARCHAR NOT NULL,"
                                              "value VARCHAR NOT NULL,"
                                              "PRIMARY KEY (source_id, attribute));"
+                                             "CREATE TABLE VERSION ( version INTEGER, revision INTEGER );"
+                                             "INSERT INTO VERSION VALUES ( %d, %d );"
                                              "COMMIT;",
-                                             errmsg);
+                                             errmsg,
+                                             SCHEMA_VERSION,
+                                             SCHEMA_REVISION);
    return ret==SQLITE_OK;
 }
 
