@@ -138,13 +138,22 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
       }
    return FALSE; /*propagate*/
 }
-static void cell_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, GtkTreeModel* model, GtkTreeIter* iter, gpointer userdata)
+static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, GtkTreeModel* model, GtkTreeIter* iter, gpointer userdata)
 {
    struct result *result = NULL;
    gtk_tree_model_get(model, iter, 0, &result, -1);
    g_return_if_fail(result);
-   g_object_set(renderer, "text", result->name, NULL);
+   int buffer_len = 3+5+strlen(result->name)+6+4+1+7+strlen(result->path)+8+1;
+   char buffer[buffer_len];
+   strcpy(buffer, "<b><big>");
+   strcat(buffer, result->name);
+   strcat(buffer, "</big></b>\n<small>");
+   strcat(buffer, result->path);
+   strcat(buffer, "</small>");
+   g_assert(strlen(buffer)==(buffer_len-1));
+   g_object_set(renderer, "markup", buffer, NULL);
 }
+
 
 static void selection_changed_cb(GtkTreeSelection* selection, gpointer userdata)
 {
@@ -168,12 +177,12 @@ static void querywin_init_list()
 
 
    GtkTreeViewColumn* col = gtk_tree_view_column_new();
-   GtkCellRenderer* cell_renderer = gtk_cell_renderer_text_new();
+   GtkCellRenderer* cell_renderer_name = gtk_cell_renderer_text_new();
    gtk_tree_view_column_set_title(col, "Result");
-   gtk_tree_view_column_pack_start(col, cell_renderer, TRUE/*expand*/);
+   gtk_tree_view_column_pack_start(col, cell_renderer_name, TRUE/*expand*/);
    gtk_tree_view_column_set_cell_data_func(col,
-                                           cell_renderer,
-                                           cell_data_func,
+                                           cell_renderer_name,
+                                           cell_name_data_func,
                                            NULL/*data*/,
                                            NULL/*destroy*/);
    gtk_tree_view_append_column(view, col);
