@@ -31,7 +31,7 @@ static gboolean queryrunner_started;
  */
 static gboolean verified=-1;
 
-#define QUERY_TIMEOUT 3000
+#define QUERY_TIMEOUT 800
 #define assert_initialized() g_return_if_fail(result_queue)
 #define assert_queryrunner_set() g_return_if_fail(queryrunner);
 
@@ -106,12 +106,6 @@ void querywin_start()
 
         if(verified==-1) {
                 verified=0;
-                printf("%s:%d: add idle. verified=%d\n", /*@nocommit@*/
-                       __FILE__,
-                       __LINE__,
-                       verified
-                       );
-
                 g_idle_add(verify_when_idle_cb, NULL/*data*/);
         }
 
