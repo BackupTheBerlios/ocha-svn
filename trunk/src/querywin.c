@@ -180,8 +180,11 @@ static void set_query_string()
    resultlist_set_current_query(query_str->str);
    g_timeout_add(300, run_query, NULL/*userdata*/);
 }
+
 /**
- * Empty the query string and the result list
+ * Empty the query string and the result list.
+ * It's not quite the same as setting the query
+ * to the empty string so use this one whenever you can.
  */
 static void reset_query_string()
 {
