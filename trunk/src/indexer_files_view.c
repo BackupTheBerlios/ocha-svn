@@ -32,8 +32,10 @@ struct indexer_files_view
         gboolean disable_cb;
 
         /** The label that displays the current path */
-        GtkLabel *path;
-        /** The file chooser button */
+        GtkEntry *path;
+        /** The button that opens the chooser dialog */
+        GtkButton *choose_button;
+        /** The file chooser dialog */
         GtkFileChooser *choose;
         /** Include content checkbox */
         GtkToggleButton *include_contents;
@@ -57,6 +59,7 @@ static void indexer_files_view_release(struct indexer_source_view *view);
 /* ------------------------- prototypes: other */
 static GtkWidget *create_widget(struct indexer_files_view *view);
 static void update_widgets(struct indexer_files_view *view);
+static void update_from_text_fields(struct indexer_files_view *view);
 static void connect_widgets(struct indexer_files_view *view);
 static void depth_changed_cb(GtkRange *range, gpointer userdata);
 static void update_depth_label_cb(GtkRange *range, gpointer userdata);
@@ -65,9 +68,8 @@ static void include_content_set_attribute_cb(GtkToggleButton *toggle, gpointer u
 static void recursive_set_sensitive(GtkContainer *parent, gboolean active, GtkWidget *exclude);
 static void include_content_disable_cb(GtkToggleButton *toggle, gpointer userdata);
 static void include_content_reset_depth_cb(GtkToggleButton *toggle, gpointer userdata);
-static void change_path_cb(GtkFileChooser *chooser, gpointer userdata);
-static void update_path_label_cb(GtkFileChooser *chooser, gpointer userdata);
-
+static void choose_file_cb(GtkButton *toggle, gpointer userdata);
+static void update_path(struct indexer_files_view *view);
 /* ------------------------- public functions */
 
 struct indexer_source_view *indexer_files_view_new(struct indexer *indexer)
@@ -76,6 +78,8 @@ struct indexer_source_view *indexer_files_view_new(struct indexer *indexer)
         g_return_val_if_fail(indexer!=NULL, NULL);
 
         retval=g_new(struct indexer_files_view, 1);
+        memset(retval, 0, sizeof(struct indexer_files_view));
+
         retval->base.indexer = indexer;
         retval->base.source_id=-1;
         retval->disable_cb=TRUE;
@@ -105,6 +109,10 @@ static void indexer_files_view_attach(struct indexer_source_view *_view, struct 
                 return;
         }
 
+        if(view->base.source_id>0) {
+                update_from_text_fields(view);
+        }
+
         view->disable_cb=TRUE;
         view->base.source_id=source->id;
         update_widgets(view);
@@ -119,6 +127,7 @@ static void indexer_files_view_detach(struct indexer_source_view *_view)
         g_return_if_fail(view!=NULL);
         view->disable_cb=TRUE;
         if(view->base.source_id>0) {
+                update_from_text_fields(view);
                 view->base.source_id=-1;
                 update_widgets(view);
         }
@@ -131,6 +140,9 @@ static void indexer_files_view_release(struct indexer_source_view *_view)
 
         g_return_if_fail(view!=NULL);
         indexer_files_view_detach(_view);
+        if(view->choose) {
+                gtk_widget_destroy(GTK_WIDGET(view->choose));
+        }
         g_object_unref(view->base.widget);
         g_free(view);
 }
@@ -145,9 +157,8 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
         GtkWidget *frame_top_label;
         GtkWidget *align;
         GtkWidget *top_table;
-        GtkWidget *pathLabel;
         GtkWidget *path;
-        GtkWidget *choose;
+        GtkWidget *choose_button;
         GtkWidget *frame_bottom;
         GtkWidget *frame_bottom_label;
         GtkWidget *bottom_table;
@@ -176,7 +187,7 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
                            TRUE/*fill*/,
                            0);
         gtk_frame_set_shadow_type(GTK_FRAME(frame_top), GTK_SHADOW_NONE);
-        frame_top_label =  gtk_label_new("<b>Folder</b>");
+        frame_top_label =  gtk_label_new("<b>Path</b>");
         gtk_widget_show(frame_top_label);
         gtk_frame_set_label_widget(GTK_FRAME(frame_top), frame_top_label);
         gtk_label_set_use_markup(GTK_LABEL(frame_top_label), TRUE);
@@ -187,32 +198,21 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
         gtk_alignment_set_padding(GTK_ALIGNMENT(align),
                                   0, 0, 12, 0);
 
-        top_table =  gtk_table_new(2/*rows*/,
-                                             2/*columns*/,
-                                             FALSE);
+        top_table =  gtk_table_new(1/*rows*/,
+                                   2/*columns*/,
+                                   FALSE);
         gtk_widget_show(top_table);
         gtk_container_add(GTK_CONTAINER(align), top_table);
 
-        pathLabel =  gtk_label_new("Path: ");
-        gtk_widget_show(pathLabel);
-        gtk_table_attach(GTK_TABLE(top_table),
-                         pathLabel, 0, 1, 0, 1,
-                         GTK_FILL, 0, 0, 0);
-        gtk_misc_set_alignment(GTK_MISC(pathLabel), 0, 0.5);
-        gtk_misc_set_padding(GTK_MISC(pathLabel), 4, 0);
-
-        path =  gtk_label_new("");
+        path =  gtk_entry_new();
         gtk_widget_show(path);
-        gtk_table_attach(GTK_TABLE(top_table), path, 1, 2, 0, 1,
+        gtk_table_attach(GTK_TABLE(top_table), path, 0, 1, 0, 1,
                          GTK_EXPAND | GTK_FILL, 0, 0, 0);
-        gtk_misc_set_alignment(GTK_MISC(path), 0, 0.5);
-        gtk_misc_set_padding(GTK_MISC(path), 4, 0);
 
-        choose =  gtk_file_chooser_button_new("Path",
-                            GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
-        gtk_widget_show(choose);
-        gtk_table_attach(GTK_TABLE(top_table), choose, 1, 2, 1, 2,
-                         GTK_EXPAND | GTK_FILL, 0, 0, 0);
+        choose_button = gtk_button_new_with_label("Choose");
+        gtk_widget_show(choose_button);
+        gtk_table_attach(GTK_TABLE(top_table), choose_button, 1, 2, 0, 1,
+                         0, 0, 0, 0);
 
         /* --- Bottom frame: Indexing */
 
@@ -319,9 +319,9 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
         gtk_misc_set_alignment(GTK_MISC(explanation), 0, 0);
         gtk_misc_set_padding(GTK_MISC(explanation), 4, 0);
 
-        view->path=GTK_LABEL(path);
-        view->choose=GTK_FILE_CHOOSER(choose);
+        view->path=GTK_ENTRY(path);
         view->include_contents=GTK_TOGGLE_BUTTON(include_contents);
+        view->choose_button=GTK_BUTTON(choose_button);
         view->depth_value=GTK_LABEL(depth_value);
         view->depth=GTK_RANGE(depth);
         view->includes=GTK_ENTRY(include);
@@ -332,15 +332,6 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
 
 static void connect_widgets(struct indexer_files_view  *view)
 {
-        g_signal_connect(view->choose,
-                         "selection-changed",
-                         G_CALLBACK(update_path_label_cb),
-                         view);
-        g_signal_connect(view->choose,
-                         "selection-changed",
-                         G_CALLBACK(change_path_cb),
-                         view);
-
         g_signal_connect(view->include_contents,
                          "toggled",
                          G_CALLBACK(include_content_set_attribute_cb),
@@ -365,6 +356,12 @@ static void connect_widgets(struct indexer_files_view  *view)
                          "toggled",
                          G_CALLBACK(include_content_reset_depth_cb),
                          view);
+
+        g_signal_connect(view->choose_button,
+                         "clicked",
+                         G_CALLBACK(choose_file_cb),
+                         view);
+
 }
 
 
@@ -403,8 +400,7 @@ static void update_widgets(struct indexer_files_view *view)
                 current_depth_i=DEPTH_INFINITY;
         }
 
-        gtk_file_chooser_set_filename(view->choose,
-                                      current_path ? current_path:"/");
+        gtk_entry_set_text(view->path, current_path ? current_path:"");
         gtk_toggle_button_set_active(view->include_contents,
                                      current_depth_i>0);
         gtk_entry_set_text(view->excludes, current_ignore ? current_ignore:"");
@@ -425,6 +421,11 @@ static void update_widgets(struct indexer_files_view *view)
         } else {
                 gtk_widget_set_sensitive(GTK_WIDGET(view->base.widget), TRUE);
         }
+}
+
+static void update_from_text_fields(struct indexer_files_view *view)
+{
+        update_path(view);
 }
 
 static void depth_changed_cb(GtkRange *range, gpointer userdata)
@@ -585,46 +586,72 @@ static void include_content_reset_depth_cb(GtkToggleButton *toggle, gpointer use
         }
 }
 
-static void change_path_cb(GtkFileChooser *chooser, gpointer userdata)
+static void choose_file_cb(GtkButton *button, gpointer userdata)
 {
         struct indexer_files_view *view;
-        gchar *filename;
-        int source_id;
+        gboolean changed;
+        char *old;
 
-        g_return_if_fail(chooser);
         g_return_if_fail(userdata);
         view = (struct indexer_files_view *)userdata;
         if(view->disable_cb) {
                 return;
         }
-
-        source_id = view->base.source_id;
-        if(source_id<=0) {
+        if(view->base.source_id<=0) {
                 return;
         }
-        filename = gtk_file_chooser_get_filename(chooser);
 
-        ocha_gconf_set_source_attribute(INDEXER_NAME, source_id, "path", filename);
-        if(filename) {
-                g_free(filename);
+        if(view->choose==NULL) {
+                GtkWidget *dialog;
+                dialog=gtk_file_chooser_dialog_new("",
+                                                   GTK_WINDOW(gtk_widget_get_ancestor(GTK_WIDGET(button),
+                                                                                      GTK_TYPE_WINDOW)),
+                                                   GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
+                                                   GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+                                                   GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
+                                                   NULL);
+                view->choose=GTK_FILE_CHOOSER(dialog);
+        }
+        old = ocha_gconf_get_source_attribute(INDEXER_NAME,
+                                              view->base.source_id,
+                                              "path");
+        if(old) {
+                gtk_file_chooser_set_filename(view->choose, old);
+                g_free(old);
+        }
+        changed = gtk_dialog_run (GTK_DIALOG(view->choose))== GTK_RESPONSE_ACCEPT;
+        gtk_widget_hide(GTK_WIDGET(view->choose));
+
+        if (changed) {
+                char *filename;
+                filename = gtk_file_chooser_get_filename (view->choose);
+                ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                                view->base.source_id,
+                                                "path",
+                                                filename);
+                gtk_entry_set_text(view->path, filename ? filename:"");
+                g_free (filename);
         }
 }
-static void update_path_label_cb(GtkFileChooser *chooser, gpointer userdata)
+static void update_path(struct indexer_files_view *view)
 {
-        GtkLabel *label;
-        gchar *uri;
-        struct indexer_files_view *view;
-
-        g_return_if_fail(chooser);
-        g_return_if_fail(userdata);
-        view = (struct indexer_files_view *)userdata;
-
-        label =  view->path;
-        g_return_if_fail(label);
-
-        uri = gtk_file_chooser_get_uri(chooser);
-        gtk_label_set_text(label, uri ? uri:"");
-        if(uri) {
-                g_free(uri);
+        const char *path;
+        char *oldpath;
+        g_return_if_fail(view);
+        if(view->base.source_id<=0) {
+                return;
+        }
+        path = gtk_entry_get_text(view->path);
+        oldpath = ocha_gconf_get_source_attribute(INDEXER_NAME,
+                                                  view->base.source_id,
+                                                  "path");
+        if(!oldpath || strcmp(oldpath, path)!=0) {
+                ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                                view->base.source_id,
+                                                "path",
+                                                path);
+        }
+        if(oldpath) {
+                g_free(oldpath);
         }
 }
