@@ -442,7 +442,7 @@ static char *display_name(struct catalog *catalog, int id)
             const char *home = g_get_home_dir();
             if(g_str_has_prefix(path, home))
             {
-                GString *gstr = g_string_new("Mozilla ");
+                GString *gstr = g_string_new("");
                 if(strstr(path, "firefox")
                    || strstr(path, "Firefox")
                    || strstr(path, "firebird")
@@ -450,10 +450,13 @@ static char *display_name(struct catalog *catalog, int id)
                 {
                     g_string_append(gstr, "Firefox ");
                 }
+                else
+                   g_string_append(gstr, "Mozilla ");
                 if(profile_name)
                     {
-                        g_string_append(gstr, "Profile: ");
+                        g_string_append(gstr, "Profile \"");
                         g_string_append(gstr, profile_name);
+                        g_string_append(gstr, "\"");
                     }
                 else
                     {
