@@ -42,8 +42,8 @@ static void indexer_applications_source_view_detach(struct indexer_source_view *
 static void indexer_applications_source_view_release(struct indexer_source_view *view);
 
 /* ------------------------- prototypes: other */
-static GSList *maybe_add_directory(GSList *path, const char *directory);
-static GSList *maybe_add_directories(GSList *path, const char * const *directories);
+static GSList *maybe_add_applications_directory(GSList *path, const char *directory);
+static GSList *maybe_add_applications_directories(GSList *path, const char * const *directories);
 
 /* ------------------------- definitions */
 
@@ -82,10 +82,11 @@ static gboolean indexer_application_discover(struct indexer *indexer, struct cat
 {
         int source_id;
         gboolean retval = FALSE;
+        /** list of char * to free with g_free */
         GSList *paths = NULL;
 
-        paths=maybe_add_directory(paths, g_get_user_data_dir());
-        paths=maybe_add_directories(paths, g_get_system_data_dirs());
+        paths=maybe_add_applications_directory(paths, g_get_user_data_dir());
+        paths=maybe_add_applications_directories(paths, g_get_system_data_dirs());
 
         if(catalog_add_source(catalog, INDEXER_NAME, &source_id)) {
                 char *paths_key = ocha_gconf_get_source_attribute_key(INDEXER_NAME,
@@ -103,6 +104,7 @@ static gboolean indexer_application_discover(struct indexer *indexer, struct cat
                 g_free(paths_key);
         }
 
+        g_slist_foreach(paths, (GFunc)g_free, NULL/*no userdata*/);
         g_slist_free(paths);
         return retval;
 }
@@ -362,22 +364,36 @@ static gboolean index_application_cb(struct catalog *catalog,
         return retval;
 }
 
-static GSList *maybe_add_directory(GSList *path, const char *directory)
+/**
+ * If directory + '/applications' exists, add it into
+ * the list.
+ *
+ * The string added into the list will need to be
+ * g_free'd at some point...
+ *
+ * @param path the current list
+ * @param directory the directory to check
+ * @return the new current list
+ */
+static GSList *maybe_add_applications_directory(GSList *path, const char *directory)
 {
-        if(g_file_test(directory, G_FILE_TEST_EXISTS)
-                        && g_file_test(directory, G_FILE_TEST_IS_DIR))
+        char *full_directory = g_strdup_printf("%s/applications", directory);
+
+        if(g_file_test(full_directory, G_FILE_TEST_EXISTS)
+                        && g_file_test(full_directory, G_FILE_TEST_IS_DIR))
         {
-                path=g_slist_append(path, (gpointer)directory);
+                return g_slist_append(path, (gpointer)full_directory);
         }
+        g_free(full_directory);
         return path;
 }
 
-static GSList *maybe_add_directories(GSList *path, const char * const *directories)
+static GSList *maybe_add_applications_directories(GSList *path, const char * const *directories)
 {
         const char * const *current;
 
         for(current=directories; *current!=NULL; current++) {
-                path=maybe_add_directory(path, *current);
+                path=maybe_add_applications_directory(path, *current);
         }
 
         return path;
