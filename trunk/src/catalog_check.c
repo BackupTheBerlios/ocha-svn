@@ -174,6 +174,24 @@ START_TEST(test_addcommand)
 }
 END_TEST
 
+START_TEST(test_addcommand_noduplicate)
+{
+   printf("--- test_addcommand_noduplicate\n");
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+   int id_1 = -1;
+   fail_unless(catalog_addcommand(catalog, "edit", "edit %s", &id_1),
+               "1st addcommand failed");
+   int id_2 = -1;
+   fail_unless(catalog_addcommand(catalog, "edit", "edit2 %s", &id_2),
+               "2nd addcommand failed");
+   fail_unless(id_1==id_2, "different ids");
+
+   int id_found = -1;
+   catalog_findcommand(catalog, "edit", &id_found);
+   fail_unless(id_1==id_found, "different ids");
+}
+END_TEST
+
 START_TEST(test_addentry)
 {
    printf("--- test_addentry\n");
@@ -184,8 +202,28 @@ START_TEST(test_addentry)
 
    int entry_id=-1;
    catalog_cmd(catalog,
-               "addentry(/tmp/toto.txt)",
+               "1st addentry(/tmp/toto.txt)",
                catalog_addentry(catalog, "/tmp", "toto.txt", "Toto", command_id, &entry_id));
+
+   catalog_disconnect(catalog);
+}
+END_TEST
+
+START_TEST(test_addentry_noduplicate)
+{
+   printf("--- test_addentry_noduplicate\n");
+   struct catalog *catalog=catalog_connect(PATH, NULL);
+
+   int command_id=-1;
+   catalog_addcommand(catalog, "edit", "edit %s", &command_id);
+
+   int entry_id_1=-1;
+   fail_unless(catalog_addentry(catalog, "/tmp", "toto.txt", "Toto", command_id, &entry_id_1),
+               "1st addentry failed");
+   int entry_id_2=-1;
+   fail_unless(catalog_addentry(catalog, "/tmp", "toto.txt", "Toto", command_id, &entry_id_2),
+               "2nd addentry failed");
+
    catalog_disconnect(catalog);
 }
 END_TEST
@@ -586,7 +624,9 @@ Suite *catalog_check_suite(void)
    suite_add_tcase(s, tc_core);
    tcase_add_test(tc_core, test_create);
    tcase_add_test(tc_core, test_addcommand);
+   tcase_add_test(tc_core, test_addcommand_noduplicate);
    tcase_add_test(tc_core, test_addentry);
+   tcase_add_test(tc_core, test_addentry_noduplicate);
 
    tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
    suite_add_tcase(s, tc_query);

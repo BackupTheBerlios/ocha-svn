@@ -125,6 +125,15 @@ bool catalog_addcommand(struct catalog *catalog, const char *name, const char *e
 bool catalog_findcommand(struct catalog *catalog, const char *name, int *id_out);
 
 /**
+ * Find an entry by path.
+ * @param catalog
+ * @param path entry path
+ * @param id_out if non-null, this variable will be set to the generated ID of the command
+ * @return true if the command was found, false otherwise
+ */
+bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out);
+
+/**
  * Add an entry into the catalog.
  * @param catalog
  * @param directory directory the file can be found in

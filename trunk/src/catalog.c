@@ -91,6 +91,10 @@ static int execute_update_nocatalog(sqlite *db, const char *sql, char **errmsg)
 static bool execute_update(struct catalog *catalog)
 {
    char *errmsg=NULL;
+   g_string_prepend(catalog->sql, "BEGIN;");
+   if(catalog->sql->str[catalog->sql->len-1]!=';')
+      g_string_append_c(catalog->sql, ';');
+   g_string_append(catalog->sql, "COMMIT;");
    int ret = execute_update_nocatalog(catalog->db,
                                       catalog->sql->str,
                                       &errmsg);
@@ -278,7 +282,7 @@ static bool update_entry_timestamp(struct catalog *catalog, int entry_id)
    g_get_current_time(&timeval);
 
    g_string_printf(catalog->sql,
-                   "BEGIN;UPDATE entries SET lastuse='%16.16lx.%6.6lu' WHERE id=%d;COMMIT;",
+                   "UPDATE entries SET lastuse='%16.16lx.%6.6lu' WHERE id=%d;",
                    (unsigned long)timeval.tv_sec,
                    (unsigned long)timeval.tv_usec,
                    entry_id);
@@ -477,12 +481,26 @@ bool catalog_addcommand(struct catalog *catalog, const char *name, const char *e
    g_return_val_if_fail(name!=NULL, false);
    g_return_val_if_fail(execute!=NULL, false);
 
-   g_string_printf(catalog->sql,
-                   "INSERT INTO command (id, display_name, execute) VALUES (NULL, '%s', '%s');",
-                   name,
-                   execute);
+   int old_id = -1;
+   if(catalog_findcommand(catalog, name, &old_id))
+      {
+         g_string_printf(catalog->sql,
+                         "UPDATE command SET execute='%s' WHERE id=%d;",
+                         execute,
+                         old_id);
+         if(id_out)
+            *id_out=old_id;
+         return execute_update(catalog);
+      }
+   else
+      {
+         g_string_printf(catalog->sql,
+                         "INSERT INTO command (id, display_name, execute) VALUES (NULL, '%s', '%s');",
+                         name,
+                         execute);
 
-   return insert_and_get_id(catalog, id_out);
+         return insert_and_get_id(catalog, id_out);
+      }
 }
 
 /**
@@ -516,6 +534,25 @@ bool catalog_findcommand(struct catalog *catalog, const char *name, int *id_out)
    return false;
 }
 
+bool catalog_findentry(struct catalog *catalog, const char *path, int *id_out)
+{
+   g_return_val_if_fail(catalog!=NULL, false);
+   g_return_val_if_fail(path!=NULL, false);
+
+   g_string_printf(catalog->sql,
+                   "SELECT id FROM entries WHERE path='%s';",
+                   path);
+   int id=-1;
+
+   if(execute_query(catalog, findid_callback, &id) && id!=-1)
+      {
+         if(id_out)
+            *id_out=id;
+         return true;
+      }
+   return false;
+}
+
 bool catalog_addentry(struct catalog *catalog, const char *directory, const char *filename, const char *display_name, int command_id, int *id_out)
 {
    g_return_val_if_fail(catalog!=NULL, false);
@@ -523,13 +560,31 @@ bool catalog_addentry(struct catalog *catalog, const char *directory, const char
    g_return_val_if_fail(filename!=NULL, false);
    g_return_val_if_fail(display_name!=NULL, false);
 
-   g_string_printf(catalog->sql,
-                   "INSERT INTO entries (id, directory, filename, path, display_name, command_id) VALUES (NULL, '%s', '%s', '%s/%s', '%s', %d);",
-                   directory,
-                   filename,
-                   directory,
-                   filename,
-                   display_name,
-                   command_id);
-   return insert_and_get_id(catalog, id_out);
+   char path[strlen(directory)+1+strlen(filename)+1];
+   strcpy(path, directory);
+   if(directory[strlen(directory)-1]!='/')
+      strcat(path, "/");
+   strcat(path, filename);
+
+   int old_id=-1;
+   if(catalog_findentry(catalog, path, &old_id))
+      {
+         g_string_printf(catalog->sql,
+                         "UPDATE entries SET display_name='%s', command_id=%d WHERE id=%d;",
+                         display_name,
+                         command_id,
+                         old_id);
+         return execute_update(catalog);
+      }
+   else
+      {
+         g_string_printf(catalog->sql,
+                         "INSERT INTO entries (id, directory, filename, path, display_name, command_id) VALUES (NULL, '%s', '%s', '%s', '%s', %d);",
+                         directory,
+                         filename,
+                         path,
+                         display_name,
+                         command_id);
+         return insert_and_get_id(catalog, id_out);
+      }
 }
