@@ -18,7 +18,11 @@ struct full_target
    const gchar* mimetype;
    GArray *actions;
    int refs;
+   GStaticMutex mutex;
 };
+#define LOCK(target) g_static_mutex_lock(&((struct full_target *)target)->mutex)
+#define UNLOCK(target) g_static_mutex_unlock(&((struct full_target *)target)->mutex)
+
 struct action_ref
 {
    struct target_action *ref;
@@ -60,6 +64,8 @@ static struct full_target *target_new()
 				  actions,
 				  (mempool_freer_f)target_free_array);
    target->actions=actions;
+
+   g_static_mutex_init(&target->mutex);
    return target;
 }
 static void target_delete(struct full_target *target)
@@ -110,7 +116,11 @@ struct target *target_ref(struct target* target)
 {
    g_return_val_if_fail(target, NULL);
    struct full_target *full = to_full_target(target);
+
+   LOCK(target);
    full->refs++;
+   UNLOCK(target);
+
    return target;
 }
 
@@ -118,38 +128,54 @@ void target_unref(struct target* target)
 {
    g_return_if_fail(target);
    struct full_target *full = to_full_target(target);
+   
+   LOCK(target);
    full->refs--;
    int refs = full->refs;
    if(refs<0) 
 	  g_warning("reference below 0 (%d) in target 0x%lx\n", refs, target);
-   else if(refs==0)
+   else if(refs==0) {
 	  target_delete(full);
+	  g_static_mutex_free(&full->mutex);
+	  return;
+   } 
+   UNLOCK(target);
 }
 
 const gchar *target_get_mimetype(struct target* target)
 {
-   g_return_val_if_fail(target, NULL);
-   return to_full_target(target)->mimetype;
+   g_return_val_if_fail(target, NULL);					
+
+   LOCK(target);
+   const gchar *retval = to_full_target(target)->mimetype;
+   UNLOCK(target);
+   return retval;
 }
 
 void target_set_mimetype(struct target* target, const gchar *mimetype)
 {
    struct full_target *full = to_full_target(target);
+
+   LOCK(target);
    if(mimetype)
 	  full->mimetype=target_strdup(full, mimetype);
    else
 	  full->mimetype=NULL;
+   UNLOCK(target);
 }
 
 unsigned int target_get_actions(struct target* target, struct target_action **target_actions, unsigned int action_dest_size)
 {
    g_return_val_if_fail(target!=NULL, 0);
+
+   LOCK(target);
    GArray* actions = to_full_target(target)->actions;
+   int len = actions->len;
    if(target_actions) {
 
 	  guint tocopy = action_dest_size;
-	  if(actions->len<tocopy)
-		 tocopy=actions->len;
+	  if(len<tocopy)
+		 tocopy=len;
 
 	  for(int i=0; i<tocopy; i++) {
 		 struct action_ref *ref = &g_array_index(actions, 
@@ -161,7 +187,9 @@ unsigned int target_get_actions(struct target* target, struct target_action **ta
 		 target_actions[i]=NULL;
 
    }
-   return actions->len;
+   UNLOCK(target);
+
+   return len;
 }
 
 void target_add_action(struct target* target, struct target_action* target_action, target_action_f action_callback)
@@ -170,12 +198,16 @@ void target_add_action(struct target* target, struct target_action* target_actio
    g_return_if_fail(target_action!=NULL);
    g_return_if_fail(action_callback!=NULL);
 
+
    struct full_target *full_target = to_full_target(target);
+
+   LOCK(target);
    GArray* actions = full_target->actions;
    g_array_set_size(actions, actions->len+1);
    struct action_ref *ref= &((struct action_ref*)actions->data)[actions->len-1];
    ref->ref = target_action;
    ref->call = action_callback;
+   UNLOCK(target);
 }
 
 static int target_find_action_ref_index(struct full_target *target, struct target_action *action)
@@ -196,14 +228,20 @@ bool target_execute_action(struct target* target, struct target_action* target_a
    g_return_val_if_fail(target_action!=NULL, false);
 
    struct full_target *full_target = to_full_target(target);
+
+   LOCK(target);
    int index = target_find_action_ref_index(full_target, target_action);
    if(index>=0) {
 	  struct action_ref *ref = &g_array_index(full_target->actions, 
 											  struct action_ref, 
 											  index);
-	  ref->call(target, target_action);
+	  target_action_f call = ref->call;
+	  UNLOCK(target);
+
+	  call(target, target_action);
 	  return true;
    } else {
+	  UNLOCK(target);
 	  return false;
    }
 }
@@ -214,14 +252,18 @@ bool target_remove_action(struct target* target, struct target_action* target_ac
    g_return_val_if_fail(target_action!=NULL, false);
 
    struct full_target *full_target = to_full_target(target);
+
+   LOCK(target);
    int index = target_find_action_ref_index(full_target, target_action);
+   bool retval;
    if(index>=0) {
 	  g_array_remove_index(full_target->actions, index);
-	  return true;
+	  retval=true; 
    } else {
-	  return false;
+	  retval=false;
    }
-
+   UNLOCK(target);
+   return retval;
 }
   
 gpointer target_mempool_alloc(struct target* target, size_t size)
@@ -229,12 +271,21 @@ gpointer target_mempool_alloc(struct target* target, size_t size)
    g_return_val_if_fail(target!=NULL, NULL);
 
    struct full_target *full_target = to_full_target(target);
-   return mempool_alloc(full_target->mempool, size);
+   gpointer retval;
+
+   LOCK(target);
+   retval = mempool_alloc(full_target->mempool, size);
+   UNLOCK(target);
+
+   return retval;
 }
 
 void target_mempool_enlist(struct target *target, gpointer resource, mempool_freer_f freer)
 {
    g_return_if_fail(target!=NULL);
    struct full_target *full_target = to_full_target(target);
+
+   LOCK(target);
    mempool_enlist(full_target->mempool, resource, freer);
+   UNLOCK(target);
 }
