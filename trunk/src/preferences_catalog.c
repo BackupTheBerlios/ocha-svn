@@ -21,6 +21,8 @@ typedef enum {
         COLUMN_COUNT,
         /** TRUE if this is a system source */
         COLUMN_IS_SYSTEM,
+        /** TRUE if the source is enabled, FALSE otherwise */
+        COLUMN_ENABLED,
 
         NUMBER_OF_COLUMNS
 } TreeViewColumns;
@@ -59,7 +61,7 @@ static gboolean find_iter_for_source(GtkListStore *model, int goal_id, GtkTreeIt
 static void display_name_changed(struct indexer_source *source, gpointer userdata);
 static void add_source(GtkListStore *model, struct indexer *indexer, struct catalog *catalog, int source_id, GtkTreeIter *iter_out);
 static void update_entry_count(GtkListStore *model, GtkTreeIter *iter, unsigned int source_id, struct catalog *catalog);
-static GtkTreeView *createView(GtkTreeModel *model);
+static GtkTreeView *createView(GtkTreeModel *model, struct preferences_catalog *prefs);
 static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current);
 static void reload_cb(GtkButton *button, gpointer userdata);
 static void update_properties(struct preferences_catalog  *prefs);
@@ -70,6 +72,7 @@ static void new_source_popup_cb(GtkButton *button, gpointer userdata);
 static void delete_cb(GtkButton *button, gpointer userdata);
 static GtkWidget *init_widget(struct preferences_catalog *prefs);
 static gint list_sort_cb(GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b, gpointer userdata);
+static void source_enabled_toggle_cb(GtkCellRendererToggle *cell, gchar *path_string, gpointer userdata);
 
 /* ------------------------- public functions */
 static int count_indexers(struct indexer **indexers)
@@ -103,7 +106,7 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
 
 
 
-        prefs->view = createView(GTK_TREE_MODEL(prefs->model));
+        prefs->view = createView(GTK_TREE_MODEL(prefs->model), prefs);
         prefs->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(prefs->view));
         prefs->properties=indexer_view_new(catalog);
         prefs->widget = init_widget(prefs);
@@ -133,8 +136,9 @@ static GtkListStore *createModel(struct catalog *catalog)
                                    G_TYPE_STRING/*COLUMN_INDEXER_TYPE*/,
                                    G_TYPE_INT/*COLUMN_SOURCE_ID*/,
                                    G_TYPE_UINT/*COLUMN_COUNT*/,
-                                   G_TYPE_BOOLEAN/*COLUMN_CAN_DELETE*/);
-        g_assert(NUMBER_OF_COLUMNS==5);
+                                   G_TYPE_BOOLEAN/*COLUMN_SYSTEM*/,
+                                   G_TYPE_BOOLEAN/*COLUMN_ENABLED*/);
+        g_assert(NUMBER_OF_COLUMNS==6);
 
         for(indexers = indexers_list();
             *indexers;
@@ -223,14 +227,18 @@ static void add_source(GtkListStore *model,
         struct indexer_source *source = indexer_load_source(indexer, catalog, source_id);
         if(source!=NULL)
         {
+                gboolean source_enabled=TRUE;
                 gtk_list_store_append(model, &iter);
                 if(iter_out)
                         memcpy(iter_out, &iter, sizeof(GtkTreeIter));
+
+                catalog_source_get_enabled(catalog, source_id, &source_enabled);
                 gtk_list_store_set(model, &iter,
                                    COLUMN_LABEL, source->display_name,
                                    COLUMN_INDEXER_TYPE, indexer->name,
                                    COLUMN_SOURCE_ID, source_id,
                                    COLUMN_IS_SYSTEM, source->system,
+                                   COLUMN_ENABLED, source_enabled,
                                    -1);
 
                 indexer_source_notify_display_name_change(source,
@@ -262,12 +270,14 @@ static void update_entry_count(GtkListStore *model,
                            -1);
 }
 
-static GtkTreeView *createView(GtkTreeModel *model)
+static GtkTreeView *createView(GtkTreeModel *model, struct preferences_catalog *prefs)
 {
         GtkWidget *_view = gtk_tree_view_new_with_model(model);
         GtkTreeView *view = GTK_TREE_VIEW(_view);
         GtkTreeViewColumn *labelCol;
         GtkTreeViewColumn *countCol;
+        GtkTreeViewColumn *enabledCol;
+        GtkCellRenderer *enabledRenderer;
         gtk_widget_show(_view);
 
         gtk_tree_view_set_headers_visible(view, TRUE);
@@ -288,6 +298,23 @@ static GtkTreeView *createView(GtkTreeModel *model)
                         NULL);
         countCol = gtk_tree_view_get_column(view, 1);
         gtk_tree_view_column_set_expand(countCol, FALSE);
+
+        enabledRenderer = gtk_cell_renderer_toggle_new();
+        g_object_set(enabledRenderer, "activatable", TRUE, NULL);
+        g_signal_connect(enabledRenderer,
+                         "toggled",
+                         G_CALLBACK(source_enabled_toggle_cb),
+                         prefs);
+
+        gtk_tree_view_insert_column_with_attributes(view,
+                                                    2,
+                                                    "\xe2\x9c\x93" /*CHECK MARK U+2713*/,
+                                                    enabledRenderer,
+                                                    "active", COLUMN_ENABLED,
+                                                    NULL);
+        enabledCol = gtk_tree_view_get_column(view, 2);
+        gtk_tree_view_column_set_expand(enabledCol, FALSE);
+
         return view;
 }
 
@@ -729,5 +756,36 @@ static gint list_sort_cb(GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b, gp
                 g_free(a_label);
                 g_free(b_label);
                 return retval;
+        }
+}
+
+static void source_enabled_toggle_cb(GtkCellRendererToggle *cell, gchar *path_string, gpointer userdata)
+{
+        struct preferences_catalog *prefs;
+        gboolean enabled = TRUE;
+        int source_id;
+        GtkTreeIter iter;
+
+        g_return_if_fail(path_string);
+        g_return_if_fail(userdata);
+
+        prefs = (struct preferences_catalog *)userdata;
+
+        if(gtk_tree_model_get_iter_from_string(GTK_TREE_MODEL(prefs->model),
+                                               &iter,
+                                               path_string)) {
+                gtk_tree_model_get(GTK_TREE_MODEL(prefs->model), &iter,
+                                   COLUMN_ENABLED, &enabled,
+                                   COLUMN_SOURCE_ID, &source_id,
+                                   -1);
+                enabled=!enabled;
+                if(source_id>0
+                   && catalog_source_set_enabled(prefs->catalog,
+                                                 source_id,
+                                                 enabled)) {
+                        gtk_list_store_set(prefs->model, &iter,
+                                           COLUMN_ENABLED, enabled,
+                                           -1);
+                }
         }
 }
