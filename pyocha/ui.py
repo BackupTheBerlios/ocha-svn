@@ -28,7 +28,7 @@ class QueryResult:
         self.path=path
         self.query=query
 
-    def getDisplayName(self):
+    def getDispyoplayName(self):
         return self.display_name
 
     def getPath(self):
