@@ -4,7 +4,9 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
+#include <stdio.h>
 #include <libgnomevfs/gnome-vfs.h>
+#include "desktop_file.h"
 
 /** \file implementation of the API defined in catalog_index.h */
 
@@ -22,6 +24,7 @@ static bool is_executable(mode_t mode);
 static bool to_ignore(const char *filename, GPatternSpec **patterns);
 
 static bool catalog_index_directory_recursive(struct catalog *catalog, const char *directory, int maxdepth, GPatternSpec **patterns, bool slow, int cmd);
+static bool catalog_index_applications_recursive(struct catalog *catalog, const char *directory, int maxdepth, bool slow, int cmd);
 static GPatternSpec **create_patterns(const char **patterns);
 static void free_patterns(GPatternSpec **);
 
@@ -43,7 +46,8 @@ bool catalog_index_directory(struct catalog *catalog, const char *directory, int
    g_return_val_if_fail(DEFAULT_IGNORE!=NULL, false); /* call catalog_index_init!() */
 
    int cmd = -1;
-   catalog_addcommand(catalog, "gnome-open", "gnome-open '%f'", &cmd);
+   if(!catalog_addcommand(catalog, "gnome-open", "gnome-open '%f'", &cmd))
+      return false;
 
 
 
@@ -63,7 +67,18 @@ bool catalog_index_applications(struct catalog *catalog, const char *directory, 
 {
    g_return_val_if_fail(catalog!=NULL, false);
    g_return_val_if_fail(directory!=NULL, false);
-   return false;
+   g_return_val_if_fail(maxdepth==-1 || maxdepth>0, false);
+
+   int cmd = -1;
+   if(!catalog_addcommand(catalog, "run-desktop-entry", "run-desktop-entry '%f'", &cmd))
+      return false;
+
+
+   return catalog_index_applications_recursive(catalog,
+                                               directory,
+                                               maxdepth,
+                                               slow,
+                                               cmd);
 }
 
 bool catalog_index_bookmarks(struct catalog *catalog, const char *bookmark_file)
@@ -126,6 +141,96 @@ static bool catalog_index_directory_recursive(struct catalog *catalog, const cha
                                          filename,
                                          cmd,
                                          NULL/*id_out*/);
+                  }
+            }
+      }
+
+   closedir(dir);
+
+   return retval;
+}
+
+static bool catalog_index_applications_recursive(struct catalog *catalog, const char *directory, int maxdepth, bool slow, int cmd)
+{
+   if(maxdepth==0)
+      return true;
+   if(maxdepth>0)
+      maxdepth--;
+
+   bool retval=true;
+   DIR *dir = opendir(directory);
+   if(dir==NULL)
+      return false;
+
+   struct dirent *dirent;
+   while( (dirent=readdir(dir)) != NULL )
+      {
+         const char *filename = dirent->d_name;
+         if(*filename=='.')
+            continue;
+
+         char buffer[strlen(directory)+1+strlen(filename)+1];
+         strcpy(buffer, directory);
+         strcat(buffer, "/");
+         strcat(buffer, filename);
+
+         mode_t mode;
+         if(getmode(buffer, &mode))
+            {
+               if(is_accessible_directory(mode))
+                  {
+                     if(maxdepth!=0)
+                        {
+                           if(!catalog_index_applications_recursive(catalog,
+                                                                    buffer,
+                                                                    maxdepth,
+                                                                    slow,
+                                                                    cmd))
+                              retval=false;
+                        }
+                  }
+               else if(is_accessible_file(mode))
+                  {
+                     if(g_str_has_suffix(filename, ".desktop"))
+                        {
+                           GError *err = NULL;
+                           GnomeDesktopFile *desktopfile = gnome_desktop_file_load(buffer,
+                                                                                   NULL/*error*/);
+                           if(desktopfile!=NULL)
+                              {
+                                 char *name = NULL;
+                                 gnome_desktop_file_get_string(desktopfile,
+                                                               "Desktop Entry",
+                                                               "Name",
+                                                               &name);
+                                 gboolean terminal = false;
+                                 gnome_desktop_file_get_boolean(desktopfile,
+                                                                "Desktop Entry",
+                                                                "Terminal",
+                                                                &terminal);
+
+                                 char *exec = NULL;
+                                 gnome_desktop_file_get_string(desktopfile,
+                                                               "Desktop Entry",
+                                                               "Exec",
+                                                               &exec);
+                                 if(!terminal && exec!=NULL && strstr(exec, "%")==NULL)
+                                    {
+                                       catalog_addentry(catalog,
+                                                        directory,
+                                                        filename,
+                                                        name==NULL ? filename:name,
+                                                        cmd,
+                                                        NULL/*id_out*/);
+                                    }
+                                 if(name)
+                                    g_free(name);
+                                 if(exec)
+                                    g_free(exec);
+
+                                 gnome_desktop_file_free(desktopfile);
+                              }
+                        }
                   }
             }
       }
