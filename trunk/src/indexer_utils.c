@@ -14,7 +14,7 @@
 /** \file implementation of the API defined in indexer_utils.h */
 
 /** default patterns, as strings */
-static const char *DEFAULT_IGNORE_STRINGS = "CVS:*~:*.bak:#*#";
+static const char *DEFAULT_IGNORE_STRINGS = "CVS,*~,*.bak,#*#";
 
 /** pattern spec created the 1st time catalog_index_directory() is called (and never freed) */
 static GPatternSpec **DEFAULT_IGNORE;
@@ -309,7 +309,7 @@ GPatternSpec **create_patterns(const char *patterns)
    do
       {
          const char *cur=ptr;
-         const char *end = strchr(ptr, ':');
+         const char *end = strchr(ptr, ',');
          int len;
          if(end)
             {
@@ -325,7 +325,7 @@ GPatternSpec **create_patterns(const char *patterns)
          strncpy(buffer, cur, len);
          buffer[len]='\0';
          g_ptr_array_add(array,
-                         g_pattern_spec_new(buffer));
+                         g_pattern_spec_new(g_strstrip(buffer)));
 
          ptr = end ? end+1:NULL;
       }

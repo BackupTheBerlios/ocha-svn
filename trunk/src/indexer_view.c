@@ -23,7 +23,7 @@ struct indexer_view
 
 static void properties_window_destroy_cb(GtkWidget *widget, gpointer userdata);
 static void create_window(struct indexer_view *view);
-static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct indexer_source *source);
+static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct indexer_source *source, struct catalog *catalog);
 static GtkWidget *properties_widget_from_indexer(struct indexer *indexer);
 
 
@@ -94,9 +94,8 @@ void indexer_view_attach_source(struct indexer_view *view,
         view->current_indexer=indexer;
         if(source)
         {
-            widget=properties_widget_from_source(indexer, source);
             title=source->display_name;
-            source->release(source);
+            widget=properties_widget_from_source(indexer, source, view->catalog);
         }
         else
         {
@@ -110,6 +109,8 @@ void indexer_view_attach_source(struct indexer_view *view,
                           widget);
         gtk_window_set_title(GTK_WINDOW(window),
                              title);
+        if(source)
+            source->release(source);
     }
 
     gtk_window_present(GTK_WINDOW(view->window));
@@ -192,12 +193,12 @@ static void properties_window_destroy_cb(GtkWidget *widget, gpointer userdata)
     g_assert(!view->current_source);
 }
 
-static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct indexer_source *source)
+static GtkWidget *properties_widget_from_source(struct indexer *indexer, struct indexer_source *source, struct catalog *catalog)
 {
     g_return_val_if_fail(indexer!=NULL, NULL);
     g_return_val_if_fail(source!=NULL, NULL);
 
-    GtkWidget *widget = source->editor_widget(source);
+    GtkWidget *widget = source->editor_widget(source, catalog);
     gtk_widget_show(widget);
     return widget;
 }

@@ -25,7 +25,7 @@ static void release(struct indexer_source *);
 static gboolean discover(struct indexer *, struct catalog *catalog);
 static char *display_name(struct catalog *catalog, int id);
 static char *describe(struct indexer *indexer);
-static GtkWidget *editor_widget(struct indexer_source *source);
+static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *catalog);
 
 #define INDEXER_NAME "applications"
 struct indexer indexer_applications =
@@ -296,7 +296,7 @@ static gboolean add_source_for_directory(struct catalog *catalog, const char *po
          return add_source(catalog,
                            possibility,
                            10/*depth*/,
-                           "locale:man:themes:doc:fonts:perl:pixmaps");
+                           "locale,man,themes,doc,fonts,perl,pixmaps");
       }
    return TRUE;
 }
@@ -372,7 +372,7 @@ static char *display_name(struct catalog *catalog, int id)
     return retval;
 }
 
-static GtkWidget *editor_widget(struct indexer_source *source)
+static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *catalog)
 {
     return gtk_label_new(source->display_name);
 }

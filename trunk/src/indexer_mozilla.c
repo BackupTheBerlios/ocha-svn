@@ -21,7 +21,7 @@ static char *html_expand_common_entities(const char *orig);
 static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, const char *bookmark_file, GError **err);
 static gboolean discover(struct indexer *, struct catalog *catalog);
 static char *display_name(struct catalog *catalog, int id);
-static GtkWidget *editor_widget(struct indexer_source *source);
+static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *catalog);
 
 
 #define INDEXER_NAME "mozilla"
@@ -497,7 +497,7 @@ static char *display_name(struct catalog *catalog, int id)
     return retval;
 }
 
-static GtkWidget *editor_widget(struct indexer_source *source)
+static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *catalog)
 {
     return gtk_label_new(source->display_name);
 }

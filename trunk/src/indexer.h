@@ -142,10 +142,12 @@ struct indexer_source
     * is not in use anymore.
     *
     * @param source
+    * @param catalog a catalog that must be kept open for
+    * as long as the widget is in use
     * @return a new widget that can be added into
     * a window to edit the source
     */
-   GtkWidget *(*editor_widget)(struct indexer_source *source);
+   GtkWidget *(*editor_widget)(struct indexer_source *source, struct catalog *);
 
    /**
     * Release the source structure.
@@ -156,7 +158,6 @@ struct indexer_source
     */
    void (*release)(struct indexer_source *source);
 };
-
 #define INDEXER_ERROR_DOMAIN_NAME "INDEXER"
 
 /** Error codes */
