@@ -219,6 +219,7 @@ static gpointer runquery_thread(gpointer userdata)
                         }
                      lock(queryrunner->mutex);
                      queryrunner->catalog=catalog;
+                     continue; /*recheck without waiting */
                   }
 
                if(query_has_changed(queryrunner) && queryrunner->query->len>0)
