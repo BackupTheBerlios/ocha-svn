@@ -1,6 +1,7 @@
 #include "indexer.h"
 #include "indexer_utils.h"
 #include "result.h"
+#include "ocha_gconf.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -91,18 +92,18 @@ static gboolean add_source(struct catalog *catalog, const char *path, int depth,
    int id;
    if(!catalog_add_source(catalog, INDEXER_NAME, &id))
       return FALSE;
-   if(!catalog_set_source_attribute(catalog, id, "path", path))
+   if(!ocha_gconf_set_source_attribute(INDEXER_NAME, id, "path", path))
       return FALSE;
    if(depth!=-1)
       {
          char *depth_str = g_strdup_printf("%d", depth);
-         gboolean ret = catalog_set_source_attribute(catalog, id, "depth", depth_str);
+         gboolean ret = ocha_gconf_set_source_attribute(INDEXER_NAME, id, "depth", depth_str);
          g_free(depth_str);
          return ret;
       }
    if(ignore)
       {
-         if(catalog_set_source_attribute(catalog, id, "ignore", ignore))
+         if(ocha_gconf_set_source_attribute(INDEXER_NAME, id, "ignore", ignore))
             return FALSE;
       }
    return TRUE;
@@ -180,7 +181,8 @@ static gboolean index(struct indexer_source *self, struct catalog *catalog, GErr
    g_return_val_if_fail(catalog!=NULL, FALSE);
    g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-   return index_recursively(catalog,
+   return index_recursively(INDEXER_NAME,
+                            catalog,
                             self->id,
                             index_file_cb,
                             self/*userdata*/,
@@ -274,9 +276,9 @@ static gboolean has_gnome_mime_command(const char *path)
 
 static char *display_name(struct catalog *catalog, int id)
 {
-    char *uri=NULL;
+    char *uri=ocha_gconf_get_source_attribute(INDEXER_NAME, id, "path");
     char *retval=NULL;
-    if(!catalog_get_source_attribute(catalog, id, "path", &uri) || uri==NULL)
+    if(uri==NULL)
         retval=g_strdup("Invalid");
     else
     {
@@ -330,10 +332,10 @@ static void depth_changed_cb(GtkRange *range, gpointer userdata)
     if(value>=DEPTH_INFINITY)
        value=-1;
     char *value_as_string = g_strdup_printf("%d", (int)value);
-    catalog_set_source_attribute(source_with_catalog->catalog,
-                                 source_with_catalog->source_id,
-                                 "depth",
-                                 value_as_string);
+    ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                    source_with_catalog->source_id,
+                                    "depth",
+                                    value_as_string);
     g_free(value_as_string);
 }
 static void update_depth_label_cb(GtkRange *range, gpointer userdata)
@@ -359,10 +361,10 @@ static void exclude_changed_cb(GtkEditable *widget, gpointer userdata)
     struct source_with_catalog *source_with_catalog =
         (struct source_with_catalog *)userdata;
     const char *text = gtk_entry_get_text(GTK_ENTRY(widget));
-    catalog_set_source_attribute(source_with_catalog->catalog,
-                                 source_with_catalog->source_id,
-                                 "ignore",
-                                 text);
+    ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                    source_with_catalog->source_id,
+                                    "ignore",
+                                    text);
 }
 static void include_content_set_attribute_cb(GtkToggleButton *toggle, gpointer userdata)
 {
@@ -372,17 +374,17 @@ static void include_content_set_attribute_cb(GtkToggleButton *toggle, gpointer u
         (struct source_with_catalog *)userdata;
     if(gtk_toggle_button_get_active(toggle))
         {
-            catalog_set_source_attribute(source_with_catalog->catalog,
-                                         source_with_catalog->source_id,
-                                         "depth",
-                                         "1");
+            ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                            source_with_catalog->source_id,
+                                            "depth",
+                                            "1");
         }
     else
         {
-            catalog_set_source_attribute(source_with_catalog->catalog,
-                                         source_with_catalog->source_id,
-                                         "depth",
-                                         "0");
+            ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                            source_with_catalog->source_id,
+                                            "depth",
+                                            "0");
         }
 }
 static void include_content_disable_cb(GtkToggleButton *toggle, gpointer userdata)
@@ -426,9 +428,9 @@ static GtkWidget *editor_widget(struct indexer_source *source, struct catalog *c
     char *current_depth = NULL;
     char *current_ignore = NULL;
 
-    catalog_get_source_attribute(catalog, source->id, "path", &current_path);
-    catalog_get_source_attribute(catalog, source->id, "depth", &current_depth);
-    catalog_get_source_attribute(catalog, source->id, "ignore", &current_ignore);
+    current_path=ocha_gconf_get_source_attribute(INDEXER_NAME, source->id, "path");
+    current_depth=ocha_gconf_get_source_attribute(INDEXER_NAME, source->id, "depth");
+    current_ignore=ocha_gconf_get_source_attribute(INDEXER_NAME, source->id, "ignore");
 
     int current_depth_i = current_depth ? atoi(current_depth):1;
     if(current_depth_i==-1)

@@ -28,7 +28,7 @@ typedef gboolean (*handle_file_f)(struct catalog *catalog,
 /**
  * Go through the files in the given directory and index them.
  *
- * @param catalog catalog to index into
+ * @param indexer
  * @param source_id source that will own the new entries
  * the source attributes 'path', 'depth' and 'ignore' will
  * be used to find the directory to go through and how
@@ -39,7 +39,8 @@ typedef gboolean (*handle_file_f)(struct catalog *catalog,
  * @return false if something goes wrong (check err, then), true
  * otherwise
  */
-gboolean index_recursively(struct catalog *catalog,
+gboolean index_recursively(const char *indexer,
+                           struct catalog *,
                            int source_id,
                            handle_file_f callback,
                            gpointer userdata,
@@ -57,7 +58,7 @@ gboolean recurse(struct catalog *catalog,
 
 /**
  * Add an entry, with error handling
- * @param catalog
+ * @param indexer
  * @param path
  * @param nam
  * @param long_name
@@ -68,7 +69,7 @@ gboolean recurse(struct catalog *catalog,
 gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, const char *long_name, int sourc_id, GError **err);
 
 /** Set source attribute, set error if something goes wrong */
-gboolean catalog_get_source_attribute_witherrors(struct catalog *catalog, int source_id, const char *attribute, char **value_out, gboolean required, GError **err);
+gboolean catalog_get_source_attribute_witherrors(const char *indexer, int source_id, const char *attribute, char **value_out, gboolean required, GError **err);
 
 /** Get the error quark for this domain, usually used through INDEXER_ERROR */
 GQuark catalog_index_error_quark(void);

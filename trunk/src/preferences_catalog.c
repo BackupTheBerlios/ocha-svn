@@ -73,21 +73,19 @@ static void add_indexer(GtkTreeStore *model, struct indexer *indexer, struct cat
 
     int *ids = NULL;
     int ids_len = -1;
-    if(catalog_list_sources(catalog, indexer->name, &ids, &ids_len))
+    ocha_gconf_get_sources(indexer->name, &ids, &ids_len);
+    if(ids)
+    {
+        for(int i=0; i<ids_len; i++)
         {
-            if(ids)
-                {
-                    for(int i=0; i<ids_len; i++)
-                        {
-                            add_source(model,
-                                       &iter,
-                                       indexer,
-                                       catalog,
-                                       ids[i]);
-                        }
-                    g_free(ids);
-                }
+            add_source(model,
+                       &iter,
+                       indexer,
+                       catalog,
+                       ids[i]);
         }
+        g_free(ids);
+    }
 }
 
 static void add_source(GtkTreeStore *model,

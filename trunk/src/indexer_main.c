@@ -8,6 +8,7 @@
 #include "indexer.h"
 #include "indexers.h"
 #include "ocha_init.h"
+#include "ocha_gconf.h"
 #include "catalog_queryrunner.h"
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
@@ -96,60 +97,50 @@ int main(int argc, char *argv[])
          struct indexer *indexer = *indexer_ptr;
          int *source_ids = NULL;
          int source_ids_len = 0;
-         if(catalog_list_sources(catalog, indexer->name, &source_ids, &source_ids_len))
-            {
-               for(int i=0; i<source_ids_len; i++)
-                  {
-                     int source_id = source_ids[i];
-                     struct indexer_source *source = indexer->load_source(indexer,
-                                                                                  catalog,
-                                                                                  source_id);
-                     if(source)
-                        {
-                           if(verbose)
-                              printf("indexing %s: %s...\n",
-                                     indexer->display_name,
-                                     source->display_name);
+         ocha_gconf_get_sources(indexer->name, &source_ids, &source_ids_len);
+         for(int i=0; i<source_ids_len; i++)
+         {
+             int source_id = source_ids[i];
+             struct indexer_source *source = indexer->load_source(indexer,
+                                                                  catalog,
+                                                                  source_id);
+             if(source)
+             {
+                 if(verbose)
+                     printf("indexing %s: %s...\n",
+                            indexer->display_name,
+                            source->display_name);
 
-                           GError *err = NULL;
-                           if(!source->index(source, catalog, &err))
-                              {
-                                 fprintf(stderr,
-                                         "error indexing list for %s (ID %d): %s\n",
-                                         source->display_name,
-                                         source_id,
-                                         err->message);
-                                 g_error_free(err);
-                                 retval++;
-                              }
+                 GError *err = NULL;
+                 if(!source->index(source, catalog, &err))
+                 {
+                     fprintf(stderr,
+                             "error indexing list for %s (ID %d): %s\n",
+                             source->display_name,
+                             source_id,
+                             err->message);
+                     g_error_free(err);
+                     retval++;
+                 }
 
-                           if(verbose)
-                           {
-                               unsigned int size=0;
-                               if(catalog_get_source_content_count(catalog,
-                                                                   source_id,
-                                                                   &size))
-                               {
-                                   printf("indexing %s: %s: %d entries\n",
-                                          indexer->display_name,
-                                          source->display_name,
-                                          size);
-                               }
-                           }
+                 if(verbose)
+                 {
+                     unsigned int size=0;
+                     if(catalog_get_source_content_count(catalog,
+                                                         source_id,
+                                                         &size))
+                     {
+                         printf("indexing %s: %s: %d entries\n",
+                                indexer->display_name,
+                                source->display_name,
+                                size);
+                     }
+                 }
 
-                        }
-                  }
-               if(source_ids)
-                  g_free(source_ids);
-            }
-         else
-            {
-               fprintf(stderr,
-                       "error getting source list for %s: %s",
-                       indexer->display_name,
-                       catalog_error(catalog));
-               retval++;
-            }
+             }
+         }
+         if(source_ids)
+             g_free(source_ids);
       }
 
    return retval;

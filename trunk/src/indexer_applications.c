@@ -1,6 +1,7 @@
 
 #include "indexer_applications.h"
 #include "indexer_utils.h"
+#include "ocha_gconf.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -259,7 +260,8 @@ static gboolean index(struct indexer_source *self, struct catalog *catalog, GErr
    g_return_val_if_fail(catalog!=NULL, FALSE);
    g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-   return index_recursively(catalog,
+   return index_recursively(INDEXER_NAME,
+                            catalog,
                             self->id,
                             index_application_cb,
                             self/*userdata*/,
@@ -271,18 +273,18 @@ static gboolean add_source(struct catalog *catalog, const char *path, int depth,
    int id;
    if(!catalog_add_source(catalog, INDEXER_NAME, &id))
       return FALSE;
-   if(!catalog_set_source_attribute(catalog, id, "path", path))
+   if(!ocha_gconf_set_source_attribute(INDEXER_NAME, id, "path", path))
       return FALSE;
    if(depth!=-1)
       {
          char *depth_str = g_strdup_printf("%d", depth);
-         gboolean ret = catalog_set_source_attribute(catalog, id, "depth", depth_str);
+         gboolean ret = ocha_gconf_set_source_attribute(INDEXER_NAME, id, "depth", depth_str);
          g_free(depth_str);
          return ret;
       }
    if(ignore)
       {
-         if(catalog_set_source_attribute(catalog, id, "ignore", ignore))
+         if(ocha_gconf_set_source_attribute(INDEXER_NAME, id, "ignore", ignore))
             return FALSE;
       }
    return TRUE;
@@ -331,9 +333,10 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
 
 static char *display_name(struct catalog *catalog, int id)
 {
-    char *uri=NULL;
+    char *uri= ocha_gconf_get_source_attribute(INDEXER_NAME, id, "path");
     char *retval=NULL;
-    if(!catalog_get_source_attribute(catalog, id, "path", &uri) || uri==NULL)
+
+    if(uri==NULL)
         retval=g_strdup("Invalid");
     else
     {

@@ -9,6 +9,7 @@
 #include <libgnome/gnome-url.h>
 #include <libgnomevfs/gnome-vfs.h>
 
+#include "ocha_gconf.h"
 #include "indexer_utils.h"
 
 /** \file implementation of the API defined in indexer_utils.h */
@@ -46,19 +47,21 @@ GQuark catalog_index_error_quark()
    return quark;
 }
 
-gboolean catalog_get_source_attribute_witherrors(struct catalog *catalog, int source_id, const char *attribute, char **value_out, gboolean required, GError **err)
+gboolean catalog_get_source_attribute_witherrors(const char *indexer,
+                                                 int source_id,
+                                                 const char *attribute,
+                                                 char **value_out,
+                                                 gboolean required,
+                                                 GError **err)
 {
-   if(!catalog_get_source_attribute(catalog, source_id, attribute, value_out))
-      {
-         g_set_error(err,
-                     INDEXER_ERROR,
-                     INDEXER_CATALOG_ERROR,
-                     "could not get attribute %s for source %d: %s",
-                     attribute,
-                     source_id,
-                     catalog_error(catalog));
-         return FALSE;
-      }
+   g_return_val_if_fail(indexer, FALSE);
+   g_return_val_if_fail(attribute, FALSE);
+   g_return_val_if_fail(value_out, FALSE);
+   g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
+
+   *value_out = ocha_gconf_get_source_attribute(indexer,
+                                                source_id,
+                                                attribute);
    if(required && !(*value_out))
       {
          g_set_error(err,
@@ -244,7 +247,8 @@ gboolean recurse(struct catalog *catalog,
          return FALSE;
       }
 }
-gboolean index_recursively(struct catalog *catalog,
+gboolean index_recursively(const char *indexer,
+                           struct catalog *catalog,
                            int source_id,
                            handle_file_f callback,
                            gpointer userdata,
@@ -253,7 +257,8 @@ gboolean index_recursively(struct catalog *catalog,
    char *path = NULL;
    gboolean retval = FALSE;
 
-   if(catalog_get_source_attribute_witherrors(catalog,
+
+   if(catalog_get_source_attribute_witherrors(indexer,
                                               source_id,
                                               "path",
                                               &path,
@@ -261,7 +266,7 @@ gboolean index_recursively(struct catalog *catalog,
                                               err))
       {
          char *depth_str = NULL;
-         if(catalog_get_source_attribute_witherrors(catalog,
+         if(catalog_get_source_attribute_witherrors(indexer,
                                                     source_id,
                                                     "depth",
                                                     &depth_str,
@@ -275,7 +280,7 @@ gboolean index_recursively(struct catalog *catalog,
                      g_free(depth_str);
                   }
                char *ignore = NULL;
-               if(catalog_get_source_attribute_witherrors(catalog,
+               if(catalog_get_source_attribute_witherrors(indexer,
                                                           source_id,
                                                           "ignore",
                                                           &ignore,

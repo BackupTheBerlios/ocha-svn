@@ -1,5 +1,6 @@
 #include "indexer_mozilla.h"
 #include "indexer_utils.h"
+#include "ocha_gconf.h"
 #include <libgnome/gnome-url.h>
 #include <libgnome/gnome-exec.h>
 #include <libgnome/gnome-util.h>
@@ -113,7 +114,7 @@ static gboolean index(struct indexer_source *self, struct catalog *catalog, GErr
    g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
    char *path = NULL;
-   if(!catalog_get_source_attribute_witherrors(catalog,
+   if(!catalog_get_source_attribute_witherrors(INDEXER_NAME,
                                                self->id,
                                                "path",
                                                &path,
@@ -398,16 +399,16 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
                int id;
                if(catalog_add_source(catalog, INDEXER_NAME, &id))
                   {
-                     if(catalog_set_source_attribute(catalog,
-                                                     id,
-                                                      "path",
-                                                     current->path))
+                      if(ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                                         id,
+                                                         "path",
+                                                         current->path))
                         {
                            if(current->profile_name)
-                              catalog_set_source_attribute(catalog,
-                                                           id,
-                                                           "profile",
-                                                           current->profile_name);
+                               ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                                               id,
+                                                               "profile",
+                                                               current->profile_name);
                         }
                      else
                         retval=FALSE;
@@ -426,15 +427,13 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
 
 static char *display_name(struct catalog *catalog, int id)
 {
-
-    char *uri=NULL;
+    char *uri=ocha_gconf_get_source_attribute(INDEXER_NAME, id, "path");
     char *retval=NULL;
-    if(!catalog_get_source_attribute(catalog, id, "path", &uri) || uri==NULL)
+    if(uri==NULL)
         retval=g_strdup("Invalid");
     else
     {
-        char *profile_name=NULL;
-        catalog_get_source_attribute(catalog, id, "profile", &profile_name);
+        char *profile_name=ocha_gconf_get_source_attribute(INDEXER_NAME, id, "profile");
 
         char *path=NULL;
         if(g_str_has_prefix(uri, "file://"))

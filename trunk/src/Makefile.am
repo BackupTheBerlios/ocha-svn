@@ -21,11 +21,11 @@ catalog_queryrunner_check_SOURCES=catalog_queryrunner_check.c catalog_queryrunne
 catalog_queryrunner_check_CFLAGS=$(TEST_CFLAGS) $(SQLITE_CFLAGS)  
 catalog_queryrunner_check_LDADD=$(TEST_LIBS) $(SQLITE_LIBS) 
 
-indexer_various_check_SOURCES=indexer_various_check.c indexer_applications.c indexer_applications.h indexer_files.c indexer.h indexer_files.h result.h indexer_utils.h indexer_utils.c mock_catalog.c mock_catalog.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h
+indexer_various_check_SOURCES=indexer_various_check.c indexer_applications.c indexer_applications.h indexer_files.c indexer.h indexer_files.h result.h indexer_utils.h indexer_utils.c mock_catalog.c mock_catalog.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h ocha_gconf.h ocha_gconf.c
 indexer_various_check_CFLAGS=$(TEST_CFLAGS) $(GNOME_CFLAGS)
 indexer_various_check_LDADD=$(TEST_LIBS) 
 
-ocha_indexer_SOURCES=indexer_main.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c
+ocha_indexer_SOURCES=indexer_main.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c ocha_gconf.h ocha_gconf.c
 ocha_indexer_CFLAGS=$(GNOME_CFLAGS) $(SQLITE_CFLAGS)
 ocha_indexer_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 
@@ -34,13 +34,13 @@ querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h catal
 query.c query.h resultlist.h resultlist.c netwm.h netwm.c netwm_queryrunner.c \
 netwm_queryrunner.h compound_queryrunner.h compound_queryrunner.c \
 indexer_files.c indexer_utils.c  indexer_applications.c indexer_applications.h desktop_file.c desktop_file.h \
-indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c
+indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c ocha_gconf.h ocha_gconf.c
 ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS)
 ocha_LDADD=$(GTK_LIBS) $(SQLITE_LIBS) $(GNOME_LIBS)
 
 
 
-ocha_preferences_SOURCES=preferences_main.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c preferences_catalog.h preferences_catalog.c indexer_view.h indexer_view.c
+ocha_preferences_SOURCES=preferences_main.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c preferences_catalog.h preferences_catalog.c indexer_view.h indexer_view.c ocha_gconf.h ocha_gconf.c
 ocha_preferences_CFLAGS=$(GNOME_CFLAGS) $(SQLITE_CFLAGS)
 ocha_preferences_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 
