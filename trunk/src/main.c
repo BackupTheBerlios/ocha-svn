@@ -14,6 +14,7 @@ static struct queryrunner *queryrunner;
 static GtkListStore *list_model;
 static GString* query_str;
 static GList* results;
+static struct result* selected;
 
 static void querywin_start()
 {
@@ -45,17 +46,28 @@ void result_handler_cb(struct queryrunner *caller,
 {
    g_return_if_fail(result);
 
+   bool was_empty = g_list_length(results)==0;
    results=g_list_append(results, result);
+
+
 
    GtkTreeIter iter;
    gtk_list_store_append(list_model, &iter);
    gtk_list_store_set(list_model, &iter,
                       0, result,
                       -1);
+
+   if(was_empty)
+      {
+         GtkTreeSelection* selection=gtk_tree_view_get_selection(GTK_TREE_VIEW(win_data.treeview));
+         gtk_tree_selection_select_iter(selection, &iter);
+      }
 }
 
 static void result_free_cb(struct result *result, gpointer userdata)
 {
+   if(selected==result)
+      selected=NULL;
    result->release(result);
 }
 static void clear_list_model()
@@ -92,8 +104,15 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
             }
          return TRUE; /*handled*/
 
+      case GDK_Return:
+         if(selected!=NULL)
+            {
+               querywin_stop();
+               selected->execute(selected);
+            }
+         return TRUE; /*handled*/
       default:
-         if(ev->string)
+         if(ev->string && ev->string[0]!='\0')
             {
                printf("add: %s\n", ev->string);
                g_string_append(query_str, ev->string);
@@ -111,6 +130,24 @@ static void cell_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, Gt
    gtk_tree_model_get(model, iter, 0, &result, -1);
    g_return_if_fail(result);
    g_object_set(renderer, "text", result->name, NULL);
+}
+
+static void selection_changed_cb(GtkTreeSelection* selection, gpointer userdata)
+{
+   GtkTreeIter iter;
+   if(gtk_tree_selection_get_selected(selection,
+                                      NULL/* *model */,
+                                      &iter))
+      {
+         gtk_tree_model_get(GTK_TREE_MODEL(list_model), &iter, 0, &selected, -1);
+         g_return_if_fail(selected);
+         printf("selected: %s\n", selected->name);
+      }
+   else
+      {
+         printf("unselected\n");
+         selection=NULL;
+      }
 }
 static void querywin_init_list()
 {
@@ -130,6 +167,12 @@ static void querywin_init_list()
    gtk_tree_view_append_column(view, col);
 
    gtk_tree_view_set_model(view, GTK_TREE_MODEL(list_model));
+
+   GtkTreeSelection *selection = gtk_tree_view_get_selection(view);
+   g_signal_connect(selection,
+                    "changed",
+                    G_CALLBACK(selection_changed_cb),
+                    NULL/*userdata*/);
 }
 
 static void init_ui(void)
