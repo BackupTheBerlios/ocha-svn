@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Encoding=UTF-8
+Name=Xpdf
+Comment=Xpdf: Portable Document Format (PDF) file viewer for X
+Icon=
+Exec=/usr/bin/xpdf
+Terminal=FALSE
+Categories=X-Debian-Apps-Viewers

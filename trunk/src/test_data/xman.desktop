@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Encoding=UTF-8
+Name=Xman
+Comment=Xman: manual page browser for X
+Icon=
+Exec=xman
+Terminal=FALSE
+Categories=X-Debian-Help
