@@ -13,7 +13,7 @@
 #include <libgnome/gnome-exec.h>
 #include <libgnome/gnome-util.h>
 #include "desktop_file.h"
-
+#include "string_set.h"
 
 /**
  * \file index applications with a .desktop file
@@ -42,9 +42,7 @@ static void indexer_applications_source_view_detach(struct indexer_source_view *
 static void indexer_applications_source_view_release(struct indexer_source_view *view);
 
 /* ------------------------- prototypes: other */
-static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore);
-static gboolean add_source_for_directory(struct catalog *catalog, const char *possibility);
-static char *display_name(struct catalog *catalog, int id);
+static GSList *maybe_add_directory(GSList *path, char *directory);
 
 /* ------------------------- definitions */
 
@@ -74,35 +72,56 @@ static struct indexer_source *indexer_application_load_source(struct indexer *se
         retval->indexer=self;
         retval->index=indexer_application_source_index;
         retval->release=indexer_application_source_release;
-        retval->display_name=display_name(catalog, id);
+        retval->display_name="Applications";
         retval->notify_display_name_change=indexer_application_source_notify_add;
         retval->remove_notification=indexer_application_source_notify_remove;
         return retval;
 }
 static gboolean indexer_application_discover(struct indexer *indexer, struct catalog *catalog)
 {
-        gboolean retval = TRUE;
+        int source_id;
+        gboolean retval = FALSE;
         char *home = gnome_util_prepend_user_home(".local/share");
         char *possibilities[] =
                 {
-                        NULL,
                         "/usr/share",
-                        "/usr/local/share",
                         "/opt/gnome/share",
+                        "/opt/gnome2/share",
                         "/opt/kde/share",
                         "/opt/kde2/share",
                         "/opt/kde3/share",
+                        "/usr/local/share",
+                        NULL,
                         NULL
                 };
         char **ptr;
-        possibilities[0]=home;
+        GSList *paths = NULL;
+
+        possibilities[7]=home;
         for(ptr=possibilities; *ptr; ptr++) {
                 char *possibility = *ptr;
-                if(!add_source_for_directory(catalog, possibility)) {
-                        retval=FALSE;
-                        break;
-                }
+                paths=maybe_add_directory(paths, possibility);
         }
+
+
+
+        if(catalog_add_source(catalog, INDEXER_NAME, &source_id)) {
+                char *paths_key = ocha_gconf_get_source_attribute_key(INDEXER_NAME,
+                                                                      source_id,
+                                                                      "paths");
+
+                if(gconf_client_set_list(ocha_gconf_get_client(),
+                                         paths_key,
+                                         GCONF_VALUE_STRING,
+                                         paths,
+                                         NULL/*let gconf client handle errors*/)) {
+                        retval = TRUE;
+                }
+
+                g_free(paths_key);
+        }
+
+        g_slist_free(paths);
         g_free(home);
         return retval;
 }
@@ -130,42 +149,88 @@ static guint indexer_application_source_notify_add(struct indexer_source *source
                                         indexer_source_notify_f notify,
                                         gpointer userdata)
 {
-        g_return_val_if_fail(source, 0);
-        g_return_val_if_fail(notify, 0);
-        return source_attribute_change_notify_add(&indexer_applications,
-                        source->id,
-                        "path",
-                        catalog,
-                        notify,
-                        userdata);
+        return 19;
 }
 static void indexer_application_source_notify_remove(struct indexer_source *source,
-                                guint id)
+                                                     guint id)
 {
-        source_attribute_change_notify_remove(id);
+
 }
 static void indexer_application_source_release(struct indexer_source *source)
 {
         g_return_if_fail(source);
-        g_free((gpointer)source->display_name);
         g_free(source);
 }
 
 static gboolean indexer_application_source_index(struct indexer_source *self, struct catalog *catalog, GError **err)
 {
-        gboolean success;
+        gboolean success = TRUE;
+        char *paths_key;
+        GSList *paths;
+        GError *gconf_err = NULL;
+        guint paths_len;
+        gint i;
+        struct string_set *visited;
 
         g_return_val_if_fail(self!=NULL, FALSE);
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
+
+
+        paths_key = ocha_gconf_get_source_attribute_key(INDEXER_NAME,
+                                                        self->id,
+                                                        "paths");
+        paths = gconf_client_get_list(ocha_gconf_get_client(),
+                                      paths_key,
+                                      GCONF_VALUE_STRING,
+                                      &gconf_err);
+        g_free(paths_key);
+        if(paths==NULL) {
+                if(gconf_err) {
+                        g_set_error(err,
+                                    INDEXER_ERROR,
+                                    INDEXER_EXTERNAL_ERROR,
+                                    "getting path list failed: %s",
+                                    gconf_err->message);
+                        g_error_free(gconf_err);
+                } else {
+                        g_set_error(err,
+                                    INDEXER_ERROR,
+                                    INDEXER_INVALID_CONFIGURATION,
+                                    "path list (paths) not configured or empty");
+                }
+
+                return FALSE;
+        }
+
         catalog_begin_source_update(catalog, self->id);
-        success=index_recursively(INDEXER_NAME,
-                                  catalog,
-                                  self->id,
-                                  index_application_cb,
-                                  self/*userdata*/,
-                                  err);
+
+
+        visited=string_set_new();
+
+        paths_len = g_slist_length(paths);
+        for(i=paths_len-1; i>=0 && success; i--) {
+                const char *directory;
+                directory = (const char *)g_slist_nth_data(paths, i);
+
+                if(directory==NULL) {
+                        g_warning("found NULL directory is item %d of path list for source %d", i, self->id);
+                        continue;
+                }
+                success=recurse(catalog,
+                                directory,
+                                NULL/*ignore_patterns*/,
+                                10/*MAXDEPTH*/,
+                                FALSE/*not slow*/,
+                                self->id,
+                                index_application_cb,
+                                visited/*userdata*/,
+                                err);
+        }
+
+        string_set_free(visited);
+
         catalog_end_source_update(catalog, self->id);
         return success;
 }
@@ -214,9 +279,20 @@ static gboolean index_application_cb(struct catalog *catalog,
         char *exec = NULL;
         char *description=NULL;
         gboolean retval;
+        struct string_set *visited;
+        const char *visited_key;
 
         if(!g_str_has_suffix(filename, ".desktop"))
                 return TRUE;
+
+        g_return_val_if_fail(userdata!=NULL, FALSE);
+        visited = (struct string_set *)userdata;
+
+        visited_key = g_basename(path);
+
+        if(string_set_contains(visited, visited_key)) {
+                return TRUE;
+        }
 
         uri = g_strdup_printf("file://%s", path);
 
@@ -262,32 +338,34 @@ static gboolean index_application_cb(struct catalog *catalog,
                                       "Exec",
                                       &exec);
 
-
-        if(comment && generic_name)
-                description=g_strdup_printf("%s (%s)", comment, generic_name);
-
         retval = TRUE;
-        if((type==NULL || g_strcasecmp("Application", type)==0)
-           && !hidden
-           && !nodisplay
-           && exec!=NULL)
-        {
-                const char *long_name=description;
-                if(!long_name)
-                        long_name=comment;
-                if(!long_name)
-                        long_name=generic_name;
-                if(!long_name)
-                        long_name=path;
-                retval=catalog_addentry_witherrors(catalog,
-                                                   uri,
-                                                   name==NULL ? filename:name,
-                                                   long_name,
-                                                   source_id,
-                                                   &launcher_application,
-                                                   err);
-        }
+        if((type==NULL || g_strcasecmp("Application", type)==0)) {
+                /* set it now that I know the file is valid and that
+                 * it is an application
+                 */
+                string_set_add(visited, visited_key);
 
+                if(comment && generic_name)
+                        description=g_strdup_printf("%s (%s)", comment, generic_name);
+
+
+                if(!hidden && !nodisplay && exec!=NULL) {
+                        const char *long_name=description;
+                        if(!long_name)
+                                long_name=comment;
+                        if(!long_name)
+                                long_name=generic_name;
+                        if(!long_name)
+                                long_name=path;
+                        retval=catalog_addentry_witherrors(catalog,
+                                                           uri,
+                                                           name==NULL ? filename:name,
+                                                           long_name,
+                                                           source_id,
+                                                           &launcher_application,
+                                                           err);
+                }
+        }
         if(description)
                 g_free(description);
         if(comment)
@@ -301,80 +379,20 @@ static gboolean index_application_cb(struct catalog *catalog,
         g_free(uri);
 
         gnome_desktop_file_free(desktopfile);
+
         return retval;
 }
 
-static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore)
+static GSList *maybe_add_directory(GSList *path, char *directory)
 {
-        int id;
-        if(!catalog_add_source(catalog, INDEXER_NAME, &id))
-                return FALSE;
-        if(!ocha_gconf_set_source_attribute(INDEXER_NAME, id, "path", path))
-                return FALSE;
-        if(depth!=-1)
+        if(g_file_test(directory, G_FILE_TEST_EXISTS)
+                        && g_file_test(directory, G_FILE_TEST_IS_DIR))
         {
-                char *depth_str = g_strdup_printf("%d", depth);
-                gboolean ret = ocha_gconf_set_source_attribute(INDEXER_NAME, id, "depth", depth_str);
-                g_free(depth_str);
-                return ret;
-        }
-        if(ignore)
-        {
-                if(ocha_gconf_set_source_attribute(INDEXER_NAME, id, "ignore", ignore))
-                        return FALSE;
-        }
-        return TRUE;
-}
+/*                 GConfValue *value; */
 
-static gboolean add_source_for_directory(struct catalog *catalog, const char *possibility)
-{
-        if(g_file_test(possibility, G_FILE_TEST_EXISTS)
-                        && g_file_test(possibility, G_FILE_TEST_IS_DIR))
-        {
-                return add_source(catalog,
-                                  possibility,
-                                  10/*depth*/,
-                                  "locale,man,themes,doc,fonts,perl,pixmaps");
+/*                 value=gconf_value_new(GCONF_VALUE_STRING); */
+/*                 gconf_value_set_string(value, directory); */
+                path=g_slist_append(path, directory);
         }
-        return TRUE;
-}
-static char *display_name(struct catalog *catalog, int id)
-{
-        char *uri= ocha_gconf_get_source_attribute(INDEXER_NAME, id, "path");
-        char *retval=NULL;
-
-        if(uri==NULL)
-                retval=g_strdup("Invalid");
-        else
-        {
-                char *path=NULL;
-                if(g_str_has_prefix(uri, "file://"))
-                        path=&uri[strlen("file://")];
-                else if(*uri=='/')
-                        path=uri;
-                if(path) {
-                        const char *home = g_get_home_dir();
-                        if(g_str_has_prefix(path, home) && strcmp(&path[strlen(home)], "/.local/share")==0)
-                                retval=g_strdup("User Applications");
-                        else if(strcmp("/usr/share", path)==0)
-                                retval=g_strdup("System Applications");
-                        else if(strcmp("/usr/local/share", path)==0)
-                                retval=g_strdup("System Applications (/usr/local)");
-                        else if(g_str_has_prefix(path, "/opt") && strstr(path, "gnome"))
-                                retval=g_strdup("GNOME Applications");
-                        else if(g_str_has_prefix(path, "/opt") && strstr(path, "kde"))
-                                retval=g_strdup("KDE Applications");
-                        else {
-                                retval=path;
-                                uri=NULL;
-                        }
-                }
-                if(!retval) {
-                        retval=uri;
-                        uri=NULL;
-                }
-        }
-        if(uri)
-                g_free(uri);
-        return retval;
+        return path;
 }

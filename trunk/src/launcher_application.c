@@ -190,6 +190,7 @@ static GnomeDesktopFile *load_desktop_file(const char *uri, GError **err)
                             "Error parsing %s: %s",
                             uri,
                             gnome_err->message);
+                g_error_free(gnome_err);
         }
         return retval;
 }

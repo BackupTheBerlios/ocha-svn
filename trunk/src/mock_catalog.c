@@ -19,8 +19,15 @@ struct catalog
         GHashTable *expected_addentry;
         /** char* x char * */
         GHashTable *source_attrs;
+        /** ID of the source that's being updated */
+        int updating_id;
 };
 
+struct myGConfValue
+{
+        GConfValue base;
+        char *str;
+};
 struct expectation
 {
         int expected;
@@ -53,6 +60,8 @@ static gboolean expectation_check(struct expectation *expect);
 static void expectation_call(struct expectation *expect);
 static void expectations_met_cb(gpointer key, gpointer value, gpointer userdata);
 static void init_source_attrs(void);
+static char *value_list_to_string(GSList *list);
+static GSList *string_to_value_list(char *str);
 
 /* ------------------------- public functions: mock_catalog */
 struct catalog *mock_catalog_new(void)
@@ -60,6 +69,7 @@ struct catalog *mock_catalog_new(void)
         struct catalog *retval = g_new(struct catalog, 1);
         retval->expected_addcommand=g_hash_table_new(g_str_hash, g_str_equal);
         retval->expected_addentry=g_hash_table_new(g_str_hash, g_str_equal);
+        retval->updating_id=0;
         return retval;
 }
 
@@ -123,23 +133,45 @@ void mock_catalog_assert_expectations_met(struct catalog *catalog)
                     "not all expectations were met (see stderr for details)");
 }
 
+void mock_catalog_set_source_attribute_list(const char *type, int source_id, const char *attribute, char *value)
+{
+        init_source_attrs();
+        g_hash_table_insert(source_attrs,
+                            ocha_gconf_get_source_attribute_key(type, source_id, attribute),
+                            value);
+}
 /* ------------------------- public functions: catalog */
 const char *catalog_error(struct catalog *catalog)
 {
         return "mock error";
 }
+
+gboolean catalog_begin_source_update(struct catalog *catalog, int source_id)
+{
+        fail_unless(catalog->updating_id!=source_id, "source update already begun for this source");
+        fail_unless(catalog->updating_id==0, "source update already begun for another source");
+        catalog->updating_id=source_id;
+        return TRUE;
+}
+
+gboolean catalog_end_source_update(struct catalog *catalog, int source_id)
+{
+       fail_unless(catalog->updating_id==source_id, "call catalog_begin_source_update before catalog_end_source_update");
+       catalog->updating_id=0;
+       return TRUE;
+}
 gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *launcher, const char *path, const char *name, const char *long_name, int *id_out)
 {
-        struct addentry_args *args =
-                                        (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,
-                                                        path);
+        struct addentry_args *args;
+        args = (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,
+                                                           path);
 
         fail_unless(long_name!=NULL, "no long_name");
         fail_unless(name!=NULL, "no display_name");
         fail_unless(path!=NULL, "no path");
-        if(args==NULL)
-{
+        fail_unless(catalog->updating_id==source_id, "call catalog_begin_source_update before catalog_add_entry");
 
+        if(args==NULL) {
                 fail(g_strdup_printf("unexpected call catalog_addentry(catalog, '%s', '%s')\n",
                                      path,
                                      name));
@@ -161,9 +193,13 @@ gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *l
                                     args->expect.description,
                                     args->command_id,
                                     source_id));
+        mark_point();
         expectation_call(&args->expect);
-        if(id_out)
+        mark_point();
+        if(id_out) {
                 *id_out=args->id;
+        }
+        mark_point();
         return TRUE;
 }
 
@@ -185,7 +221,9 @@ gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const 
 
 gchar *ocha_gconf_get_source_attribute_key(const char *type, int source_id, const char *attribute)
 {
-        return "fake_key";
+        return g_strdup_printf("%d/%s",
+                               source_id,
+                               attribute);
 }
 GConfClient *ocha_gconf_get_client()
 {
@@ -204,6 +242,72 @@ guint        gconf_client_notify_add(GConfClient* client,
 
 void gconf_client_notify_remove(GConfClient *client, guint num)
 {}
+GConfValue* gconf_value_new(GConfValueType type)
+{
+        struct myGConfValue *value;
+        fail_unless(type==GCONF_VALUE_STRING, "value must be a string");
+
+        value = g_new(struct myGConfValue, 1);
+        value->base.type=GCONF_VALUE_STRING;
+        value->str=NULL;
+        return (GConfValue *)value;
+}
+void gconf_value_free(GConfValue* value)
+{
+        fail_unless(value!=NULL, "value is null");
+        fail_unless(value->type==GCONF_VALUE_STRING, "value must be a string");
+        g_free(value);
+}
+
+const char*    gconf_value_get_string    (const GConfValue *value)
+{
+        return ((struct myGConfValue *)value)->str;
+}
+
+void        gconf_value_set_string           (GConfValue* value,
+                                              const gchar* the_str)
+{
+        ((struct myGConfValue *)value)->str = g_strdup(the_str);
+}
+
+
+
+gboolean gconf_client_set_list(GConfClient* client,
+                               const gchar* key,
+                               GConfValueType list_type,
+                               GSList* list,
+                               GError** err)
+{
+        fail_unless(client==ocha_gconf_get_client(), "wrong client");
+        fail_unless(list_type==GCONF_VALUE_STRING, "value must be string");
+        init_source_attrs();
+        g_hash_table_insert(source_attrs,
+                            (gpointer)key,
+                            value_list_to_string(list));
+        return TRUE;
+}
+
+GSList* gconf_client_get_list    (GConfClient* client,
+                                  const gchar* key,
+                                  GConfValueType list_type,
+                                  GError** err)
+{
+        char *str;
+        fail_unless(client==ocha_gconf_get_client(), "wrong client");
+        fail_unless(list_type==GCONF_VALUE_STRING, "value must be string");
+
+        init_source_attrs();
+        str=g_hash_table_lookup(source_attrs,
+                                key);
+        if(str==NULL) {
+                return NULL;
+        } else {
+                return string_to_value_list(str);
+        }
+}
+
+
+
 gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id)
 {
         fail("unexpected call");
@@ -275,4 +379,46 @@ static void init_source_attrs()
 {
         if(!source_attrs)
                 source_attrs=g_hash_table_new(g_str_hash, g_str_equal);
+}
+
+static char *value_list_to_string(GSList *list)
+{
+        GString *gstr;
+        GSList *item;
+
+        gstr=g_string_new("");
+        for(item=list; item; item=g_slist_next(item)) {
+                if(gstr->len>0) {
+                        g_string_append_c(gstr, ':');
+                }
+                g_string_append(gstr, (char *)item->data);
+        }
+        return gstr->str;
+}
+
+static GSList *string_to_value_list(char *str)
+{
+        char *colon;
+        int len;
+        GSList *retval = NULL;
+        char *value;
+
+        if(str==NULL || *str=='\0') {
+                return retval;
+        }
+        do {
+                colon = strchr(str, ':');
+                len = colon==NULL ? strlen(str):colon-str;
+                value=g_malloc(len+1);
+                strncpy(value, str, len);
+                value[len]='\0';
+                retval=g_slist_append(retval,
+                                      value);
+                if(colon!=NULL) {
+                        str=colon+1;
+                } else {
+                        str=NULL;
+                }
+        } while(str);
+        return retval;
 }

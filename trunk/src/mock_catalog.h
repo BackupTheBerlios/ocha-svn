@@ -37,4 +37,13 @@ void mock_catalog_expect_addentry(struct catalog *catalog, const char *path, con
  */
 void mock_catalog_assert_expectations_met(struct catalog *catalog);
 
+/**
+ * Set a source attribute that's a list using one string.
+ * The elements on the string are separated by colons
+ * @param type indexer
+ * @param source_id
+ * @param attribute
+ * @param value
+ */
+void mock_catalog_set_source_attribute_list(const char *type, int source_id, const char *attribute, char *value);
 #endif /*MOCK_CATALOG*/

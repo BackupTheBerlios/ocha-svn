@@ -165,7 +165,32 @@ END_TEST
 /* ------------------------- test cases: applications */
 static void setup_applications()
 {
-        setup();
+        base_setup();
+        mkdir(TEMPDIR "/d1", 0700);
+        mkdir(TEMPDIR "/d1/d2", 0700);
+        mkdir(TEMPDIR "/d2", 0700);
+        current_dir=g_get_current_dir();
+}
+static void setup_one_application_path(void)
+{
+
+        mock_catalog_set_source_attribute_list("test",
+                                               SOURCE_ID,
+                                               "paths",
+                                               g_strdup_printf("%s/%s",
+                                                               current_dir,
+                                                               TEMPDIR));
+}
+static void setup_two_application_path(void)
+{
+        mock_catalog_set_source_attribute_list("test",
+                                               SOURCE_ID,
+                                               "paths",
+                                               g_strdup_printf("%s/%s/d1:%s/%s/d2",
+                                                               current_dir,
+                                                               TEMPDIR,
+                                                               current_dir,
+                                                               TEMPDIR));
 }
 static void setup_3_applications()
 {
@@ -177,12 +202,15 @@ static void setup_3_applications()
 
 static void teardown_applications()
 {
-        teardown();
+        base_teardown();
 }
 
 START_TEST(test_index_applications)
 {
+        printf("-- test_index_applications\n");
+        setup_one_application_path();
         setup_3_applications();
+
 
         expect_entry("xmms.desktop", "XMMS", "X Multimedia System");
         expect_entry("d1/xman.desktop", "Xman", "Xman: manual page browser for X");
@@ -191,28 +219,55 @@ START_TEST(test_index_applications)
         index(&indexer_applications);
 
         verify();
-}
-END_TEST
-
-START_TEST(test_index_applications_depth)
-{
-        setup_3_applications();
-        set_depth(1);
-
-        expect_entry("xmms.desktop", "XMMS", "X Multimedia System");
-
-        index(&indexer_applications);
-
-        verify();
+        printf("-- test_index_applications OK\n");
 }
 END_TEST
 
 START_TEST(test_index_applications_skip_withargs)
 {
+        printf("-- test_index_applications_skip_withargs\n");
+
+        setup_one_application_path();
         copyfile("test_data/digikam.desktop", TEMPDIR "/digikam.desktop");
         index(&indexer_applications);
 
         verify();
+        printf("-- test_index_applications_skip_withargs OK\n");
+}
+END_TEST
+
+START_TEST(test_index_applications_noduplicates)
+{
+        printf("-- test_index_applications_noduplicates\n");
+
+        setup_two_application_path();
+        expect_entry("d2/xman.desktop", "Xman", "Xman: manual page browser for X");
+
+        copyfile("test_data/xman.desktop", TEMPDIR "/d1/xman.desktop");
+        copyfile("test_data/xman.desktop", TEMPDIR "/d2/xman.desktop");
+
+        index(&indexer_applications);
+
+        verify();
+
+        printf("-- test_index_applications_noduplicates OK\n");
+}
+END_TEST
+
+START_TEST(test_index_applications_hide)
+{
+        printf("-- test_index_applications_hide\n");
+
+        setup_two_application_path();
+
+        copyfile("test_data/xman.desktop", TEMPDIR "/d1/xman.desktop");
+        copyfile("test_data/xman-hidden.desktop", TEMPDIR "/d2/xman.desktop");
+
+        index(&indexer_applications);
+
+        verify();
+        printf("-- test_index_applications_hide OK\n");
+
 }
 END_TEST
 
@@ -366,8 +421,9 @@ static Suite *indexer_files_check_suite(void)
         suite_add_tcase(s, tc_applications);
         tcase_add_checked_fixture(tc_applications, setup_applications, teardown_applications);
         tcase_add_test(tc_applications, test_index_applications);
-        tcase_add_test(tc_applications, test_index_applications_depth);
         tcase_add_test(tc_applications, test_index_applications_skip_withargs);
+        tcase_add_test(tc_applications, test_index_applications_noduplicates);
+        tcase_add_test(tc_applications, test_index_applications_hide);
 
         tc_bookmarks =  tcase_create("tc_bookmarks");
         suite_add_tcase(s, tc_bookmarks);

@@ -29,6 +29,10 @@ typedef gboolean (*handle_file_f)(struct catalog *catalog,
 /**
  * Go through the files in the given directory and index them.
  *
+ * This method will access the configuration of the source,
+ * supposing the standard source attributes are available:
+ * 'path', 'depth', 'ignore'
+ *
  * @param indexer
  * @param source_id source that will own the new entries
  * the source attributes 'path', 'depth' and 'ignore' will
@@ -47,12 +51,28 @@ gboolean index_recursively(const char *indexer,
                            gpointer userdata,
                            GError **err);
 
+/**
+ * Go through the files in the given directory and index them.
+ *
+ * @param catalog
+ * @param directory base directory to index
+ * @param ignore_patterns pattern of files to ignore
+ * @param maxdepth maximum depth, -1 => unlimited
+ * @param slow if TRUE, arbitrarily slow down operation
+ * @param source_id source that will own the new entries
+ * @param callback function to call for each entry
+ * @param userdata data to pass to the callback
+ * @param err error to be set by the file handler if something
+ * goes wrong
+ * @return false if something goes wrong (check err, then), true
+ * otherwise
+ */
 gboolean recurse(struct catalog *catalog,
                  const char *directory,
                  GPatternSpec **ignore_patterns,
                  int maxdepth,
                  gboolean slow,
-                 int cmd,
+                 int source_id,
                  handle_file_f callback,
                  gpointer userdata,
                  GError **err);
