@@ -239,6 +239,8 @@ static GtkTreeView *createView(GtkTreeModel *model)
 {
         GtkWidget *_view = gtk_tree_view_new_with_model(model);
         GtkTreeView *view = GTK_TREE_VIEW(_view);
+        GtkTreeViewColumn *labelCol;
+        GtkTreeViewColumn *countCol;
         gtk_widget_show(_view);
 
         gtk_tree_view_set_headers_visible(view, TRUE);
@@ -248,13 +250,17 @@ static GtkTreeView *createView(GtkTreeModel *model)
                         gtk_cell_renderer_text_new(),
                         "text", COLUMN_LABEL,
                         NULL);
+        labelCol = gtk_tree_view_get_column(view, 0);
+        gtk_tree_view_column_set_expand(labelCol, TRUE);
+
         gtk_tree_view_insert_column_with_attributes(view,
                         1,
                         "Count",
                         gtk_cell_renderer_text_new(),
                         "text", COLUMN_COUNT,
                         NULL);
-
+        countCol = gtk_tree_view_get_column(view, 1);
+        gtk_tree_view_column_set_expand(countCol, FALSE);
         return view;
 }
 
