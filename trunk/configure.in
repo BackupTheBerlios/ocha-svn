@@ -21,8 +21,8 @@ AC_PROG_LIBTOOL
 
 dnl Checks for libraries.
 AM_PATH_CHECK()
-AM_PATH_GLIB_2_0(, , exit 10, "gthread")
-AM_PATH_GTK_2_0(, , exit 10)
+AM_PATH_GLIB_2_0(2.6, , exit 10, "gthread")
+AM_PATH_GTK_2_0(2.6, , exit 10)
 PKG_CHECK_MODULES(SQLITE, sqlite, ,exit 10)
 PKG_CHECK_MODULES(LIBGNOME, libgnomeui-2.0, ,exit 10)
 PKG_CHECK_MODULES(GNOME_VFS, gnome-vfs-module-2.0, ,exit 10)
@@ -36,7 +36,7 @@ dnl Checks for typedefs, structures, and compiler characteristics.
 dnl Checks for library functions.
 
 dnl Configuration
-CFLAGS=" -std=c99 $GLIB_CFLAGS -O -D_REENTRANT -D_POSIX_SOURCE -D_ISOC99_SOURCE"
+CFLAGS="-g -std=c99 $GLIB_CFLAGS -O -D_REENTRANT -D_POSIX_SOURCE -D_ISOC99_SOURCE"
 LIBS="$GLIB_LIBS $LIBS"
 
 SQLITE_CFLAGS="$SQLITE_CFLAGS"
