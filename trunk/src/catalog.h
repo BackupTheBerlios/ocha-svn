@@ -7,18 +7,28 @@
 /** \file interface to an sqllite-based catalog
  */
 
+/** error codes returned by catalog connect */
+typedef enum
+   {
+      CATALOG_CONNECTION_ERROR,
+      CATALOG_CANNOT_CREATE_TABLES
+   } CatalogErrorCodes;
+
+/** get the error quark for the errors returned by catalog */
+GQuark catalog_error_quark();
+
 /**
  * Make a connection to an sqlite catalog,
  * creating it if necessary.
  *
  * @param path path to the catalog file
  * @param if non-null and if this function returns
- * NULL, you'll find there an error message (in english)
- * explaining why the query failed. This is a static
- * pointer; it is always valid and does not need to be freed.
+ * NULL, you'll find there an error message and
+ * code explaining why connecting to the database
+ * failed (to be freed with g_error_free())
  * @return NULL if the catalog could not be open/created
  */
-struct catalog *catalog_connect(const char *path, char **errormsg);
+struct catalog *catalog_connect(const char *path, GError **errs);
 
 /**
  * Disconnect from the catalog, free any

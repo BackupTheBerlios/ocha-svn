@@ -371,7 +371,7 @@ static bool execute_result(GList *list, const char *name)
          if(strcmp(name, result->name)==0)
             {
                executed=true;
-               result->execute(result);
+               result->execute(result, NULL/*errors*/);
             }
       }
    return executed;
@@ -608,7 +608,7 @@ START_TEST(test_execute)
    printf("execute result\n");
    /* child */
    struct result *result = (struct result *)g_list_nth_data(list, 0);
-   result->execute(result);
+   result->execute(result, NULL/*errors*/);
 
    printf("read from pipe\n");
    int buffer_len=1024;

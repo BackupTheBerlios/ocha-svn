@@ -59,7 +59,7 @@ START_TEST(test_index_directory)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", gnome_open_id, 4);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, false/*not slow*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, false/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -76,7 +76,7 @@ START_TEST(test_index_directory_maxdepth_1)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x1.txt", "x1.txt", gnome_open_id, 1);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, 1, NULL/*ignore*/, false/*not slow*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, 1, NULL/*ignore*/, false/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -93,7 +93,7 @@ START_TEST(test_index_directory_maxdepth_2)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, 2, NULL/*ignore*/, false/*not slow*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, 2, NULL/*ignore*/, false/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -120,7 +120,7 @@ START_TEST(test_index_directory_default_ignore)
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/x3.txt", "x3.txt", gnome_open_id, 3);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/d1/d2/x4.txt", "x4.txt", gnome_open_id, 4);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, false/*not slow*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, NULL/*ignore*/, false/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -138,7 +138,7 @@ START_TEST(test_index_directory_ignore_others)
    mock_catalog_expect_addcommand(catalog, "gnome-open", "gnome-open \"%f\"", gnome_open_id);
    mock_catalog_expect_addentry(catalog, TEMPDIR "/x2.gif", "x2.gif", gnome_open_id, 2);
 
-   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, ignore, false/*not slow*/),
+   fail_unless(catalog_index_directory(catalog, TEMPDIR, -1, ignore, false/*not slow*/, NULL/*err*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -237,7 +237,8 @@ START_TEST(test_index_applications)
    fail_unless(catalog_index_applications(catalog,
                                           TEMPDIR,
                                           -1,
-                                          false/*not slow*/),
+                                          false/*not slow*/,
+                                          NULL/*ignore errors*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -265,7 +266,8 @@ START_TEST(test_index_applications_depth)
    fail_unless(catalog_index_applications(catalog,
                                           TEMPDIR,
                                           1,
-                                          false/*not slow*/),
+                                          false/*not slow*/,
+                                          NULL/*ignore errors*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -297,7 +299,8 @@ START_TEST(test_index_applications_skip_terminal)
    fail_unless(catalog_index_applications(catalog,
                                           TEMPDIR,
                                           1,
-                                          false/*not slow*/),
+                                          false/*not slow*/,
+                                          NULL/*ignore errors*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -346,7 +349,8 @@ START_TEST(test_index_applications_skip_withargs)
    fail_unless(catalog_index_applications(catalog,
                                           TEMPDIR,
                                           1,
-                                          false/*not slow*/),
+                                          false/*not slow*/,
+                                          NULL/*ignore errors*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -426,7 +430,8 @@ START_TEST(test_index_bookmarks)
                                 4);
 
    fail_unless(catalog_index_bookmarks(catalog,
-                                       TEMPDIR "/bookmarks.html"),
+                                       TEMPDIR "/bookmarks.html",
+                                       NULL/*ignore errors*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);
@@ -467,7 +472,8 @@ START_TEST(test_index_bookmarks_escape)
                                 3);
 
    fail_unless(catalog_index_bookmarks(catalog,
-                                       TEMPDIR "/bookmarks.html"),
+                                       TEMPDIR "/bookmarks.html",
+                                       NULL/*ignore errors*/),
                "indexing failed");
 
    mock_catalog_assert_expectations_met(catalog);

@@ -109,6 +109,10 @@ void mock_catalog_assert_expectations_met(struct catalog *catalog)
 }
 
 /* ------------------------- catalog */
+const char *catalog_error(struct catalog *catalog)
+{
+   return "mock error";
+}
 bool catalog_addentry(struct catalog *catalog, const char *path, const char *display_name, int command_id, int *id_out)
 {
    struct addentry_args *args =

@@ -19,7 +19,7 @@ static void stop(struct queryrunner *self);
 static void release(struct queryrunner *self);
 
 static struct result *result_new(const char *query, int index);
-static bool result_execute(struct result *);
+static bool result_execute(struct result *, GError **);
 static void result_release(struct result *);
 
 /** keep up to 256 characters of a query */
@@ -94,7 +94,7 @@ static struct result *result_new(const char *query, int index)
  * @praam result
  * @return true, always
  */
-static bool result_execute(struct result *result)
+static bool result_execute(struct result *result, GError **errors)
 {
    g_return_val_if_fail(result!=NULL, false);
    printf("execute result: %s\n", result->name);

@@ -18,7 +18,7 @@ struct mock_result
    bool released;
 };
 
-static bool execute_cb(struct result *);
+static bool execute_cb(struct result *, GError **);
 static void release_cb(struct result *);
 static struct mock_result results[] =
    {
@@ -46,7 +46,7 @@ static struct mock_result results[] =
 #endif
 
 
-static bool execute_cb(struct result *_result)
+static bool execute_cb(struct result *_result, GError **err)
 {
    struct mock_result *result = (struct mock_result *)_result;
    fail_unless(!result->released, "released");

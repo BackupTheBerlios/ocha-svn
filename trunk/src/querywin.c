@@ -3,6 +3,7 @@
 #include <string.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+#include <stdio.h>
 
 /** \file
  * Create a query window and initialize the querwin structure.
@@ -33,6 +34,7 @@ static void result_handler_cb(struct queryrunner *caller,
 static gboolean run_query(gpointer userdata);
 static void set_query_string(void);
 static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata);
+static void execute_result(struct result *result);
 
 #define assert_initialized() g_return_if_fail(result_queue)
 #define assert_queryrunner_set() g_return_if_fail(queryrunner);
@@ -169,7 +171,6 @@ static gboolean run_query(gpointer userdata)
  */
 static void set_query_string()
 {
-   printf("set_query_string('%s')\n", query_str->str);
    strncpy(query_label_text, query_str->str, query_label_text_len-1);
    gtk_label_set_text(GTK_LABEL(query_label), query_label_text);
    resultlist_set_current_query(query_str->str);
@@ -201,7 +202,7 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
             if(selected!=NULL)
                {
                   querywin_stop();
-                  selected->execute(selected);
+                  execute_result(selected);
                }
             return TRUE; /*handled*/
          }
@@ -262,4 +263,18 @@ static void querywin_create(GtkWidget *list)
   treeview=list;
 }
 
+static void execute_result(struct result *result)
+{
+   GError *errs = NULL;
+   if(!result->execute(result, &errs))
+      {
+         gdk_beep();
+         fprintf(stderr,
+                 "execution of %s failed: %s %s\n",
+                 result->path,
+                 errs->message,
+                 errs->code==RESULT_ERROR_INVALID_RESULT ? "(result was invalid)":"");
+         g_error_free(errs);
+      }
 
+}

@@ -1,7 +1,9 @@
 #ifndef RESULT_H
 #define RESULT_H
 
+#include <glib.h>
 #include <stdbool.h>
+
 /** \file
  * A result is an executable object that
  * will be presented to the user as a result
@@ -36,9 +38,14 @@ struct result
     * so as not to block the caller's thread.
     *
     * @param self the result
+    * @param errors a GError to set when the function
+    * returns false, may be NULL if you don't care.
+    * The domain will be RESULT_ERROR and the error
+    * code one of the codes defined by ResultErrorCode.
+    * (to be freed with g_error_free())
     * @return true if execution succeeded
     */
-   bool (*execute)(struct result *self);
+   bool (*execute)(struct result *self, GError **errors);
 
    /**
     * Free all memory and resources held by this result
@@ -46,5 +53,19 @@ struct result
     */
    void (*release)(struct result *self);
 };
+
+/** Result error quark */
+#define RESULT_ERROR g_quark_from_static_string("RESULT_ERROR")
+
+/** Result error codes */
+typedef enum
+   {
+      /** Such an error meant that the result is invalid and should be discarded */
+      RESULT_ERROR_INVALID_RESULT,
+      /** Such an error meant that some resource was missing, but the result is generally valid */
+      RESULT_ERROR_MISSING_RESOURCE,
+      /** Generic error code, use it only when nothing else matches */
+      RESULT_ERROR_FAILED,
+   } ResultErrorCode;
 
 #endif /* RESULT_H */

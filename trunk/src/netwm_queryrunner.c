@@ -52,7 +52,7 @@ static void stop(struct queryrunner *self);
 static void release(struct queryrunner *self);
 
 static struct result *result_new(Display *display, Window win, const char *title);
-static bool result_execute(struct result *self);
+static bool result_execute(struct result *self, GError **);
 static void result_release(struct result *self);
 
 /* ------------------------- public functions */
@@ -185,10 +185,11 @@ static struct result *result_new(Display *display, Window win, const char *title
    return TO_RESULT(retval);
 }
 
-static bool result_execute(struct result *_self)
+static bool result_execute(struct result *_self, GError **err)
 {
    struct window_result *self = TO_WINDOW_RESULT(_self);
    g_return_val_if_fail(self, false);
+   g_return_val_if_fail(err==NULL || *err==NULL, false);
 
    printf("activate window %s '%s'\n",
           self->base.path,
@@ -199,9 +200,14 @@ static bool result_execute(struct result *_self)
                                 self->win,
                                 true/*switch desktop*/);
    gdk_flush();
-   if(gdk_error_trap_pop())
+   gint xerror = gdk_error_trap_pop();
+   if(xerror)
       {
-         fprintf(stderr, "window activation failed (X error)\n");
+         g_set_error(err,
+                     RESULT_ERROR,
+                     xerror==BadWindow ? RESULT_ERROR_INVALID_RESULT:RESULT_ERROR_MISSING_RESOURCE,
+                     "window activation failed (X error %d)\n",
+                     xerror);
          return false;
       }
    return retval;

@@ -91,7 +91,6 @@ void resultlist_init()
 
 void resultlist_set_current_query(const char *query)
 {
-   printf("resultlist_set_current_query('%s')\n", query);
    g_string_assign(query_str, query);
 
    GtkTreeIter iter;
