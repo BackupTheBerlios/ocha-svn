@@ -22,7 +22,7 @@ struct result
    const char *path;
 
    /**
-    * Function to be called to execute this result.
+    * Execute this result.
     *
     * This function should execute the result, whatever
     * that means for the current result, and return
@@ -40,6 +40,10 @@ struct result
     */
    bool (*execute)(struct result *self);
 
+   /**
+    * Free all memory and resources held by this result
+    * @param self the result
+    */
    void (*release)(struct result *self);
 };
 
