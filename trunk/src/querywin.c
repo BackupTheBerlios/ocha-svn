@@ -51,7 +51,7 @@ void querywin_init()
 
    gtk_window_stick(GTK_WINDOW(querywin));
    gtk_window_set_keep_above(GTK_WINDOW(querywin),
-                 true);
+                             true);
 
 
    g_signal_connect(querywin,
@@ -106,17 +106,35 @@ void querywin_stop()
 
 /* ------------------------- private functions */
 
+/**
+ * Gtk callback for "focus-out".
+ *
+ * This stops the query and hides the window if the user
+ * goes to another windew.
+ */
 static gboolean focus_out_cb(GtkWidget* widget, GdkEventFocus* ev, gpointer userdata)
 {
    querywin_stop();
    return FALSE; /*propagate*/
 }
 
+/**
+ * Gtk callback for "map-event".
+ *
+ * This makes sure the window is shown on the currentor the
+ * desktop, even if it has been mapped previously on another
+ * desktop.
+ */
 static gboolean map_event_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata)
 {
    gtk_window_present(GTK_WINDOW(querywin));
 }
 
+/**
+ * Result handler called by the query runner.
+ *
+ * This adds a new result into the result list
+ */
 static void result_handler_cb(struct queryrunner *caller,
                               const char *query,
                               float pertinence,
@@ -128,6 +146,9 @@ static void result_handler_cb(struct queryrunner *caller,
    resultlist_add_result(pertinence, result);
 }
 
+/**
+ * Run the query (gtk timeout callback)
+ */
 static gboolean run_query(gpointer userdata)
 {
    if(strcmp(running_query->str, query_str->str)!=0)
@@ -140,12 +161,20 @@ static gboolean run_query(gpointer userdata)
    return FALSE;
 }
 
+/**
+ * Update the query string that's displayed on
+ * the window, and set the timeout for actually
+ * running the query if the user waits long enough
+ * for it to be worth it.
+ */
 static void set_query_string()
 {
    strncpy(query_label_text, query_str->str, query_label_text_len-1);
    gtk_label_set_text(GTK_LABEL(query_label), query_label_text);
    g_timeout_add(300, run_query, NULL/*userdata*/);
 }
+
+/** Gtk callback for "release-event" */
 static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata)
 {
    switch(ev->keyval)
@@ -192,6 +221,10 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
 }
 
 
+/**
+ * Create the gtk window.
+ * @param list the tree view
+ */
 static void querywin_create(GtkWidget *list)
 {
   GtkWidget *vbox1;

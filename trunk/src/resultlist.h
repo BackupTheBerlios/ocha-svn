@@ -7,12 +7,51 @@
 /** \file Maintain a gtk list view and model representing
  * the current result list.
  */
+
+/**
+ * Create the result list.
+ *
+ * Make sure you call this function before any other
+ * in this module.x
+ */
 void resultlist_init();
 
-GtkWidget *resultlist_get_widget();
-struct result *resultlist_get_selected();
+/**
+ * Get the treeview widget that's the view of the result list.
+ *
+ * Make sure you've called resultlist_init() before this
+ * function, otherwise the widget will not have been created.
+ *
+ * @return the view tree widget created by resultlist_init()
+ */
+GtkWidget *resultlist_get_widget(void);
+
+/**
+ * Get the currently selected result or NULL.
+ *
+ * @return the selected result or NULL
+ */
+struct result *resultlist_get_selected(void);
+
+/**
+ * Add a result to the list.
+ *
+ * @param pertinence
+ * @param result
+ */
 void resultlist_add_result(float pertinence, struct result *);
+
+/**
+ * Clear the list.
+ */
 void resultlist_clear(void);
+
+/**
+ * Set the current query, for highlighting it on
+ * the result list.
+ *
+ * @param query new query string to highlight
+ */
 void resultlist_set_current_query(const char *query);
 
 #endif
