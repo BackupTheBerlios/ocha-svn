@@ -23,6 +23,13 @@ gboolean shown;
 static struct result_queue *result_queue;
 static struct queryrunner *queryrunner;
 static gboolean queryrunner_started;
+/**
+ * Index of the next entry to verify.
+ * -1 means they've all been verified.
+ *
+ * verified!=-1 <=> verify_when_idle_cb is runnig
+ */
+static gboolean verified=-1;
 
 #define QUERY_TIMEOUT 3000
 #define assert_initialized() g_return_if_fail(result_queue)
@@ -38,6 +45,7 @@ static void reset_query_string(void);
 static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata);
 static void querywin_create(GtkWidget *list);
 static gboolean execute_result(struct result *result);
+static gboolean verify_when_idle_cb(gpointer userdata);
 
 /* ------------------------- public functions */
 
@@ -90,12 +98,23 @@ void querywin_start()
         assert_initialized();
         assert_queryrunner_set();
 
-        if(shown)
+        if(shown) {
                 return;
+        }
         last_keypress=0;
-        /*resultlist_verify();*/
+        /* restart verification */
 
-        /*gtk_window_move(GTK_WINDOW(querywin), gdk_screen_width()/2, gdk_screen_height()/2);*/
+        if(verified==-1) {
+                verified=0;
+                printf("%s:%d: add idle. verified=%d\n", /*@nocommit@*/
+                       __FILE__,
+                       __LINE__,
+                       verified
+                       );
+
+                g_idle_add(verify_when_idle_cb, NULL/*data*/);
+        }
+
         gtk_widget_show(querywin);
         shown=TRUE;
 }
@@ -322,3 +341,13 @@ static gboolean execute_result(struct result *result)
         return TRUE;
 }
 
+static gboolean verify_when_idle_cb(gpointer userdata)
+{
+        if(resultlist_verify_nth(verified)) {
+                verified++;
+                return TRUE/*continue*/;
+        } else {
+                verified=-1;
+                return FALSE/*remove*/;
+        }
+}

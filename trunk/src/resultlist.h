@@ -73,6 +73,17 @@ void resultlist_set_current_query(const char *query);
  * periods, during which files may have been deleted or
  * removed or windows closed.
  */
-void resultlist_verify(void);
+void resultlist_verify_all(void);
+
+/**
+ * Verify one result and remove it.
+ *
+ * @param index result index (starting at 0)
+ * @return true if there's more after this one,
+ * false if there's no more valid index after
+ * this one or if the index was invalid to begin
+ * with.
+ */
+gboolean resultlist_verify_nth(int index);
 
 #endif

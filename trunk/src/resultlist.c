@@ -56,6 +56,7 @@ static void append_markup_escaped(GString *gstr, const char *str);
 static void append_query_pango_highlight(GString *gstr, const char *query, const char *str, const char *on, const char *off);
 static const char *create_highlighted_label_markup(const char *query, struct result  *result);
 static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, GtkTreeModel* model, GtkTreeIter* iter, gpointer userdata);
+static gboolean verify_iter(GtkTreeIter *iter);
 
 /* ------------------------- public functions */
 void resultlist_init()
@@ -199,22 +200,30 @@ void resultlist_add_result(const char *query, float pertinence, struct result *r
         }
 }
 
-void resultlist_verify(void)
+
+
+void resultlist_verify_all(void)
 {
         GtkTreeIter iter;
         if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
                                          &iter)) {
                 gboolean go_on;
                 do {
-                        struct resultholder *holder;
-                        gtk_tree_model_get(GTK_TREE_MODEL(model), &iter, 0, &holder, -1);
-                        if(!holder->result->validate(holder->result)) {
-                                g_hash_table_remove(hash, holder->result->path);
-                                go_on=gtk_list_store_remove(GTK_LIST_STORE(model), &iter);
-                        } else {
-                                go_on=gtk_tree_model_iter_next(GTK_TREE_MODEL(model), &iter);
-                        }
+                        go_on = verify_iter(&iter);
                 } while(go_on);
+        }
+}
+
+gboolean resultlist_verify_nth(int index)
+{
+        GtkTreeIter iter;
+        if(gtk_tree_model_iter_nth_child(GTK_TREE_MODEL(model),
+                                         &iter,
+                                         NULL/*parent=root*/,
+                                         index)) {
+                return verify_iter(&iter);
+        } else {
+                return FALSE;
         }
 }
 
@@ -358,3 +367,15 @@ static void cell_name_data_func(GtkTreeViewColumn* col,
         }
 }
 
+static gboolean verify_iter(GtkTreeIter *iter)
+{
+        struct resultholder *holder;
+
+        gtk_tree_model_get(GTK_TREE_MODEL(model), iter, 0, &holder, -1);
+        if(!holder->result->validate(holder->result)) {
+                g_hash_table_remove(hash, holder->result->path);
+                return gtk_list_store_remove(GTK_LIST_STORE(model), iter);
+        } else {
+                return gtk_tree_model_iter_next(GTK_TREE_MODEL(model), iter);
+        }
+}
