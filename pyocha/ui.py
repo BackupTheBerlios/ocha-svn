@@ -140,8 +140,16 @@ class QueryWin(QueryObserver):
 
         query.addObserver(self)
 
+        win=self.win
+        win.stick()
+        win.set_keep_above(True)
+        win.connect("focus_out_event", self.cb_focus_out_event)
+
+    def cb_focus_out_event(self, event, userdata):
+        self.win.hide()
+
     def show(self):
-        self.win.show()
+        self.win.present()
 
     def ping(self):
         self.__ping=now()
@@ -234,5 +242,8 @@ import signal
 def sighndl(sig, stack):
     win.show()
 signal.signal(signal.SIGUSR1, sighndl)
-win.show()
-gtk.main()
+
+
+if __name__ == '__main__':
+    win.show()
+    gtk.main()
