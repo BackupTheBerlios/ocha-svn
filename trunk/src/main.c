@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -138,19 +139,45 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
       }
    return FALSE; /*propagate*/
 }
+static void str_lower(char *dest, const char *from)
+{
+   int len = strlen(from);
+   for(int i=0; i<len; i++)
+      dest[i]=tolower(from[i]);
+   dest[len]='\0';
+}
 static void cell_name_data_func(GtkTreeViewColumn* col, GtkCellRenderer* renderer, GtkTreeModel* model, GtkTreeIter* iter, gpointer userdata)
 {
    struct result *result = NULL;
    gtk_tree_model_get(model, iter, 0, &result, -1);
    g_return_if_fail(result);
-   int buffer_len = 3+5+strlen(result->name)+6+4+1+7+strlen(result->path)+8+1;
+   int buffer_len = 3+5+3+strlen(result->name)+4+6+4+1+7+strlen(result->path)+8+1;
    char buffer[buffer_len];
    strcpy(buffer, "<b><big>");
-   strcat(buffer, result->name);
+   char *query = query_str->str;
+   char query_lower[query_str->len+1];
+   str_lower(query_lower, query);
+   char name_lower[strlen(result->name)+1];
+   str_lower(name_lower, result->name);
+   char *found=strstr(name_lower, query_lower);
+   if(found==NULL)
+      strcat(buffer, result->name);
+   else
+      {
+         int index=found-name_lower;
+         int buflen=strlen(buffer);
+         strncat(buffer, result->name, index);
+         buffer[buflen+index]='\0';
+         strcat(buffer, "<u>");
+         strncat(buffer, &result->name[index], strlen(query));
+         buffer[buflen+index+3+strlen(query)]='\0';
+         strcat(buffer, "</u>");
+         strcat(buffer, &result->name[index+strlen(query)]);
+      }
    strcat(buffer, "</big></b>\n<small>");
    strcat(buffer, result->path);
    strcat(buffer, "</small>");
-   g_assert(strlen(buffer)==(buffer_len-1));
+   g_assert(strlen(buffer)<=(buffer_len-1));
    g_object_set(renderer, "markup", buffer, NULL);
 }
 
