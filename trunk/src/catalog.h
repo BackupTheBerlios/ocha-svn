@@ -5,6 +5,55 @@
 #include "target.h"
 
 /**
+ * A search on a catalog.
+ *
+ * A search starts empty and the query is set
+ * piece by piece. It's not possible to reset 
+ * the query; create a new search instad.
+ *
+ * Only one thread should run a search at a
+ * time.
+ */
+struct catalog_search
+{
+   /**
+	* Get the query as it is so far.
+	*
+	* @param memory to write the query to. if it's null
+	* nothing will be done
+	* @param len size of dest if it's too small
+	* for the query to fit, it is truncated. The
+	* last bit is always set to 0
+	* @return the real length of the query, always.
+	*/
+   const int (*get_query)(const struct catalog_search *, char *dest, int len);
+
+   /**
+	* Append the following string to the query.
+	* @param search 
+	* @param str string to append to the current query
+	* @return true if appending was really done (always true
+	* unless the catalog is frozen, in which case it's always false)
+	*/
+   bool (*append)(struct catalog_search *search, const char *str);
+
+   /**
+	* Freeze the search.
+	*
+	* The most expensive searches won't be executed until
+	* the search is frozen. 
+	*/
+   void (*freeze)(struct catalog_search *search);
+
+   /**
+	* Stop the search and release the resource.
+	* 
+	* This destroys the search object.
+	*/
+   void (*delete)(struct catalog_search *);
+};
+
+/**
  * This function receives search results.
  *
  * Search results and sent to this callback whenever
@@ -68,53 +117,5 @@ struct catalog
 };
 
 
-/**
- * A search on a catalog.
- *
- * A search starts empty and the query is set
- * piece by piece. It's not possible to reset 
- * the query; create a new search instad.
- *
- * Only one thread should run a search at a
- * time.
- */
-struct catalog_search
-{
-   /**
-	* Get the query as it is so far.
-	*
-	* @param memory to write the query to. if it's null
-	* nothing will be done
-	* @param len size of dest if it's too small
-	* for the query to fit, it is truncated. The
-	* last bit is always set to 0
-	* @return the real length of the query, always.
-	*/
-   const int (*get_query)(const struct catalog_search *, char *dest, int len);
-
-   /**
-	* Append the following string to the query.
-	* @param search 
-	* @param str string to append to the current query
-	* @return true if appending was really done (always true
-	* unless the catalog is frozen, in which case it's always false)
-	*/
-   bool (*append)(struct catalog_search *search, const char *str);
-
-   /**
-	* Freeze the search.
-	*
-	* The most expensive searches won't be executed until
-	* the search is frozen. 
-	*/
-   void (*freeze)(struct catalog_search *search);
-
-   /**
-	* Stop the search and release the resource.
-	* 
-	* This destroys the search object.
-	*/
-   void (*delete)(struct catalog_search *);
-};
 
 #endif

@@ -1,6 +1,6 @@
 #ifndef CATALOG_UPDATEDB_H
 #define CATALOG_UPDATEDB_H
-#include "catalog.h"
+#include <catalog.h>
 
 /** \file
  * Implementation of the catalog.h API based on updatedb/locate.
@@ -14,6 +14,6 @@
  * Create a new catalog structure for 
  * searches based on updatedb
  */
-struct catalog *catalog_updatedb_new(void);
+struct catalog *updatedb_new(void);
 
 #endif

@@ -33,7 +33,7 @@ dnl Checks for typedefs, structures, and compiler characteristics.
 dnl Checks for library functions.
 
 dnl Configuration
-CFLAGS="-std=c99 $GLIB_CFLAGS -O -D_REENTRANT"
+CFLAGS=" -std=c99 $GLIB_CFLAGS -O -D_REENTRANT "
 LIBS="$GLIB_LIBS $LIBS"
 
 TEST_CFLAGS="-g $CHECK_CFLAGS"
@@ -43,4 +43,4 @@ AC_SUBST([TEST_LIBS])
 
 
 dnl Output
-AC_OUTPUT( Makefile src/Makefile )
+AC_OUTPUT( Makefile src/Makefile src/catalog/Makefile src/catalog/updatedb/Makefile )

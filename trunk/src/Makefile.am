@@ -27,3 +27,6 @@ xref:
 
 doxygen:
 	doxygen Doxyfile
+
+
+SUBDIRS=catalog
