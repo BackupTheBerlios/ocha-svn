@@ -21,6 +21,7 @@ static struct result_queue *result_queue;
 static struct queryrunner *queryrunner;
 static GtkListStore *list_model;
 static GString* query_str;
+static GString* running_query;
 static GList* results;
 static struct result* selected;
 static guint32 last_keypress;
@@ -90,14 +91,22 @@ static void clear_list_model()
    results=NULL;
 }
 
-static void run_query()
+static gboolean run_query(gpointer userdata)
 {
+   if(strcmp(running_query->str, query_str->str)!=0)
+      {
+         g_string_assign(running_query, query_str->str);
+         clear_list_model();
+         queryrunner->run_query(queryrunner, running_query->str);
+      }
+   return FALSE;
+}
 
+static void set_query_string()
+{
    strncpy(query_label_text, query_str->str, query_label_text_len-1);
    gtk_label_set_text(GTK_LABEL(win_data.query_label), query_label_text);
-   clear_list_model();
-
-   queryrunner->run_query(queryrunner, query_str->str);
+   g_timeout_add(200, run_query, NULL/*userdata*/);
 }
 static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointer userdata)
 {
@@ -112,7 +121,7 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
          if(query_str && query_str->len>0)
             {
                g_string_truncate(query_str, query_str->len-1);
-               run_query();
+               set_query_string();
             }
          last_keypress=ev->time;
          return TRUE; /*handled*/
@@ -131,7 +140,7 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
                   g_string_assign(query_str, ev->string);
                else
                   g_string_append(query_str, ev->string);
-               run_query();
+               set_query_string();
                last_keypress=ev->time;
                return TRUE;/*handled*/
             }
@@ -269,6 +278,7 @@ int main(int argc, char *argv[])
    gtk_init(&argc, &argv);
 
    query_str=g_string_new("");
+   running_query=g_string_new("");
    result_queue=result_queue_new(NULL/*default context*/,
                                  result_handler_cb,
                                  NULL/*userdata*/);
