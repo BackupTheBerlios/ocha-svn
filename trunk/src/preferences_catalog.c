@@ -30,7 +30,7 @@ struct prefs_and_indexer
 };
 struct preferences_catalog
 {
-        GtkTreeStore *model;
+        GtkListStore *model;
         GtkTreeView *view;
         GtkTreeSelection *selection;
         /** root widget, retured by get_widget */
@@ -47,18 +47,17 @@ struct preferences_catalog
 };
 
 /* ------------------------- prototypes */
-static GtkTreeStore *createModel(struct catalog *catalog);
-static void add_indexer(GtkTreeStore *model, struct indexer *indexer, struct catalog *catalog);
-static gboolean find_iter_for_source(GtkTreeStore *model, int goal_id, GtkTreeIter *iter_out);
+static GtkListStore *createModel(struct catalog *catalog);
+static void add_indexer(GtkListStore *model, struct indexer *indexer, struct catalog *catalog);
+static gboolean find_iter_for_source(GtkListStore *model, int goal_id, GtkTreeIter *iter_out);
 static void display_name_changed(struct indexer_source *source, gpointer userdata);
-static void add_source(GtkTreeStore *model, GtkTreeIter *parent, struct indexer *indexer, struct catalog *catalog, int source_id, GtkTreeIter *iter_out);
-static void update_entry_count(GtkTreeStore *model, GtkTreeIter *iter, unsigned int source_id, struct catalog *catalog);
+static void add_source(GtkListStore *model, struct indexer *indexer, struct catalog *catalog, int source_id, GtkTreeIter *iter_out);
+static void update_entry_count(GtkListStore *model, GtkTreeIter *iter, unsigned int source_id, struct catalog *catalog);
 static GtkTreeView *createView(GtkTreeModel *model);
 static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current);
 static void reload_cb(GtkButton *button, gpointer userdata);
 static void update_properties(struct preferences_catalog  *prefs);
 static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userdata);
-static gboolean find_indexer_iter(struct preferences_catalog *prefs, struct indexer *indexer, GtkTreeIter *iter_out);
 static void select_row(struct preferences_catalog  *prefs, GtkTreeIter *source_iter);
 static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer userdata);
 static void new_source_popup_cb(GtkButton *button, gpointer userdata);
@@ -113,14 +112,16 @@ GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
 }
 
 /* ------------------------- static functions */
-static GtkTreeStore *createModel(struct catalog *catalog)
+static GtkListStore *createModel(struct catalog *catalog)
 {
-        GtkTreeStore *model = gtk_tree_store_new(NUMBER_OF_COLUMNS,
-                              G_TYPE_STRING/*COLUMN_LABEL*/,
-                              G_TYPE_STRING/*COLUMN_INDEXER_TYPE*/,
-                              G_TYPE_INT/*COLUMN_SOURCE_ID*/,
-                              G_TYPE_UINT/*COLUMN_COUNT*/);
+        GtkListStore *model;
         struct indexer **indexers;
+
+        model = gtk_list_store_new(NUMBER_OF_COLUMNS,
+                                   G_TYPE_STRING/*COLUMN_LABEL*/,
+                                   G_TYPE_STRING/*COLUMN_INDEXER_TYPE*/,
+                                   G_TYPE_INT/*COLUMN_SOURCE_ID*/,
+                                   G_TYPE_UINT/*COLUMN_COUNT*/);
 
         for(indexers = indexers_list();
             *indexers;
@@ -131,26 +132,18 @@ static GtkTreeStore *createModel(struct catalog *catalog)
         return model;
 }
 
-static void add_indexer(GtkTreeStore *model,
+static void add_indexer(GtkListStore *model,
                         struct indexer *indexer,
                         struct catalog *catalog)
 {
         int *ids = NULL;
         int ids_len = -1;
-        GtkTreeIter iter;
-
-        gtk_tree_store_append(model, &iter, NULL/*toplevel*/);
-        gtk_tree_store_set(model, &iter,
-                           COLUMN_LABEL, indexer->display_name,
-                           COLUMN_INDEXER_TYPE, indexer->name,
-                           -1);
 
         ocha_gconf_get_sources(indexer->name, &ids, &ids_len);
         if(ids) {
                 int i;
                 for(i=0; i<ids_len; i++) {
                         add_source(model,
-                                   &iter,
                                    indexer,
                                    catalog,
                                    ids[i], NULL/*iter_out*/);
@@ -158,35 +151,22 @@ static void add_indexer(GtkTreeStore *model,
                 g_free(ids);
         }
 }
-static gboolean find_iter_for_source(GtkTreeStore *model,
+static gboolean find_iter_for_source(GtkListStore *model,
                                      int goal_id,
                                      GtkTreeIter *iter_out)
 {
         int source_id;
-        GtkTreeIter iter_parent;
-
         g_return_val_if_fail(model, FALSE);
         g_return_val_if_fail(iter_out, FALSE);
 
-        if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
-                                         &iter_parent)) {
-                do {
-                        if(gtk_tree_model_iter_children(GTK_TREE_MODEL(model),
-                                                        iter_out,
-                                                        &iter_parent)) {
-                                do {
-                                        gtk_tree_model_get(GTK_TREE_MODEL(model), iter_out,
-                                                           COLUMN_SOURCE_ID, &source_id,
-                                                           -1);
-                                        if(source_id==goal_id) {
-                                                return TRUE;
-                                        }
-                                } while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model),
-                                                                 iter_out));
-                        }
-                } while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model),
-                                                 &iter_parent));
-        }
+        if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model), iter_out)) {
+                gtk_tree_model_get(GTK_TREE_MODEL(model), iter_out,
+                                   COLUMN_SOURCE_ID, &source_id,
+                                   -1);
+                if(source_id==goal_id) {
+                        return TRUE;
+                }
+        } while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model), iter_out));
         /* iter_out has been set to be invalid */
         return FALSE;
 
@@ -194,7 +174,7 @@ static gboolean find_iter_for_source(GtkTreeStore *model,
 
 static void display_name_changed(struct indexer_source *source, gpointer userdata)
 {
-        GtkTreeStore *model = GTK_TREE_STORE(userdata);
+        GtkListStore *model = GTK_LIST_STORE(userdata);
         GtkTreeIter iter;
 
         g_return_if_fail(source);
@@ -202,13 +182,12 @@ static void display_name_changed(struct indexer_source *source, gpointer userdat
 
         if(find_iter_for_source(model, source->id, &iter))
         {
-                gtk_tree_store_set(model, &iter,
+                gtk_list_store_set(model, &iter,
                                    COLUMN_LABEL, source->display_name,
                                    -1);
         }
 }
-static void add_source(GtkTreeStore *model,
-                       GtkTreeIter *parent,
+static void add_source(GtkListStore *model,
                        struct indexer *indexer,
                        struct catalog *catalog,
                        int source_id,
@@ -218,10 +197,10 @@ static void add_source(GtkTreeStore *model,
         struct indexer_source *source = indexer_load_source(indexer, catalog, source_id);
         if(source!=NULL)
         {
-                gtk_tree_store_append(model, &iter, parent);
+                gtk_list_store_append(model, &iter);
                 if(iter_out)
                         memcpy(iter_out, &iter, sizeof(GtkTreeIter));
-                gtk_tree_store_set(model, &iter,
+                gtk_list_store_set(model, &iter,
                                    COLUMN_LABEL, source->display_name,
                                    COLUMN_INDEXER_TYPE, indexer->name,
                                    COLUMN_SOURCE_ID, source_id,
@@ -235,16 +214,12 @@ static void add_source(GtkTreeStore *model,
                 indexer_source_release(source);
         }
 }
-static void update_entry_count(GtkTreeStore *model,
+static void update_entry_count(GtkListStore *model,
                                GtkTreeIter *iter,
                                unsigned int source_id,
                                struct catalog *catalog)
 {
         unsigned int count=0;
-        unsigned int oldcount=0;
-        int difference;
-        GtkTreeIter current;
-        GtkTreeIter parent;
 
         g_return_if_fail(model!=NULL);
         g_return_if_fail(iter!=NULL);
@@ -255,30 +230,9 @@ static void update_entry_count(GtkTreeStore *model,
                 return;
         }
 
-
-        gtk_tree_model_get(GTK_TREE_MODEL(model), iter,
-                           COLUMN_COUNT, &oldcount,
-                           -1);
-        gtk_tree_store_set(model, iter,
+        gtk_list_store_set(model, iter,
                            COLUMN_COUNT, count,
                            -1);
-        difference =  count-oldcount;
-
-        memcpy(&current, iter, sizeof(GtkTreeIter));
-        while(gtk_tree_model_iter_parent(GTK_TREE_MODEL(model),
-                                         &parent,
-                                         &current))
-        {
-                oldcount=0;
-                gtk_tree_model_get(GTK_TREE_MODEL(model), &parent,
-                                   COLUMN_COUNT, &oldcount,
-                                   -1);
-                gtk_tree_store_set(model, &parent,
-                                   COLUMN_COUNT, oldcount+difference,
-                                   -1);
-
-                memcpy(&current, &parent, sizeof(GtkTreeIter));
-        }
 }
 
 static GtkTreeView *createView(GtkTreeModel *model)
@@ -306,7 +260,7 @@ static GtkTreeView *createView(GtkTreeModel *model)
 
 static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current)
 {
-        GtkTreeStore *model;
+        GtkListStore *model;
         int source_id;
 
         g_return_if_fail(prefs!=NULL);
@@ -424,37 +378,6 @@ static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userd
         update_properties(prefs);
 }
 
-static gboolean find_indexer_iter(struct preferences_catalog *prefs,
-                                  struct indexer *indexer,
-                                  GtkTreeIter *iter_out)
-{
-        GtkTreeStore *model;
-
-        g_return_val_if_fail(prefs, FALSE);
-        g_return_val_if_fail(indexer, FALSE);
-        g_return_val_if_fail(iter_out, FALSE);
-
-        model =  prefs->model;
-        if(gtk_tree_model_get_iter_first(GTK_TREE_MODEL(model),
-                                         iter_out))
-        {
-                do {
-                        gchar *type = NULL;
-                        gtk_tree_model_get(GTK_TREE_MODEL(model), iter_out,
-                                           COLUMN_INDEXER_TYPE, &type,
-                                           -1);
-                        if(type!=NULL) {
-                                gboolean success = strcmp(type, indexer->name)==0;
-                                g_free(type);
-                                if(success) {
-                                        return TRUE;
-                                }
-                        }
-                } while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model), iter_out));
-        }
-        /* iter_out has been set to be invalid */
-        return FALSE;
-}
 
 /**
  * Make sure the row is visible and then select it
@@ -492,18 +415,14 @@ static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer use
 
         source = indexer_new_source(indexer, prefs->catalog, NULL/*err*/);
         if(source) {
-                GtkTreeIter indexer_iter;
-                if(find_indexer_iter(prefs, indexer, &indexer_iter)) {
-                        GtkTreeIter source_iter;
-                        add_source(GTK_TREE_STORE(prefs->model),
-                                   &indexer_iter,
-                                   indexer,
-                                   prefs->catalog,
-                                   source->id,
-                                   &source_iter);
+                GtkTreeIter source_iter;
+                add_source(GTK_LIST_STORE(prefs->model),
+                           indexer,
+                           prefs->catalog,
+                           source->id,
+                           &source_iter);
 
-                        select_row(prefs, &source_iter);
-                }
+                select_row(prefs, &source_iter);
                 indexer_source_release(source);
         }
 }
@@ -543,30 +462,20 @@ static void delete_cb(GtkButton *button, gpointer userdata)
                                                            prefs->catalog,
                                                            source_id);
                                 if(source) {
-                                        GtkTreeIter parent_iter;
-                                        int child_count, parent_count;
-
-                                        gtk_tree_model_iter_parent(GTK_TREE_MODEL(prefs->model),
-                                                                   &parent_iter,
-                                                                   &iter);
-
-                                        gtk_tree_model_get(GTK_TREE_MODEL(prefs->model),
-                                                           &parent_iter,
-                                                           COLUMN_COUNT, &parent_count,
-                                                           -1);
-                                        gtk_tree_model_get(GTK_TREE_MODEL(prefs->model),
-                                                           &iter,
-                                                           COLUMN_COUNT, &child_count,
-                                                           -1);
-                                        gtk_tree_store_set(prefs->model,
-                                                           &parent_iter,
-                                                           COLUMN_COUNT, parent_count-child_count,
-                                                           -1);
-
-                                        if(gtk_tree_store_remove(prefs->model, &iter)) {
+                                        if(gtk_list_store_remove(prefs->model, &iter)) {
                                                 gtk_tree_selection_select_iter(prefs->selection, &iter);
                                         } else {
-                                                gtk_tree_selection_select_iter(prefs->selection, &parent_iter);
+                                                int node_count;
+                                                node_count = gtk_tree_model_iter_n_children(GTK_TREE_MODEL(prefs->model),
+                                                                                            NULL/*parent=root*/);
+                                                if(node_count>0) {
+                                                        if(gtk_tree_model_iter_nth_child(GTK_TREE_MODEL(prefs->model),
+                                                                                         &iter,
+                                                                                         NULL/*parent=root*/,
+                                                                                         node_count-1)) {
+                                                                gtk_tree_selection_select_iter(prefs->selection, &iter);
+                                                        }
+                                                }
                                         }
                                         indexer_source_destroy(source, prefs->catalog);
                                 }
