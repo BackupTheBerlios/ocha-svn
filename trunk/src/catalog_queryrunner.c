@@ -213,7 +213,7 @@ static gpointer runquery_thread(gpointer userdata)
                      queryrunner->catalog=catalog;
                   }
 
-               while(query_has_changed(queryrunner) && queryrunner->query->len>0)
+               if(query_has_changed(queryrunner) && queryrunner->query->len>0)
                   {
                      g_string_assign(queryrunner->running_query,
                                      queryrunner->query->str);
@@ -234,6 +234,7 @@ static gpointer runquery_thread(gpointer userdata)
                                   catalog_error(queryrunner->catalog));
                         }
                      lock(queryrunner->mutex);
+                     continue; /*recheck without waiting */
                   }
             }
          else if(queryrunner->catalog)
@@ -243,6 +244,7 @@ static gpointer runquery_thread(gpointer userdata)
                unlock(queryrunner->mutex);
                catalog_disconnect(catalog);
                lock(queryrunner->mutex);
+               continue; /*recheck without waiting */
             }
 
          printf("thread: waiting on cond\n");
