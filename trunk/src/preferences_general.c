@@ -1,7 +1,8 @@
 #include "preferences_general.h"
 #include "ocha_gconf.h"
 #include <gdk/gdkkeysyms.h>
-
+#include <X11/keysym.h>
+#include <X11/Xutil.h>
 /** \file Implementation of the API defined in preferences_general.h
  *
  */
@@ -123,6 +124,10 @@ static void accel_button_init(GtkWidget *button)
                          "key-release-event",
                          G_CALLBACK(accel_button_key_cb),
                          NULL/*userdata*/);
+        g_signal_connect(button,
+                         "key-press-event",
+                         G_CALLBACK(accel_button_key_cb),
+                         NULL/*userdata*/);
 
         notify_id=gconf_client_notify_add(ocha_gconf_get_client(),
                                           OCHA_GCONF_ACCELERATOR_KEY,
@@ -165,16 +170,20 @@ static gboolean accel_button_key_cb(GtkWidget *widget, GdkEventKey *event, gpoin
         if(!accel_button_is_recording(GTK_BUTTON(widget))) {
                 return FALSE;
         }
-        if(event->keyval==GDK_BackSpace || event->keyval==GDK_Escape || event->keyval==GDK_Delete) {
-                accel_button_set_label(GTK_BUTTON(widget));
-        } else {
-                accelerator= gtk_accelerator_name(event->keyval, event->state);
+        if(event->type==GDK_KEY_RELEASE) {
+                if(event->keyval==GDK_BackSpace || event->keyval==GDK_Escape || event->keyval==GDK_Delete) {
+                        accel_button_set_label(GTK_BUTTON(widget));
+                } else {
+                        if(!IsModifierKey(event->keyval)) {
+                                accelerator= gtk_accelerator_name(event->keyval, event->state);
 
-                gconf_client_set_string(ocha_gconf_get_client(),
-                                        OCHA_GCONF_ACCELERATOR_KEY,
-                                        accelerator,
-                                        NULL/*err*/);
-                g_free(accelerator);
+                                gconf_client_set_string(ocha_gconf_get_client(),
+                                                        OCHA_GCONF_ACCELERATOR_KEY,
+                                                        accelerator,
+                                                        NULL/*err*/);
+                                g_free(accelerator);
+                        }
+                }
         }
         return TRUE;
  }
