@@ -335,18 +335,22 @@ static gboolean index_application_cb(struct catalog *catalog,
 
                 if(!hidden && !nodisplay && exec!=NULL) {
                         const char *long_name=description;
+                        struct catalog_entry entry;
+
                         if(!long_name)
                                 long_name=comment;
                         if(!long_name)
                                 long_name=generic_name;
                         if(!long_name)
                                 long_name=path;
+
+                        entry.name=(char *) ( name==NULL ? filename:name );
+                        entry.path=uri;
+                        entry.long_name=long_name;
+                        entry.source_id=source_id;
+                        entry.launcher=launcher_application.id;
                         retval=catalog_addentry_witherrors(catalog,
-                                                           uri,
-                                                           name==NULL ? filename:name,
-                                                           long_name,
-                                                           source_id,
-                                                           &launcher_application,
+                                                           &entry,
                                                            err);
                 }
         }

@@ -42,13 +42,7 @@ static void init_widget(struct content_view *view);
 static ContentList *run_query(struct content_view *view);
 static gboolean fill_contentlist_cb(struct catalog *catalog,
                                     float pertinence,
-                                    int entry_id,
-                                    const char *name,
-                                    const char *long_name,
-                                    const char *path,
-                                    int source_id,
-                                    const char *source_type,
-                                    const char *launcher,
+                                    const struct catalog_entry *entry,
                                     void *userdata);
 static void cell_data_func(GtkTreeViewColumn* col,
                            GtkCellRenderer* renderer,
@@ -184,13 +178,7 @@ static ContentList *run_query(struct content_view *view)
 
 static gboolean fill_contentlist_cb(struct catalog *catalog,
                                     float pertinence,
-                                    int entry_id,
-                                    const char *name,
-                                    const char *long_name,
-                                    const char *path,
-                                    int source_id,
-                                    const char *source_type,
-                                    const char *launcher,
+                                    const struct catalog_entry *entry,
                                     void *_userdata)
 {
         struct fill_contentlist_userdata *userdata;
@@ -200,9 +188,9 @@ static gboolean fill_contentlist_cb(struct catalog *catalog,
         userdata = (struct fill_contentlist_userdata *)_userdata;
         contentlist_set(userdata->contentlist,
                         userdata->index,
-                        entry_id,
-                        name,
-                        long_name);
+                        entry->id,
+                        entry->name,
+                        entry->long_name);
         userdata->index++;
         return userdata->index<userdata->size;
 }

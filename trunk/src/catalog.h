@@ -3,6 +3,7 @@
 
 #include "result.h"
 #include "result_queue.h"
+#include <string.h>
 
 /** \file interface to an sqllite-based catalog
  */
@@ -17,6 +18,39 @@ typedef enum
 /** get the error quark for the errors returned by catalog */
 GQuark catalog_error_quark(void);
 
+/**
+ * Information about an entry of the catalog
+ */
+struct catalog_entry
+{
+        /** short name */
+        char *name;
+
+        /** long name (description) */
+        const char *long_name;
+
+        /** path|uri */
+        const char *path;
+
+        /** launcher */
+        const char *launcher;
+
+        /** owner source ID */
+        int source_id;
+
+        /** entry ID */
+        int id;
+};
+
+/**
+ * Set sane default values for a catalog entry.
+ *
+ * Example:
+ *
+ * struct catalog_entry entry;
+ * CATALOG_ENTRY_INIT(&entry)
+ */
+#define CATALOG_ENTRY_INIT(entry) memset((entry), 0, sizeof(struct catalog_entry))
 /**
  * Make a connection to an sqlite catalog,
  * creating it if necessary.
@@ -45,25 +79,13 @@ void catalog_disconnect(struct catalog *catalog);
  *
  * @param catalog
  * @param pertinence pertinence of the result, between 0.0 and 1.0
- * @param entry_id ID of the entry
- * @param name entry name, in UTF-8. released by the caller after the function returns
- * @param long_name long entry name, in UTF-8. released by the caller after the function returns
- * @param path path/uri, in UTF-8. released by the caller after the function returns
- * @param source_id ID of the source this entry belongs to
- * @param source_type type of the source this entry belongs to
- * @param launcher launcher ID
+ * @param entry the entry structure, read-only, fully initialized
  * @param userdata pointer passed to catalog_executequery()
  * @return TRUE to continue adding results, FALSE to stop looking for results
  */
 typedef gboolean (*catalog_callback_f)(struct catalog *catalog,
                                        float pertinence,
-                                       int entry_id,
-                                       const char *name,
-                                       const char *long_name,
-                                       const char *path,
-                                       int source_id,
-                                       const char *source_type,
-                                       const char *launcher,
+                                       const struct catalog_entry *entry,
                                        void *userdata);
 
 /**
@@ -186,14 +208,12 @@ gboolean catalog_remove_source(struct catalog *catalog, int source_id);
 /**
  * Add an entry into the catalog or refresh/confirm it if it already exists.
  * @param catalog
- * @param path local path or URI
- * @param name short name for the entry (what will be searched)
- * @param long_name long name for the entry/description. For a file it's often a path.
- * @param source_id id of the source that is responsible for this entry
- * @param id_out if non-null, this variable will be set to the generated ID of the entry
+ * @param entry the entry to add (field id is ignored - and certainly not modified)
+ * @param id_out if non-null, this variable will be set to the generated ID of the entry, set
+ * it to &entry->id if you want the struct field to be modified
  * @return TRUE if the entry was added, FALSE otherwise
  */
-gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *launcher, const char *path, const char *name, const char *long_name, int *id_out);
+gboolean catalog_add_entry_struct(struct catalog *catalog, const struct catalog_entry *entry, int *id_out);
 
 /**
  * Start updating a source entries.
@@ -233,6 +253,35 @@ gboolean catalog_end_source_update(struct catalog *catalog, int source_id);
  * @return TRUE if the entry was remove, FALSE otherwise
  */
 gboolean catalog_remove_entry(struct catalog *catalog, int source_id, const char *path);
+
+/**
+ * Enable/disable an entry.
+ *
+ * Disabled entries will not be returned when a query is run. They'll
+ * kept on the database and will be returned when getting the source
+ * content.
+ * @param catalog
+ * @param entry_id ID of the entry, usally from a query on source content
+ * @param enable TRUE => enable, FALSE=> disable
+ * @return TRUE if modification was done, FALSE otherwise (check error)
+ */
+gboolean catalog_entry_set_enabled(struct catalog *catalog, int entry_id, gboolean enabled);
+
+
+/**
+ * Enable/disable a source
+ *
+ * Entries from disabled sources will not be returned when a query is run. They'll
+ * kept on the database and will be returned when getting the source
+ * content.
+ *
+ * @param catalog
+ * @param source_id ID of the source
+ * @param enable TRUE => enable, FALSE=> disable
+ * @return TRUE if modification was done, FALSE otherwise (check error)
+ */
+void catalog_source_set_enabled(struct catalog *catalog, int source_id, gboolean enabled);
+
 
 /**
  * Get a pointer on the last error that happened with

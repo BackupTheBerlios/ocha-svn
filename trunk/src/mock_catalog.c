@@ -160,39 +160,39 @@ gboolean catalog_end_source_update(struct catalog *catalog, int source_id)
        catalog->updating_id=0;
        return TRUE;
 }
-gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *launcher, const char *path, const char *name, const char *long_name, int *id_out)
+gboolean catalog_add_entry_struct(struct catalog *catalog, const struct catalog_entry *entry, int *id_out)
 {
         struct addentry_args *args;
         args = (struct addentry_args *)g_hash_table_lookup(catalog->expected_addentry,
-                                                           path);
+                                                           entry->path);
 
-        fail_unless(long_name!=NULL, "no long_name");
-        fail_unless(name!=NULL, "no display_name");
-        fail_unless(path!=NULL, "no path");
-        fail_unless(catalog->updating_id==source_id, "call catalog_begin_source_update before catalog_add_entry");
+        fail_unless(entry->long_name!=NULL, "no long_name");
+        fail_unless(entry->name!=NULL, "no display_name");
+        fail_unless(entry->path!=NULL, "no path");
+        fail_unless(catalog->updating_id==entry->source_id, "call catalog_begin_source_update before catalog_add_entry");
 
         if(args==NULL) {
                 fail(g_strdup_printf("unexpected call catalog_addentry(catalog, '%s', '%s')\n",
-                                     path,
-                                     name));
+                                     entry->path,
+                                     entry->name));
                 expectation_call(NULL);
                 return FALSE;
         }
-        fail_unless(strcmp(args->name, name)==0,
+        fail_unless(strcmp(args->name, entry->name)==0,
                     g_strdup_printf("wrong name for %s, expected '%s', got '%s'",
                                     args->expect.description,
                                     args->name,
-                                    name));
-        fail_unless(strcmp(args->long_name, long_name)==0,
+                                    entry->name));
+        fail_unless(strcmp(args->long_name, entry->long_name)==0,
                     g_strdup_printf("wrong long_name for %s, expected '%s', got '%s'",
                                     args->expect.description,
                                     args->long_name,
-                                    long_name));
-        fail_unless(source_id==args->command_id,
+                                    entry->long_name));
+        fail_unless(entry->source_id==args->command_id,
                     g_strdup_printf("wrong command id for %s, expected %d, got %d",
                                     args->expect.description,
                                     args->command_id,
-                                    source_id));
+                                    entry->source_id));
         mark_point();
         expectation_call(&args->expect);
         mark_point();
@@ -217,6 +217,15 @@ gboolean ocha_gconf_set_source_attribute(const char *type, int source_id, const 
         init_source_attrs();
         g_hash_table_insert(source_attrs, g_strdup(attribute), g_strdup(value));
         return TRUE;
+}
+
+void ocha_gconf_set_system(const char *type, int source_id, gboolean system)
+{
+}
+
+gboolean ocha_gconf_is_system(const char *type, int source_id)
+{
+        return FALSE;
 }
 
 gchar *ocha_gconf_get_source_attribute_key(const char *type, int source_id, const char *attribute)

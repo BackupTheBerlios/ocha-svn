@@ -69,6 +69,7 @@ static void setup()
 {
         int source_id;
         struct catalog *catalog;
+        struct catalog_entry entry;
         int i;
 
         unlink(CATALOG_PATH);
@@ -78,13 +79,16 @@ static void setup()
         catalog =  catalog_connect(CATALOG_PATH, NULL/*errs*/);
         fail_unless(catalog!=NULL, "no catalog in " CATALOG_PATH);
         fail_unless(catalog_add_source(catalog, "test", &source_id), "add_source");
+
+        CATALOG_ENTRY_INIT(&entry);
+        entry.source_id=source_id;
+        entry.launcher=TEST_LAUNCHER;
         for(i=0; i<entries_len; i++) {
-                fail_unless(catalog_add_entry(catalog,
-                                              source_id,
-                                              TEST_LAUNCHER,
-                                              entries[i]/*path*/,
-                                              entries[i]/*name*/,
-                                              entries[i]/*long_name*/,
+                entry.name=entries[i];
+                entry.path=entries[i];
+                entry.long_name=entries[i];
+                fail_unless(catalog_add_entry_struct(catalog,
+                                              &entry,
                                               NULL/*id_out*/),
                             "add source");
         }

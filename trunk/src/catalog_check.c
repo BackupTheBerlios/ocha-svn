@@ -22,40 +22,34 @@ static struct catalog *catalog;
 static int source_id;
 static GMutex *execute_query_mutex;
 static GCond  *execute_query_cond;
-struct entry_definition
-{
-        const char *path;
-        const char *filename;
-        int id;
+
+#define CATALOG_ENTRY(path, filename) { filename, path, path, TEST_LAUNCHER, 0, 0 }
+struct catalog_entry entries[] = {
+        CATALOG_ENTRY("/tmp/toto.c", "toto.c"),
+        CATALOG_ENTRY("/tmp/toto.h", "toto.h"),
+        CATALOG_ENTRY("/tmp/total.h", "total.h"),
+        CATALOG_ENTRY("/tmp/etalma.c", "etalma.c"),
+        CATALOG_ENTRY("/tmp/talm.c", "talm.c"),
+        CATALOG_ENTRY("/tmp/talm.h", "talm.h"),
+        CATALOG_ENTRY("/tmp/hello.txt", "hello.txt"),
+        CATALOG_ENTRY("/tmp/hullo.txt", "hullo.txt")
 };
-struct entry_definition entries[] =
-        {
-                { "/tmp/toto.c", "toto.c"
-                },
-                { "/tmp/toto.h", "toto.h"},
-                { "/tmp/total.h", "total.h"},
-                { "/tmp/etalma.c", "etalma.c"},
-                { "/tmp/talm.c", "talm.c"},
-                { "/tmp/talm.h", "talm.h"},
-                { "/tmp/hello.txt", "hello.txt"},
-                { "/tmp/hullo.txt", "hullo.txt"}
-        };
-#define entries_length (sizeof(entries)/sizeof(struct entry_definition))
+#define entries_length (sizeof(entries)/sizeof(struct catalog_entry))
 
 #define catalog_cmd(catalog, comment, ret) _catalog_cmd(catalog, comment, ret, __FILE__, __LINE__)
 
 /* ------------------------- prototypes */
 static Suite *catalog_check_suite(void);
 static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered);
-static gboolean collect_result_names_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, const char *launcher, void *userdata);
+static gboolean collect_result_names_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
 static void _catalog_cmd(struct catalog *catalog, const char *comment, gboolean ret, const char *file, int line);
 static gboolean exists(const char *path);
 static void unlink_if_exists(const char *path);
 static void execute_query_and_expect(const char *query, int goal_length, char *goal[], gboolean ordered);
 static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered);
-static gboolean test_source_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int result_source_id, const char *source_type, const char *launcher, void *userdata);
-static gboolean countdown_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, const char *launcher, void *userdata);
-static gboolean countdown_interrupt_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, const char *launcher, void *userdata);
+static gboolean test_source_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
+static gboolean countdown_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
+static gboolean countdown_interrupt_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
 static gpointer execute_query_thread(void *userdata);
 static void addentries(struct catalog *catalog, int sourceid, int count, const char *name_pattern);
 
@@ -85,12 +79,10 @@ static void setup_query()
                                        &source_id),
                     "source could not be created");
         for(i=0; i<entries_length; i++) {
-                fail_unless(catalog_add_entry(catalog,
-                                              source_id, TEST_LAUNCHER,
-                                              entries[i].path,
-                                              entries[i].filename,
-                                              entries[i].path/*long_name*/,
-                                              &entries[i].id),
+                entries[i].source_id=source_id;
+                fail_unless(catalog_add_entry_struct(catalog,
+                                                     &entries[i],
+                                                     &entries[i].id),
                             "entry could not be created");
         }
 
@@ -125,23 +117,17 @@ END_TEST
 START_TEST(test_addentry)
 {
         struct catalog *catalog=catalog_connect(PATH, NULL);
-        int source_id=-1;
-        int entry_id=-1;
+        struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
 
         printf("--- test_addentry\n");
         catalog = catalog_connect(PATH, NULL);
 
-        catalog_add_source(catalog, "test", &source_id);
-
+        catalog_add_source(catalog, "test", &entry.source_id);
         catalog_cmd(catalog,
                     "1st addentry(/tmp/toto.txt)",
-                    catalog_add_entry(catalog,
-                                      source_id, TEST_LAUNCHER,
-                                      "/tmp/toto.txt",
-                                      "Toto",
-                                      "/tmp/toto.txt",
-                                      &entry_id));
-
+                    catalog_add_entry_struct(catalog,
+                                      &entry,
+                                      &entry.id));
         catalog_disconnect(catalog);
 }
 END_TEST
@@ -149,18 +135,17 @@ END_TEST
 START_TEST(test_addentry_escape)
 {
         struct catalog *catalog;
+        struct catalog_entry entry = CATALOG_ENTRY("To'to", "/tmp/to'to.txt");
         printf("--- test_addentry_escape\n");
 
         catalog = catalog_connect(PATH, NULL);
 
+        catalog_add_source(catalog, "test", &entry.source_id);
         catalog_cmd(catalog,
                     "1st addentry(/tmp/toto.txt)",
-                    catalog_add_entry(catalog,
-                                      source_id, TEST_LAUNCHER,
-                                      "/tmp/to'to.txt",
-                                      "To'to",
-                                      "/tmp/toto.txt",
-                                      NULL));
+                    catalog_add_entry_struct(catalog,
+                                      &entry,
+                                      NULL/*id_out*/));
 
         catalog_disconnect(catalog);
 }
@@ -169,30 +154,27 @@ END_TEST
 START_TEST(test_addentry_noduplicate)
 {
         struct catalog *catalog;
-        int source_id=-1;
+        struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
         int entry_id_1=-1;
         int entry_id_2=-1;
 
         printf("--- test_addentry_noduplicate\n");
+
         catalog = catalog_connect(PATH, NULL);
 
-        catalog_add_source(catalog, "test", &source_id);
+        catalog_add_source(catalog, "test", &entry.source_id);
 
-        fail_unless(catalog_add_entry(catalog,
-                                      source_id, TEST_LAUNCHER,
-                                      "/tmp/toto.txt",
-                                      "Toto",
-                                      "/tmp/toto.txt",
+        fail_unless(catalog_add_entry_struct(catalog,
+                                      &entry,
                                       &entry_id_1),
                     "1st addentry failed");
-        fail_unless(catalog_add_entry(catalog,
-                                      source_id, TEST_LAUNCHER,
-                                      "/tmp/toto.txt",
-                                      "Toto",
-                                      "/tmp/toto.txt",
+        fail_unless(catalog_add_entry_struct(catalog,
+                                      &entry,
                                       &entry_id_2),
                     "2nd addentry failed");
 
+        fail_unless(entry_id_1==entry_id_2,
+                    "two entries with the same path and source_id but with different IDs");
         catalog_disconnect(catalog);
         printf("--- test_addentry_noduplicate OK\n");
 }
@@ -367,7 +349,7 @@ START_TEST(test_source_update)
         struct catalog *catalog;
         int source1_id;
         unsigned int source1_count;
-        int entry_id;
+        struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
 
         printf("--- test_source_update\n");
 
@@ -381,15 +363,13 @@ START_TEST(test_source_update)
 
         catalog_begin_source_update(catalog, source1_id);
         addentries(catalog, source1_id, 3, "source1-entry-%d");
+
+        entry.source_id=source1_id;
         catalog_cmd(catalog,
                     "custom addentry",
-                    catalog_add_entry(catalog,
-                                      source1_id,
-                                      TEST_LAUNCHER,
-                                      "/tmp/toto.txt",
-                                      "Toto",
-                                      "/tmp/toto.txt",
-                                      &entry_id));
+                    catalog_add_entry_struct(catalog,
+                                             &entry,
+                                             &entry.id));
         catalog_end_source_update(catalog, source1_id);
 
         catalog_cmd(catalog,
@@ -663,21 +643,13 @@ static void unlink_if_exists(const char *path)
  * Add the result name into a GArray
  * @param catalog ignored
  * @param pertinence ignored
- * @param name
- * @param long_name
- * @param path
+ * @param entry
  * @param userdata an array of strings (passed by catalog_executequery as userdata)
  * @see #results
  */
 static gboolean collect_result_names_callback(struct catalog *catalog,
                                               float pertinence,
-                                              int entry_id,
-                                              const char *name,
-                                              const char *long_name,
-                                              const char *path,
-                                              int source_id,
-                                              const char *source_type,
-                                              const char *launcher,
+                                              const struct catalog_entry *entry,
                                               void *userdata)
 {
         GArray **results;
@@ -688,12 +660,12 @@ static gboolean collect_result_names_callback(struct catalog *catalog,
         results =  (GArray **)userdata;
         g_return_val_if_fail(results, FALSE);
 
-        fail_unless(name!=NULL, "missing name");
-        fail_unless(long_name!=NULL, "missing long name");
-        fail_unless(path!=NULL, "missing long path/uri");
+        fail_unless(entry->name!=NULL, "missing name");
+        fail_unless(entry->long_name!=NULL, "missing long name");
+        fail_unless(entry->path!=NULL, "missing long path/uri");
 
         mark_point();
-        name_dup =  g_strdup(name);
+        name_dup =  g_strdup(entry->name);
         mark_point();
         g_array_append_val(*results,
                            name_dup);
@@ -783,20 +755,14 @@ static void assert_array_contains(const char *query,
 
 static gboolean test_source_callback(struct catalog *catalog,
                                      float pertinence,
-                                     int entry_id,
-                                     const char *name,
-                                     const char *long_name,
-                                     const char *path,
-                                     int result_source_id,
-                                     const char *source_type,
-                                     const char *launcher,
+                                     const struct catalog_entry *entry,
                                      void *userdata)
 {
         gboolean *checked = (gboolean *)userdata;
-        fail_unless(source_id==result_source_id,
+        fail_unless(source_id==entry->source_id,
                     "wrong source id");
-        fail_unless(strcmp("test", source_type)==0,
-                    "wrong source type");
+        fail_unless(strcmp(TEST_LAUNCHER, entry->launcher)==0,
+                    "wrong launcher");
         *checked=TRUE;
         return TRUE/*continue*/;
 }
@@ -811,13 +777,7 @@ static gboolean test_source_callback(struct catalog *catalog,
  */
 static gboolean countdown_callback(struct catalog *catalog,
                                    float pertinence,
-                                   int entry_id,
-                                   const char *name,
-                                   const char *long_name,
-                                   const char *path,
-                                   int source_id,
-                                   const char *source_type,
-                                   const char *launcher,
+                                   const struct catalog_entry *entry,
                                    void *userdata)
 {
         int *counter = (int *)userdata;
@@ -840,13 +800,7 @@ static gboolean countdown_callback(struct catalog *catalog,
  */
 static gboolean countdown_interrupt_callback(struct catalog *catalog,
                                              float pertinence,
-                                             int entry_id,
-                                             const char *name,
-                                             const char *long_name,
-                                             const char *path,
-                                             int source_id,
-                                             const char *source_type,
-                                             const char *launcher,
+                                             const struct catalog_entry *entry,
                                              void *userdata)
 {
         int *counter = (int *)userdata;
@@ -917,18 +871,21 @@ static void addentries(struct catalog *catalog,
                        int count,
                        const char *name_pattern)
 {
+        struct catalog_entry entry;
         int i;
+        entry.source_id=sourceid;
+        entry.launcher=TEST_LAUNCHER;
         for(i=0; i<count; i++)
         {
                 char *name = g_strdup_printf(name_pattern, i);
+                entry.name=name;
+                entry.path=name;
+                entry.long_name=name;
                 printf("adding %s into source %d\n", name, sourceid);
                 catalog_cmd(catalog,
                             name,
-                            catalog_add_entry(catalog,
-                                              sourceid, TEST_LAUNCHER,
-                                              name,
-                                              name,
-                                              name,
+                            catalog_add_entry_struct(catalog,
+                                              &entry,
                                               NULL/*id_out*/));
                 g_free(name);
         }

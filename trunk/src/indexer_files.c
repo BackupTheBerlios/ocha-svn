@@ -254,6 +254,7 @@ static gboolean index_file_cb(struct catalog *catalog,
                               GError **err,
                               gpointer userdata)
 {
+        struct catalog_entry entry;
         char *uri;
         gboolean retval;
 
@@ -262,13 +263,14 @@ static gboolean index_file_cb(struct catalog *catalog,
         }
 
         uri = g_strdup_printf("file://%s", path);
-        retval = catalog_addentry_witherrors(catalog,
-                                             uri,
-                                             filename,
-                                             path/*long_name*/,
-                                             source_id,
-                                             &launcher_open,
-                                             err);
+
+        CATALOG_ENTRY_INIT(&entry);
+        entry.source_id=source_id;
+        entry.name=(char *)filename;
+        entry.long_name=path;
+        entry.path=uri;
+        entry.launcher=launcher_open.id;
+        retval = catalog_addentry_witherrors(catalog, &entry, err);
         g_free(uri);
         return retval;
 }

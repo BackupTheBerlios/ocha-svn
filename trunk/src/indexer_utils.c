@@ -87,21 +87,16 @@ gboolean catalog_get_source_attribute_witherrors(const char *indexer,
 }
 
 gboolean catalog_addentry_witherrors(struct catalog *catalog,
-                                     const char *path,
-                                     const char *name,
-                                     const char *long_name,
-                                     int source_id,
-                                     struct launcher *launcher,
+                                     const struct catalog_entry *entry,
                                      GError **err)
 {
-        g_return_val_if_fail(launcher, FALSE);
-        if(!catalog_add_entry(catalog, source_id, launcher->id, path, name, long_name, NULL/*id_out*/))
+        if(!catalog_add_entry_struct(catalog, entry, NULL/*id_out*/))
         {
                 g_set_error(err,
                             INDEXER_ERROR,
                             INDEXER_CATALOG_ERROR,
                             "could not add/refresh entry %s in catalog: %s",
-                            path,
+                            entry==NULL ? "null":entry->path,
                             catalog_error(catalog));
                 return FALSE;
         }

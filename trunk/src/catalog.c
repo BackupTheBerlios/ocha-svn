@@ -61,38 +61,38 @@ static gboolean source_version(struct catalog *catalog, int source_id, int *vers
 
 /* ------------------------- public functions */
 
-gboolean catalog_add_entry(struct catalog *catalog,
-                           int source_id,
-                           const char *launcher,
-                           const char *path,
-                           const char *name,
-                           const char *long_name,
-                           int *id_out)
+gboolean catalog_add_entry_struct(struct catalog *catalog,
+                                  const struct catalog_entry *entry,
+                                  int *id_out)
 {
         int old_id=-1;
         int version;
 
         g_return_val_if_fail(catalog!=NULL, FALSE);
-        g_return_val_if_fail(launcher!=NULL, FALSE);
-        g_return_val_if_fail(path!=NULL, FALSE);
-        g_return_val_if_fail(name!=NULL, FALSE);
-        g_return_val_if_fail(long_name!=NULL, FALSE);
+        g_return_val_if_fail(entry!=NULL, FALSE);
+        g_return_val_if_fail(entry->launcher!=NULL, FALSE);
+        g_return_val_if_fail(entry->path!=NULL, FALSE);
+        g_return_val_if_fail(entry->name!=NULL, FALSE);
+        g_return_val_if_fail(entry->long_name!=NULL, FALSE);
 
-        if(!source_version(catalog, source_id, &version)) {
+        if(!source_version(catalog, entry->source_id, &version)) {
                 return FALSE;
         }
 
 
-        if(findentry(catalog, path, source_id, &old_id))
+        if(findentry(catalog, entry->path, entry->source_id, &old_id))
         {
+                if(id_out) {
+                        *id_out=old_id;
+                }
                 return execute_update_printf(catalog, TRUE/*autocommit*/,
                                              "UPDATE entries "
                                              "SET name='%q', long_name='%q', source_id=%d, launcher='%q', version=%d "
                                              "WHERE id=%d",
-                                             name,
-                                             long_name,
-                                             source_id,
-                                             launcher,
+                                             entry->name,
+                                             entry->long_name,
+                                             entry->source_id,
+                                             entry->launcher,
                                              version,
                                              old_id);
         } else
@@ -101,11 +101,11 @@ gboolean catalog_add_entry(struct catalog *catalog,
                                          "INSERT INTO entries "
                                          " (id, path, name, long_name, source_id, launcher, version) "
                                          " VALUES (NULL, '%q', '%q', '%q', %d, '%q', %d)",
-                                         path,
-                                         name,
-                                         long_name,
-                                         source_id,
-                                         launcher,
+                                         entry->path,
+                                         entry->name,
+                                         entry->long_name,
+                                         entry->source_id,
+                                         entry->launcher,
                                          version)) {
                         get_id(catalog, id_out);
                         return TRUE;
@@ -647,14 +647,8 @@ static int result_sqlite_callback(void *userdata,
                                   char **col_data,
                                   char **col_names)
 {
-        int entry_id;
-        const char *path;
-        const char *name;
-        const char *long_name;
-        int source_id;
-        const char *source_type;
-        const char *launcher;
         struct catalog *catalog;
+        struct catalog_entry entry;
         catalog_callback_f callback;
         gboolean go_on;
 
@@ -664,37 +658,33 @@ static int result_sqlite_callback(void *userdata,
         /* executequery called by another thread: forbidden */
         g_return_val_if_fail(callback!=NULL, 1);
 
+        if(catalog->stop) {
+                return 1;
+        }
+
         /* this must correspond to the query in catalog_executequery()
          * and catalog_get_source_content()
          */
-        entry_id = atoi(col_data[0]);
-        path = col_data[1];
-        name = col_data[2];
-        long_name = col_data[3];
-        source_id = atoi(col_data[4]);
-        source_type = col_data[5];
-        launcher = col_data[6];
-
-        if(catalog->stop)
-                return 1;
+        entry.id = atoi(col_data[0]);
+        entry.path = col_data[1];
+        entry.name = col_data[2];
+        entry.long_name = col_data[3];
+        entry.source_id = atoi(col_data[4]);
+        /* IGNORED : source_type = col_data[5]; */
+        entry.launcher = col_data[6];
 
         go_on = catalog->callback(catalog,
                                   0.5/*pertinence*/,
-                                  entry_id,
-                                  name,
-                                  long_name,
-                                  path,
-                                  source_id,
-                                  source_type,
-                                  launcher,
+                                  &entry,
                                   catalog->callback_userdata);
         return go_on && !catalog->stop ? 0:1;
 }
 
 static void get_id(struct catalog  *catalog, int *id_out)
 {
-        if(id_out!=NULL)
+        if(id_out!=NULL) {
                 *id_out=sqlite_last_insert_rowid(catalog->db);
+        }
 }
 
 /**

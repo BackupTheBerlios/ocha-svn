@@ -262,10 +262,15 @@ static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, 
         FILE *fh;
         gboolean error;
         GString *line;
+        struct catalog_entry entry;
 
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(bookmark_file!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
+
+        CATALOG_ENTRY_INIT(&entry);
+        entry.source_id=source_id;
+        entry.launcher=launcher_openurl.id;
 
         fh =  fopen(bookmark_file, "r");
         if(!fh) {
@@ -296,12 +301,11 @@ static gboolean catalog_index_bookmarks(struct catalog *catalog, int source_id, 
                                                         *href_end='\0';
                                                         *a_close='\0';
                                                         expanded_label = html_expand_common_entities(a_end+1);
+                                                        entry.path=href_start;
+                                                        entry.name=expanded_label;
+                                                        entry.long_name=href_start;
                                                         if(!catalog_addentry_witherrors(catalog,
-                                                                                        href_start,
-                                                                                        expanded_label,
-                                                                                        href_start,
-                                                                                        source_id,
-                                                                                        &launcher_openurl,
+                                                                                        &entry,
                                                                                         err)) {
                                                                 error=TRUE;
                                                         }

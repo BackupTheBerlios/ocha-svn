@@ -79,15 +79,12 @@ gboolean recurse(struct catalog *catalog,
 
 /**
  * Add an entry, with error handling
- * @param indexer
- * @param path
- * @param nam
- * @param long_name
- * @param source_id
+ * @param catalog
+ * @param entry entry to add (field id is ignored and not modified)
  * @param err error to set if something went wrong
  * @return true if all went well, false otherwise
  */
-gboolean catalog_addentry_witherrors(struct catalog *catalog, const char *path, const char *name, const char *long_name, int sourc_id, struct launcher *launcher, GError **err);
+gboolean catalog_addentry_witherrors(struct catalog *catalog, const struct catalog_entry *entry, GError **err);
 
 /** Set source attribute, set error if something goes wrong */
 gboolean catalog_get_source_attribute_witherrors(const char *indexer, int source_id, const char *attribute, char **value_out, gboolean required, GError **err);

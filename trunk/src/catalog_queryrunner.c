@@ -102,7 +102,7 @@ static gboolean query_has_changed(struct catalog_queryrunner *queryrunner);
 static gpointer runquery_thread(gpointer userdata);
 static void catalog_queryrunner_start(struct queryrunner *_self);
 static void wait_on_condition(struct catalog_queryrunner *self, int time_ms);
-static gboolean result_callback(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, const char *launcher, void *userdata);
+static gboolean result_callback(struct catalog *catalog, float pertinence, const struct catalog_entry *entry, void *userdata);
 static void catalog_queryrunner_run_query(struct queryrunner *_self, const char *query);
 static void catalog_queryrunner_consolidate(struct queryrunner *_self);
 static void catalog_queryrunner_stop(struct queryrunner *_self);
@@ -423,13 +423,7 @@ static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
 }
 static gboolean result_callback(struct catalog *catalog,
                                 float pertinence,
-                                int entry_id,
-                                const char *name,
-                                const char *long_name,
-                                const char *path,
-                                int source_id,
-                                const char *source_type,
-                                const char *launcher_id,
+                                const struct catalog_entry *entry,
                                 void *userdata)
 {
         struct catalog_queryrunner *self;
@@ -439,13 +433,10 @@ static gboolean result_callback(struct catalog *catalog,
         int count;
 
         g_return_val_if_fail(userdata!=NULL, FALSE);
-        g_return_val_if_fail(name!=NULL, FALSE);
-        g_return_val_if_fail(long_name!=NULL, FALSE);
-        g_return_val_if_fail(path!=NULL, FALSE);
-        g_return_val_if_fail(source_type!=NULL, FALSE);
+        g_return_val_if_fail(entry!=NULL, FALSE);
 
         self = CATALOG_QUERYRUNNER(userdata);
-        launcher = launchers_get(launcher_id);
+        launcher = launchers_get(entry->launcher);
         if(!launcher)
         {
                 /* it can happen, because launchers may be removed, but it's
@@ -454,22 +445,22 @@ static gboolean result_callback(struct catalog *catalog,
                  * catalogs.
                  */
                 g_warning("unclean catalog: no launcher for source referenced "
-                          "in catalog with source_id=%d source_type=%s launcher=%s\n",
-                          source_id, source_type, launcher_id);
+                          "in catalog with source_id=%d launcher=%s\n",
+                          entry->source_id, entry->launcher);
                 return TRUE;
         }
 
         result = catalog_result_create(self->path,
                                        launcher,
-                                       path,
-                                       name,
-                                       long_name,
-                                       entry_id);
+                                       entry->path,
+                                       entry->name,
+                                       entry->long_name,
+                                       entry->id);
         query = self->running_query->str;
 #ifdef DEBUG
 
         printf("%s:%d:query(%s) add %s\n",
-               __FILE__, __LINE__, query, path);
+               __FILE__, __LINE__, query, entry->path);
 #endif
 
         result_queue_add(self->queue,
