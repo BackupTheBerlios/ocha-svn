@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #define QUERY_TIMEOUT 3000
 
@@ -276,6 +277,30 @@ int main(int argc, char *argv[])
 {
    g_thread_init(NULL/*vtable*/);
    gtk_init(&argc, &argv);
+
+   for(int i=1; i<argc; i++)
+      {
+         const char *arg = argv[i];
+         if(strncmp("--pid=", arg, strlen("--pid="))==0)
+            {
+               const char *file=&arg[strlen("--pid=")];
+               pid_t pid = getpid();
+               FILE* pidh = fopen(file, "w");
+               if(pidh==NULL)
+                  {
+                     fprintf(stderr, "error: cannot open pid file %s\n", file);
+                     exit(14);
+                  }
+               fprintf(pidh, "%d\n", pid);
+               fclose(pidh);
+            }
+         else
+            {
+               fprintf(stderr, "error: unknown argument %s\n", arg);
+               exit(15);
+            }
+      }
+
 
    query_str=g_string_new("");
    running_query=g_string_new("");
