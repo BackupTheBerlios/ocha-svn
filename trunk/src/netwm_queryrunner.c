@@ -8,6 +8,14 @@
 
 /** \file Implementation of the API defined in netwm_queryrunner.h */
 
+/** info about a window that can be used later to generate a result */
+struct window_info
+{
+   Window win;
+   const char *title;
+   const char *description;
+};
+
 /** Private extension of the structure queryrunner */
 struct netwm_queryrunner
 {
@@ -16,14 +24,8 @@ struct netwm_queryrunner
    Display *display;
    struct result_queue *queue;
 
-   /** window list, set by start(), cleared by stop() */
-   Window *windows;
-
-   /** array of UTF8 window titles, to be freed by g_free() of the same length as windows, some may be null */
-   char **titles;
-
-   /** length of the window list. windows==NULL <=> windows_len==0 */
-   unsigned long windows_len;
+   /** array of struct window_inf, window list, set by start(), cleared by stop() */
+   GArray *window_infos;
 };
 
 /** struct netwm_queryrunner to struct queryrunner */
@@ -38,6 +40,8 @@ struct window_result
    Display *display;
    Window win;
 };
+
+
 /** window_result -> result */
 #define TO_RESULT(wr) (&((wr)->base))
 /** result -> window_result */
@@ -51,7 +55,7 @@ static void consolidate(struct queryrunner *self);
 static void stop(struct queryrunner *self);
 static void release(struct queryrunner *self);
 
-static struct result *result_new(Display *display, Window win, const char *title);
+static struct result *result_new(Display *display, Window win, const char *title, const char *description);
 static gboolean result_execute(struct result *self, GError **);
 static void result_release(struct result *self);
 
@@ -67,29 +71,27 @@ struct queryrunner *netwm_queryrunner_create(Display *display, struct result_que
    retval->base.release=release;
    retval->display=display;
    retval->queue=queue;
-   retval->windows=NULL;
-   retval->windows_len=0;
-   retval->titles=NULL;
+   retval->window_infos=g_array_new(FALSE/*not zero_terminated*/,
+                                    TRUE/*clear*/,
+                                    sizeof(struct window_info));
    return TO_QUERYRUNNER(retval);
 }
 
 /* ------------------------- static */
 static void clear_windows_list(struct netwm_queryrunner *self)
 {
-   if(self->windows)
+   GArray *array = self->window_infos;
+   int len = array->len;
+   if(len>0)
       {
-         g_free(self->windows);
-         self->windows=NULL;
+         struct window_info *info = (struct window_info *)array->data;
+         for(int i=0; i<len; i++, info++)
+            {
+               g_free((void *)info->title);
+               g_free((void *)info->description);
+            }
+         g_array_set_size(array, 0);
       }
-   if(self->titles)
-      {
-         unsigned long len = self->windows_len;
-         for(int i=0; i<len; i++)
-            g_free(self->titles[i]);
-         g_free(self->titles);
-         self->titles=NULL;
-      }
-   self->windows_len=0;
 }
 
 /* ------------------------- queryrunner */
@@ -98,30 +100,40 @@ static void start(struct queryrunner *_self)
    struct netwm_queryrunner *self = TO_NETWM_QUERYRUNNER(_self);
    g_return_if_fail(self);
 
-   if(self->windows)
+   if(self->window_infos->len>0)
       return;
 
    unsigned long len=0;
+   Window *windows=netwm_get_client_list(self->display, &len);
 
-   self->windows=netwm_get_client_list(self->display, &len);
-   self->windows_len=len;
-   if(self->windows_len==0)
-      clear_windows_list(self);
-   else
+   if(len>0)
       {
-         self->titles=g_malloc(sizeof(char *)*len);
-         for(unsigned long i=0; i<len; i++)
+         for(int i=0; i<len; i++)
             {
+               Window win = windows[i];
                gdk_error_trap_push();
-               self->titles[i]=netwm_get_window_title(self->display,
-                                                      self->windows[i]);
+               const char *title = netwm_get_window_title(self->display, win);
+               const char *class = netwm_get_window_class(self->display, win);
+               const char *host = netwm_get_window_host(self->display, win);
                gdk_flush();
-               if(gdk_error_trap_pop())
+               if(gdk_error_trap_pop()==0)
                   {
-                     self->titles[i]=NULL;
+                     struct window_info info;
+                     info.win=win;
+                     info.title=g_strdup(title);
+                     info.description=g_strdup_printf("Window \"%s\" of class %s on %s (0x%lx)",
+                                                      title,
+                                                      class,
+                                                      host,
+                                                      (unsigned long)win);
+                     g_array_append_val(self->window_infos, info);
                   }
             }
       }
+
+   if(windows)
+      g_free(windows);
+
 }
 static void stop(struct queryrunner *_self)
 {
@@ -136,25 +148,27 @@ static void run_query(struct queryrunner *_self, const char *query)
    g_return_if_fail(self);
    g_return_if_fail(query);
 
-   Window *wins = self->windows;
-   char **titles = self->titles;
-   unsigned long len = self->windows_len;
-   for(unsigned long i=0; i<len; i++)
+   int len = self->window_infos->len;
+   if(len==0)
+      return;
+
+   struct window_info *info = (struct window_info *)self->window_infos->data;
+   for(int i=0; i<len; i++, info++)
       {
-         Window win = wins[i];
-         const char *title = titles[i];
-         if(!title)
-            continue;
+         Window win = info->win;
+         const char *title = info->title;
          if(query_ismatch(query, title))
             {
                result_queue_add(self->queue,
                                 TO_QUERYRUNNER(self),
                                 query,
                                 0.5/*pertinence*/,
-                                result_new(self->display, win, title));
+                                result_new(self->display,
+                                           win,
+                                           title,
+                                           info->description));
             }
       }
-
 }
 static void consolidate(struct queryrunner *self)
 {
@@ -164,11 +178,12 @@ static void release(struct queryrunner *_self)
    struct netwm_queryrunner *self = TO_NETWM_QUERYRUNNER(_self);
    g_return_if_fail(self);
    clear_windows_list(self);
+   g_array_free(self->window_infos, TRUE/*free content*/);
    g_free(self);
 }
 
 /* ------------------------- result */
-static struct result *result_new(Display *display, Window win, const char *title)
+static struct result *result_new(Display *display, Window win, const char *title, const char *description)
 {
    g_return_val_if_fail(display, NULL);
    g_return_val_if_fail(title, NULL);
@@ -176,7 +191,7 @@ static struct result *result_new(Display *display, Window win, const char *title
    struct window_result *retval = g_new(struct window_result, 1);
 
    retval->base.name=g_strdup(title);
-   retval->base.long_name=g_strdup_printf("Window \"%s\" (0x%lx)", title, (unsigned long)win);
+   retval->base.long_name=g_strdup(description);
    retval->base.path=g_strdup_printf("x-win:0x%lx", (unsigned long)win);
    retval->base.execute=result_execute;
    retval->base.release=result_release;

@@ -40,4 +40,22 @@ gboolean netwm_activate_window (Display *disp, Window win, gboolean switch_deskt
  */
 char *netwm_get_window_title(Display *disp, Window win);
 
+/**
+ * Get the class of a window in UTF-8.
+ *
+ * @param disp display
+ * @param win window
+ * @return NULL or an utf-8 string to free using g_free
+ */
+char *netwm_get_window_class(Display *disp, Window win);
+
+/**
+ * Get the name of the host the client owning the window runs on.
+ *
+ * @param disp display
+ * @param win window
+ * @return NULL or an utf-8 string to free using g_free
+ */
+char *netwm_get_window_host(Display *disp, Window win);
+
 #endif /*NETWM_H*/

@@ -73,6 +73,7 @@ static int close_window (Display *disp, Window win);
 static int longest_str (gchar **strv);
 static int window_to_desktop (Display *disp, Window win, int desktop);
 static void window_set_title (Display *disp, Window win, char *str, char mode);
+static gchar *get_window_class (Display *disp, Window win);
 static gchar *get_window_title (Display *disp, Window win);
 static gchar *get_property (Display *disp, Window win,
         Atom xa_prop_type, gchar *prop_name, unsigned long *size);
@@ -97,6 +98,25 @@ char *netwm_get_window_title(Display *disp, Window win)
 {
    return get_window_title(disp, win);
 }
+
+char *netwm_get_window_class(Display *disp, Window win)
+{
+   return get_window_class(disp, win);
+}
+
+char *netwm_get_window_host(Display *disp, Window win)
+{
+   char *host = get_property(disp, win,
+                             XA_STRING,
+                             "WM_CLIENT_MACHINE",
+                             NULL);
+   if(host==NULL)
+      return NULL;
+   char *host_utf8 = g_locale_to_utf8(host, -1, NULL, NULL, NULL);
+   g_free(host);
+   return host_utf8;
+}
+
 /* ------------------------- static functions */
 
 static int client_msg(Display *disp, Window win, char *msg, /* {{{ */
@@ -239,5 +259,27 @@ static gchar *get_property (Display *disp, Window win, /*{{{*/
 
     XFree(ret_prop);
     return ret;
+}/*}}}*/
+
+static gchar *get_window_class (Display *disp, Window win) {/*{{{*/
+    gchar *class_utf8;
+    gchar *wm_class;
+    unsigned long size;
+
+    wm_class = get_property(disp, win, XA_STRING, "WM_CLASS", &size);
+    if (wm_class) {
+        gchar *p_0 = strchr(wm_class, '\0');
+        if (wm_class + size - 1 > p_0) {
+            *(p_0) = '.';
+        }
+        class_utf8 = g_locale_to_utf8(wm_class, -1, NULL, NULL, NULL);
+    }
+    else {
+        class_utf8 = NULL;
+    }
+
+    g_free(wm_class);
+
+    return class_utf8;
 }/*}}}*/
 
