@@ -47,6 +47,7 @@ static void release_cb(struct result *_result)
 
 static void setup()
 {
+   g_thread_init(NULL/*vtable*/);
 }
 
 static void teardown()
@@ -113,7 +114,12 @@ END_TEST
 
 START_TEST(test_gtk_loop)
 {
+   fail("write test");
+}
+END_TEST
 
+START_TEST(test_quit)
+{
    fail("write test");
 }
 END_TEST
@@ -130,6 +136,7 @@ Suite *result_queue_check_suite(void)
    tcase_add_test(tc_core, test_newdelete);
    tcase_add_test(tc_core, test_add_result);
    tcase_add_test(tc_core, test_gtk_loop);
+   tcase_add_test(tc_core, test_quit);
    return s;
 }
 
