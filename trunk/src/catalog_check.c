@@ -393,6 +393,7 @@ START_TEST(test_execute_query)
         static char *array[] = { "toto.c" };
 
         printf("--- test_execute_query\n");
+
         execute_query_and_expect("toto.c",
                                  1,
                                  array,
@@ -558,6 +559,82 @@ START_TEST(test_busy)
 }
 END_TEST
 
+START_TEST(test_disable_entry)
+{
+        static char *array[] = { "toto.h", "toto.c" };
+
+        printf("--- test_disable_entry\n");
+
+        catalog_cmd(catalog,
+                    "set enabled(FALSE) failed",
+                    catalog_entry_set_enabled(catalog, entries[0].id, FALSE));
+
+        execute_query_and_expect("toto",
+                                 1,
+                                 array,
+                                 FALSE/*not ordered*/);
+
+        catalog_cmd(catalog,
+                   "set_enabled(TRUE) failed",
+                   catalog_entry_set_enabled(catalog, entries[0].id, TRUE));
+
+        execute_query_and_expect("toto",
+                                 2,
+                                 array,
+                                 FALSE/*not ordered*/);
+}
+END_TEST
+
+START_TEST(test_disable_source)
+{
+        static char *array[] = { "toto.h", "toto.c" };
+
+        printf("--- test_disable_source\n");
+
+        catalog_cmd(catalog,
+                    "disable_source: set enabled(FALSE) failed",
+                    catalog_source_set_enabled(catalog, source_id, FALSE));
+
+        execute_query_and_expect("toto",
+                                 0,
+                                 array,
+                                 FALSE/*not ordered*/);
+
+        catalog_cmd(catalog,
+                   "disable_source: set_enabled(TRUE) failed",
+                   catalog_source_set_enabled(catalog, source_id, TRUE));
+
+        execute_query_and_expect("toto",
+                                 2,
+                                 array,
+                                 FALSE/*not ordered*/);
+}
+END_TEST
+
+START_TEST(test_get_source_enabled)
+{
+        gboolean enabled = TRUE;
+
+        printf("--- test_get_source_enabled\n");
+
+        catalog_cmd(catalog,
+                    "get_source_enabled: set enabled(FALSE) failed",
+                    catalog_source_set_enabled(catalog, source_id, FALSE));
+        catalog_cmd(catalog,
+                    "get_source_enabled: get enabled(FALSE) failed",
+                    catalog_source_get_enabled(catalog, source_id, &enabled));
+        fail_unless(!enabled, "wrong value for get_enabled(FALSE)");
+
+        catalog_cmd(catalog,
+                    "get_source_enabled: set enabled(FALSE) failed",
+                    catalog_source_set_enabled(catalog, source_id, TRUE));
+        catalog_cmd(catalog,
+                    "get_source_enabled: get enabled(FALSE) failed",
+                    catalog_source_get_enabled(catalog, source_id, &enabled));
+        fail_unless(enabled, "wrong value for get_enabled(FALSE)");
+}
+END_TEST
+
 /* ------------------------- main */
 
 static Suite *catalog_check_suite(void)
@@ -578,6 +655,7 @@ static Suite *catalog_check_suite(void)
         tcase_add_test(tc_core, test_remove_source);
         tcase_add_test(tc_core, test_source_update);
 
+
         tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
         suite_add_tcase(s, tc_query);
         tcase_add_test(tc_query, test_execute_query);
@@ -588,6 +666,9 @@ static Suite *catalog_check_suite(void)
         tcase_add_test(tc_query, test_recover_from_interruption);
         tcase_add_test(tc_query, test_busy);
         tcase_add_test(tc_query, test_lastexecuted_first);
+        tcase_add_test(tc_query, test_disable_entry);
+        tcase_add_test(tc_query, test_disable_source);
+        tcase_add_test(tc_query, test_get_source_enabled);
 
         return s;
 }
@@ -827,7 +908,7 @@ static gpointer execute_query_thread(void *userdata)
         g_mutex_lock(execute_query_mutex);
         printf("execute_query_thread: lock\n");
         sqlite_exec(db,
-                    "BEGIN; INSERT INTO entries VALUES (NULL, '', '', '', '', '', '', 0);",
+                    "BEGIN; INSERT INTO entries VALUES (NULL, '', '', '', '', '', '', 0, 0);",
                     NULL/*no callback*/,
                     NULL/*userdata*/,
                     &errmsg);

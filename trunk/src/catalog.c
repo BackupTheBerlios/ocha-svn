@@ -99,8 +99,8 @@ gboolean catalog_add_entry_struct(struct catalog *catalog,
         {
                 if(execute_update_printf(catalog, TRUE/*autocommit*/,
                                          "INSERT INTO entries "
-                                         " (id, path, name, long_name, source_id, launcher, version) "
-                                         " VALUES (NULL, '%q', '%q', '%q', %d, '%q', %d)",
+                                         " (id, path, name, long_name, source_id, launcher, version, enabled) "
+                                         " VALUES (NULL, '%q', '%q', '%q', %d, '%q', %d, 1)",
                                          entry->path,
                                          entry->name,
                                          entry->long_name,
@@ -121,7 +121,7 @@ gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_o
         g_return_val_if_fail(id_out!=NULL, FALSE);
 
         if(execute_update_printf(catalog, TRUE/*autocommit*/,
-                                 "INSERT INTO sources (id, type, version) VALUES (NULL, '%q', 0)",
+                                 "INSERT INTO sources (id, type, version, enabled) VALUES (NULL, '%q', 0, 1)",
                                  type))
         {
                 get_id(catalog, id_out);
@@ -216,7 +216,7 @@ gboolean catalog_executequery(struct catalog *catalog,
         sql = g_string_new("SELECT e.id, e.path, e.name, e.long_name, "
                            "       s.id, s.type, e.launcher, e.lastuse "
                            "FROM entries e, sources s "
-                           "WHERE e.name LIKE '%%");
+                           "WHERE e.enabled==1 AND e.source_id=s.id AND s.enabled==1 AND e.name LIKE '%%");
 
         has_space=FALSE;
         for(cptr=query; *cptr!='\0'; cptr++)
@@ -241,7 +241,7 @@ gboolean catalog_executequery(struct catalog *catalog,
                 }
         }
         g_string_append(sql,
-                        "%%' AND e.source_id=s.id "
+                        "%%' "
                         "ORDER BY e.lastuse DESC");
         catalog->callback=callback;
         catalog->callback_userdata=userdata;
@@ -433,6 +433,48 @@ gboolean catalog_end_source_update(struct catalog *catalog, int source_id)
                                      version);
 }
 
+gboolean catalog_entry_set_enabled(struct catalog *catalog, int entry_id, gboolean enabled)
+{
+        g_return_val_if_fail(catalog, FALSE);
+
+        return execute_update_printf(catalog,
+                                     TRUE/*autocommit*/,
+                                     "UPDATE entries SET enabled=%d WHERE id=%d;",
+                                     enabled ? 1:0,
+                                     entry_id);
+}
+
+gboolean catalog_source_set_enabled(struct catalog *catalog, int source_id, gboolean enabled)
+{
+        g_return_val_if_fail(catalog, FALSE);
+
+        return execute_update_printf(catalog,
+                                     TRUE/*autocommit*/,
+                                     "UPDATE sources SET enabled=%d WHERE id=%d;",
+                                     enabled ? 1:0,
+                                     source_id);
+}
+
+gboolean catalog_source_get_enabled(struct catalog *catalog, int source_id, gboolean *enabled_out)
+{
+        int number;
+
+        g_return_val_if_fail(catalog, FALSE);
+        g_return_val_if_fail(enabled_out, FALSE);
+
+        number=0;
+        if(execute_query_printf(catalog,
+                                getinteger_callback,
+                                &number,
+                                "SELECT enabled "
+                                "FROM sources "
+                                "WHERE id=%d",
+                                source_id)) {
+                *enabled_out = number!=0;
+                return TRUE;
+        }
+        return FALSE;
+}
 
 /* ------------------------- static functions */
 /**
@@ -608,9 +650,11 @@ static gboolean create_tables(sqlite *db, char **errmsg)
                                               "launcher VARCHAR NOT NULL, "
                                               "lastuse TIMESTAMP, "
                                               "version INTEGER, "
+                                              "enabled INTEGER NOT NULL, "
                                               "UNIQUE (id, path));"
                                               "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
                                               "CREATE INDEX path_idx ON entries (path);"
+                                              "CREATE INDEX e_enabled_idx ON entries (enabled);"
                                               "CREATE INDEX source_idx ON entries (source_id);",
                                               errmsg);
         if(ret!=SQLITE_OK) {
@@ -619,11 +663,13 @@ static gboolean create_tables(sqlite *db, char **errmsg)
         ret = execute_update_nocatalog_printf(db,
                                               "CREATE TABLE sources (id INTEGER PRIMARY KEY , "
                                               "type VARCHAR NOT NULL, "
-                                              "version INTEGER NOT NULL);"
+                                              "version INTEGER NOT NULL, "
+                                              "enabled INTEGER NOT NULL);"
                                               "CREATE TABLE source_attrs (source_id INTEGER, "
                                               "attribute VARCHAR NOT NULL,"
                                               "value VARCHAR NOT NULL,"
-                                              "PRIMARY KEY (source_id, attribute));",
+                                              "PRIMARY KEY (source_id, attribute));"
+                                              "CREATE INDEX s_enabled_idx ON sources (enabled);",
                                               errmsg);
         if(ret!=SQLITE_OK) {
                 return FALSE;

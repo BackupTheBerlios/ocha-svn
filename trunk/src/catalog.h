@@ -280,8 +280,17 @@ gboolean catalog_entry_set_enabled(struct catalog *catalog, int entry_id, gboole
  * @param enable TRUE => enable, FALSE=> disable
  * @return TRUE if modification was done, FALSE otherwise (check error)
  */
-void catalog_source_set_enabled(struct catalog *catalog, int source_id, gboolean enabled);
+gboolean catalog_source_set_enabled(struct catalog *catalog, int source_id, gboolean enabled);
 
+/**
+ * Check whether a source is enabled.
+ *
+ * @param catalog
+ * @param source_id
+ * @param enabled_out set to TRUE if it is enable, FALSE otherwise (if return value is TRUE)
+ * @return TRUE if query worked, FALSE otherwise (check error)
+ */
+gboolean catalog_source_get_enabled(struct catalog *catalog, int source_id, gboolean *enabled_out);
 
 /**
  * Get a pointer on the last error that happened with
