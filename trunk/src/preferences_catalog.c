@@ -625,7 +625,7 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
         gtk_widget_show(twopanes);
         gtk_paned_pack1(GTK_PANED(twopanes),
                         vbox,
-                        TRUE/*resize*/,
+                        FALSE/*resize*/,
                         FALSE/*shrink*/);
         gtk_paned_pack2(GTK_PANED(twopanes),
                         properties_frame,
