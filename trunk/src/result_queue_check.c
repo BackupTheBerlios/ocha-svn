@@ -63,7 +63,7 @@ static void release_cb(struct result *_result)
 
 static void setup()
 {
-   g_thread_init(NULL/*vtable*/);
+   g_thread_init_with_errorcheck_mutexes(NULL/*vtable*/);
 }
 
 static void teardown()

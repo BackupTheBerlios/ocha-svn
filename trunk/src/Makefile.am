@@ -3,7 +3,7 @@ bin_PROGRAMS=ocha
 
 noinst_PROGRAMS=mempool_check result_queue_check catalog_check
 
-TESTS=mempool_check result_queue_check
+TESTS=mempool_check result_queue_check catalog_check
 
 mempool_check_SOURCES=mempool_check.c mempool.c mempool.h
 mempool_check_CFLAGS=$(TEST_CFLAGS) 
