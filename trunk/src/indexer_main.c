@@ -7,6 +7,7 @@
 #include "catalog.h"
 #include "indexer.h"
 #include "indexers.h"
+#include "ocha_init.h"
 #include "catalog_queryrunner.h"
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
@@ -25,32 +26,13 @@ static void usage(FILE *out)
 }
 
 
-static char *get_catalog_path(void)
-{
-   GString *catalog_path = g_string_new(getenv("HOME"));
-   g_string_append(catalog_path, "/.ocha");
-   mkdir(catalog_path->str, 0700);
-   g_string_append(catalog_path, "/catalog");
-   char *retval = catalog_path->str;
-   g_string_free(catalog_path, FALSE);
-   return retval;
-}
-
 int main(int argc, char *argv[])
 {
    gboolean slow=FALSE;
    gboolean verbose=TRUE;
    int maxdepth=-1;
-
-
-   gnome_program_init ("ocha",
-                       "0.1",
-                       LIBGNOME_MODULE,
-                       argc,
-                       argv,
-                       GNOME_PARAM_CREATE_DIRECTORIES, TRUE,
-                       GNOME_PARAM_NONE);
-
+   struct configuration config;
+   ocha_init(argc, argv, FALSE/*no UI*/, &config);
 
    int curarg;
    for(curarg=1; curarg<argc; curarg++)
@@ -83,7 +65,7 @@ int main(int argc, char *argv[])
          usage(stderr);
          exit(111);
       }
-   char *catalog_path = get_catalog_path();
+   const char *catalog_path = config.catalog_path;
 
    int retval=0;
    gboolean catalog_existed = g_file_test(catalog_path, G_FILE_TEST_EXISTS);
