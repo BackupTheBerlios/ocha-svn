@@ -45,7 +45,6 @@ static gboolean is_readable(mode_t mode);
 static gboolean is_executable(mode_t mode);
 static gboolean to_ignore(const char *filename, GPatternSpec **patterns);
 static void doze_off(gboolean really);
-static gboolean remove_invalid_cb(struct catalog *catalog, float pertinence, int entry_id, const char *name, const char *long_name, const char *path, int source_id, const char *source_type, const char *launcher, void *userdata);
 static void attribute_change_notify_cb(GConfClient *client, guint id, GConfEntry *entry, gpointer _userdata);
 
 /* ------------------------- public functions */
@@ -313,13 +312,6 @@ void source_attribute_change_notify_remove(guint id)
                                    id);
 }
 
-void remove_invalid_entries(struct catalog *catalog, int source_id)
-{
-        g_return_if_fail(catalog);
-
-        catalog_get_source_content(catalog, source_id, remove_invalid_cb, NULL/*userdata*/);
-}
-
 /* ------------------------- static functions */
 
 static void catalog_index_init()
@@ -497,22 +489,5 @@ static void doze_off(gboolean really)
 {
         if(really)
                 sleep(3);
-}
-
-static gboolean remove_invalid_cb(struct catalog *catalog,
-                                  float pertinence,
-                                  int entry_id,
-                                  const char *name,
-                                  const char *long_name,
-                                  const char *path,
-                                  int source_id,
-                                  const char *source_type,
-                                  const char *launcher_id,
-                                  void *userdata)
-{
-        struct launcher *launcher = launchers_get(launcher_id);
-        if(launcher==NULL || !launcher_validate(launcher, path))
-                catalog_remove_entry(catalog, source_id, path);
-        return TRUE/*continue*/;
 }
 

@@ -153,17 +153,21 @@ static void indexer_application_source_release(struct indexer_source *source)
 
 static gboolean indexer_application_source_index(struct indexer_source *self, struct catalog *catalog, GError **err)
 {
+        gboolean success;
+
         g_return_val_if_fail(self!=NULL, FALSE);
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-        remove_invalid_entries(catalog, self->id);
-        return index_recursively(INDEXER_NAME,
-                                 catalog,
-                                 self->id,
-                                 index_application_cb,
-                                 self/*userdata*/,
-                                 err);
+        catalog_begin_source_update(catalog, self->id);
+        success=index_recursively(INDEXER_NAME,
+                                  catalog,
+                                  self->id,
+                                  index_application_cb,
+                                  self/*userdata*/,
+                                  err);
+        catalog_end_source_update(catalog, self->id);
+        return success;
 }
 
 /* ------------------------- member functions (indexer_source_view) */

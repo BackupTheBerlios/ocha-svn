@@ -186,19 +186,23 @@ static gboolean indexer_mozilla_source_index(struct indexer_source *self, struct
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(err==NULL || *err==NULL, FALSE);
 
-        if(!catalog_get_source_attribute_witherrors(INDEXER_NAME,
-                                                    self->id,
-                                                    "path",
-                                                    &path,
-                                                    TRUE/*required*/,
-                                                    err)) {
-                return FALSE;
+        catalog_begin_source_update(catalog, self->id);
+        retval = catalog_get_source_attribute_witherrors(INDEXER_NAME,
+                                                         self->id,
+                                                         "path",
+                                                         &path,
+                                                         TRUE/*required*/,
+                                                         err);
+        if(retval) {
+                retval =  catalog_index_bookmarks(catalog,
+                                                  self->id,
+                                                  path,
+                                                  err);
+                g_free(path);
         }
-        retval =  catalog_index_bookmarks(catalog,
-                                          self->id,
-                                          path,
-                                          err);
-        g_free(path);
+
+        catalog_end_source_update(catalog, self->id);
+
         return retval;
 }
 

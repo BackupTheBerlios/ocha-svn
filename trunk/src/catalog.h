@@ -184,7 +184,7 @@ gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_o
 gboolean catalog_remove_source(struct catalog *catalog, int source_id);
 
 /**
- * Add an entry into the catalog.
+ * Add an entry into the catalog or refresh/confirm it if it already exists.
  * @param catalog
  * @param path local path or URI
  * @param name short name for the entry (what will be searched)
@@ -194,6 +194,36 @@ gboolean catalog_remove_source(struct catalog *catalog, int source_id);
  * @return TRUE if the entry was added, FALSE otherwise
  */
 gboolean catalog_add_entry(struct catalog *catalog, int source_id, const char *launcher, const char *path, const char *name, const char *long_name, int *id_out);
+
+/**
+ * Start updating a source entries.
+ *
+ * To update source entries, make calls to catalog_add_entry(), even
+ * for existing entries. When you later call catalog_end_source_update(),
+ * the entries that existed before catalog_begin_source_update() that
+ * haven't updated will be removed.
+ *
+ * @param catalog
+ * @param source_id
+ * @return TRUE if the update can start, FALSE otherwise
+ */
+gboolean catalog_begin_source_update(struct catalog *catalog, int source_id);
+
+/**
+ * Declare a source update as done, remove stale entries.
+ *
+ * This function marks a source update as finished and then
+ * gets rid of all the entries that have been added before
+ * the call to catalog_begin_source_update() that haven't
+ * been updated using catalog_add_entry()
+ *
+ * See also catalog_start_source_update()
+ *
+ * @param catalog
+ * @param source_id
+ * @return TRUE if all has been deleted successfully, FALSE otherwise
+ */
+gboolean catalog_end_source_update(struct catalog *catalog, int source_id);
 
 /**
  * Remove a stale entry from the catalog

@@ -32,10 +32,19 @@ struct catalog
         GMutex *busy_wait_mutex;
 
         char *path;
+
+        /**
+         * ID of the 'current source', used as a cache for source_version()
+         */
+        int current_source_id;
+        /**
+         * version of the 'current source', used as a cache for source_version()
+         */
+        int current_source_version;
 };
 
 /* ------------------------- prototypes */
-static int getcount_callback(void *userdata, int column_count, char **result, char **names);
+static int getinteger_callback(void *userdata, int column_count, char **result, char **names);
 static gboolean exists(const char *path);
 static gboolean handle_sqlite_retval(struct catalog *catalog, int retval, char *errmsg, const char *sql);
 static int execute_update_nocatalog_printf(sqlite *db, const char *sql, char **errmsg, ...);
@@ -48,6 +57,7 @@ static int result_sqlite_callback(void *userdata, int col_count, char **col_data
 static void get_id(struct catalog  *catalog, int *id_out);
 static int findid_callback(void *userdata, int column_count, char **result, char **names);
 static gboolean findentry(struct catalog *catalog, const char *path, int source_id, int *id_out);
+static gboolean source_version(struct catalog *catalog, int source_id, int *version_out);
 
 /* ------------------------- public functions */
 
@@ -60,6 +70,7 @@ gboolean catalog_add_entry(struct catalog *catalog,
                            int *id_out)
 {
         int old_id=-1;
+        int version;
 
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(launcher!=NULL, FALSE);
@@ -67,29 +78,35 @@ gboolean catalog_add_entry(struct catalog *catalog,
         g_return_val_if_fail(name!=NULL, FALSE);
         g_return_val_if_fail(long_name!=NULL, FALSE);
 
+        if(!source_version(catalog, source_id, &version)) {
+                return FALSE;
+        }
+
+
         if(findentry(catalog, path, source_id, &old_id))
         {
                 return execute_update_printf(catalog, TRUE/*autocommit*/,
                                              "UPDATE entries "
-                                             "SET name='%q', long_name='%q', source_id=%d, launcher='%q' "
+                                             "SET name='%q', long_name='%q', source_id=%d, launcher='%q', version=%d "
                                              "WHERE id=%d",
                                              name,
                                              long_name,
                                              source_id,
                                              launcher,
+                                             version,
                                              old_id);
         } else
         {
                 if(execute_update_printf(catalog, TRUE/*autocommit*/,
                                          "INSERT INTO entries "
-                                         " (id, path, name, long_name, source_id, launcher) "
-                                         " VALUES (NULL, '%q', '%q', '%q', %d, '%q')",
+                                         " (id, path, name, long_name, source_id, launcher, version) "
+                                         " VALUES (NULL, '%q', '%q', '%q', %d, '%q', %d)",
                                          path,
                                          name,
                                          long_name,
                                          source_id,
                                          launcher,
-                                         NULL)) {
+                                         version)) {
                         get_id(catalog, id_out);
                         return TRUE;
                 }
@@ -104,7 +121,7 @@ gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_o
         g_return_val_if_fail(id_out!=NULL, FALSE);
 
         if(execute_update_printf(catalog, TRUE/*autocommit*/,
-                                 "INSERT INTO sources (id, type) VALUES (NULL, '%q')",
+                                 "INSERT INTO sources (id, type, version) VALUES (NULL, '%q', 0)",
                                  type))
         {
                 get_id(catalog, id_out);
@@ -299,7 +316,7 @@ gboolean catalog_get_source_content_count(struct catalog *catalog,
 
         number=0;
         if(execute_query_printf(catalog,
-                                getcount_callback,
+                                getinteger_callback,
                                 &number,
                                 "SELECT COUNT(*) "
                                 "FROM entries "
@@ -373,11 +390,55 @@ gboolean catalog_update_entry_timestamp(struct catalog *catalog, int entry_id)
 }
 
 
+gboolean catalog_begin_source_update(struct catalog *catalog, int source_id)
+{
+        int old_version;
+        int new_version;
+
+        g_return_val_if_fail(catalog, FALSE);
+        g_return_val_if_fail(source_id>0, FALSE);
+
+        if(!source_version(catalog, source_id, &old_version)) {
+                return FALSE;
+        }
+        new_version=old_version+1;
+        if(execute_update_printf(catalog,
+                                 TRUE/*autocommit*/,
+                                 "UPDATE sources SET version=%d WHERE id=%d",
+                                 new_version,
+                                 source_id))
+        {
+                catalog->current_source_id=source_id;
+                catalog->current_source_version=new_version;
+                return TRUE;
+        }
+        return FALSE;
+}
+
+gboolean catalog_end_source_update(struct catalog *catalog, int source_id)
+{
+        int version;
+
+        g_return_val_if_fail(catalog, FALSE);
+        g_return_val_if_fail(source_id>0, FALSE);
+
+        if(!source_version(catalog, source_id, &version)) {
+                return FALSE;
+        }
+
+        return execute_update_printf(catalog,
+                                     TRUE/*autocommit*/,
+                                     "DELETE FROM entries WHERE source_id=%d and version<%d",
+                                     source_id,
+                                     version);
+}
+
+
 /* ------------------------- static functions */
 /**
  * sqlite callback that expects an unsigned integer as the 1st (and only) result
  */
-static int getcount_callback(void *userdata,
+static int getinteger_callback(void *userdata,
                              int column_count,
                              char **result,
                              char **names)
@@ -545,7 +606,9 @@ static gboolean create_tables(sqlite *db, char **errmsg)
                                               "long_name VARCHAR NOT NULL, "
                                               "source_id INTEGER, "
                                               "launcher VARCHAR NOT NULL, "
-                                              "lastuse TIMESTAMP, UNIQUE (id, path));"
+                                              "lastuse TIMESTAMP, "
+                                              "version INTEGER, "
+                                              "UNIQUE (id, path));"
                                               "CREATE INDEX lastuse_idx ON entries (lastuse DESC);"
                                               "CREATE INDEX path_idx ON entries (path);"
                                               "CREATE INDEX source_idx ON entries (source_id);",
@@ -555,7 +618,8 @@ static gboolean create_tables(sqlite *db, char **errmsg)
         }
         ret = execute_update_nocatalog_printf(db,
                                               "CREATE TABLE sources (id INTEGER PRIMARY KEY , "
-                                              "type VARCHAR NOT NULL);"
+                                              "type VARCHAR NOT NULL, "
+                                              "version INTEGER NOT NULL);"
                                               "CREATE TABLE source_attrs (source_id INTEGER, "
                                               "attribute VARCHAR NOT NULL,"
                                               "value VARCHAR NOT NULL,"
@@ -671,6 +735,31 @@ static gboolean findentry(struct catalog *catalog,
         {
                 if(id_out)
                         *id_out=id;
+                return TRUE;
+        }
+        return FALSE;
+}
+
+static gboolean source_version(struct catalog *catalog,
+                               int source_id,
+                               int *version_out)
+{
+        g_return_val_if_fail(catalog, FALSE);
+        g_return_val_if_fail(version_out, FALSE);
+
+        if(catalog->current_source_id==source_id) {
+                *version_out=catalog->current_source_version;
+                return TRUE;
+        }
+
+        if(execute_query_printf(catalog,
+                                getinteger_callback,
+                                version_out/*userdata*/,
+                                "SELECT version FROM sources WHERE id=%d",
+                                source_id))
+        {
+                catalog->current_source_id=source_id;
+                catalog->current_source_version=*version_out;
                 return TRUE;
         }
         return FALSE;

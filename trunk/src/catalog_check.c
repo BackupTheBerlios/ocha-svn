@@ -362,6 +362,50 @@ START_TEST(test_remove_source)
 }
 END_TEST
 
+START_TEST(test_source_update)
+{
+        struct catalog *catalog;
+        int source1_id;
+        unsigned int source1_count;
+        int entry_id;
+
+        printf("--- test_source_update\n");
+
+        catalog = catalog_connect(PATH, NULL);
+
+        catalog_cmd(catalog,
+                    "add_source(edit)",
+                    catalog_add_source(catalog, "test", &source1_id));
+
+        addentries(catalog, source1_id, 10, "source1-entry-%d");
+
+        catalog_begin_source_update(catalog, source1_id);
+        addentries(catalog, source1_id, 3, "source1-entry-%d");
+        catalog_cmd(catalog,
+                    "custom addentry",
+                    catalog_add_entry(catalog,
+                                      source1_id,
+                                      TEST_LAUNCHER,
+                                      "/tmp/toto.txt",
+                                      "Toto",
+                                      "/tmp/toto.txt",
+                                      &entry_id));
+        catalog_end_source_update(catalog, source1_id);
+
+        catalog_cmd(catalog,
+                    "get count",
+                    catalog_get_source_content_count(catalog,
+                                                     source1_id,
+                                                     &source1_count));
+
+        fail_unless(source1_count==4,
+                    "expected non-refreshed entries to have been deleted");
+
+
+        printf("--- test_source_update OK\n");
+}
+END_TEST
+
 
 
 START_TEST(test_execute_query)
@@ -552,6 +596,7 @@ static Suite *catalog_check_suite(void)
         tcase_add_test(tc_core, test_get_source_content);
         tcase_add_test(tc_core, test_remove_entry);
         tcase_add_test(tc_core, test_remove_source);
+        tcase_add_test(tc_core, test_source_update);
 
         tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
         suite_add_tcase(s, tc_query);
@@ -828,7 +873,7 @@ static gpointer execute_query_thread(void *userdata)
         g_mutex_lock(execute_query_mutex);
         printf("execute_query_thread: lock\n");
         sqlite_exec(db,
-                    "BEGIN; INSERT INTO entries VALUES (NULL, '', '', '', '', '', '');",
+                    "BEGIN; INSERT INTO entries VALUES (NULL, '', '', '', '', '', '', 0);",
                     NULL/*no callback*/,
                     NULL/*userdata*/,
                     &errmsg);
