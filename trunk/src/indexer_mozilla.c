@@ -392,7 +392,6 @@ static gboolean discover(struct indexer *indexer, struct catalog *catalog)
                int id;
                if(catalog_add_source(catalog, INDEXER_NAME, &id))
                   {
-                     printf("add %s %s: %d\n", current->path, current->profile_name, id);
                      if(catalog_set_source_attribute(catalog,
                                                      id,
                                                       "path",
