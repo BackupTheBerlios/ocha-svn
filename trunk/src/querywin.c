@@ -13,6 +13,7 @@
 static GtkWidget *querywin;
 static GtkWidget *query_label;
 static GtkWidget *treeview;
+static GtkWidget *scroll;
 static GString* query_str;
 static GString* running_query;
 static guint32 last_keypress;
@@ -93,6 +94,11 @@ void querywin_start()
         last_keypress=0;
         resultlist_verify();
         queryrunner->start(queryrunner);
+        gtk_adjustment_set_value(gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scroll)),
+                                 0.0);
+        gtk_adjustment_set_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scroll)),
+                                 0.0);
+
         gtk_window_reshow_with_initial_size(GTK_WINDOW(querywin));
         shown=TRUE;
 }
@@ -281,6 +287,7 @@ static void querywin_create(GtkWidget *list)
         /* fill in structure */
         query_label=query;
         treeview=list;
+        scroll=scrolledwindow1;
 }
 
 static gboolean execute_result(struct result *result)

@@ -339,7 +339,7 @@ static void runquery_thread_execute_query(struct catalog_queryrunner  *queryrunn
                __LINE__,
                queryrunner->running_query->str);
 #endif
-
+        g_string_truncate(queryrunner->running_query, 0);
         lock(queryrunner->mutex);
 }
 
