@@ -9,8 +9,8 @@
 struct querywin
 {
    GtkWidget *querywin;
-   GtkWidget *query;
-   GtkWidget *list;
+   GtkWidget *query_label;
+   GtkWidget *treeview;
 };
 
 /**

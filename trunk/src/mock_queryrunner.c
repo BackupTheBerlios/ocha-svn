@@ -77,12 +77,14 @@ struct queryrunner *mock_queryrunner_new(struct result_queue *queue)
 static struct result *result_new(const char *query, int index)
 {
    struct result *retval = g_new(struct result, 1);
-   char *name = g_malloc(strlen(query)+1);
-   strcpy(name, query);
-   retval->name=name;
-   retval->path=name;
+   GString* name = g_string_new("");
+   g_string_printf(name, "%s%d", query, index);
+   retval->name=name->str;
+   retval->path=name->str;
+   g_string_free(name, false/*not free_segment*/);
    retval->execute=result_execute;
    retval->release=result_release;
+   return retval;
 }
 
 /**
@@ -106,6 +108,7 @@ static bool result_execute(struct result *result)
 static void result_release(struct result *result)
 {
    g_return_if_fail(result!=NULL);
+   printf("result_release(%s)\n", result->name);
    g_free((gpointer)result->name);
    g_free(result);
 }
@@ -115,6 +118,7 @@ static void result_release(struct result *result)
 /** Start the query */
 static void start(struct queryrunner *_self)
 {
+   printf("start(0x%lx)\n", (unsigned long)_self);
    struct mock_queryrunner *self = MOCK_QUERYRUNNER(_self);
    g_return_if_fail(!self->started);
    self->started=TRUE;
@@ -177,8 +181,9 @@ static void consolidate(struct queryrunner *_self)
 static void stop(struct queryrunner *_self)
 {
    struct mock_queryrunner *self = MOCK_QUERYRUNNER(_self);
-   g_return_if_fail(self->started);
-   printf("stop(%s)\n", self->query);
+   if(!self->started)
+      return;
+   printf("stop(0x%lx)\n", (unsigned long)_self);
    self->started=FALSE;
 }
 
@@ -187,6 +192,6 @@ static void stop(struct queryrunner *_self)
  */
 static void release(struct queryrunner *self)
 {
-   printf("mock_queryrunner released\n");
+   printf("release(0x%lx)\n", (unsigned long)self);
    g_free(self);
 }

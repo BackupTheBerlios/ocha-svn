@@ -42,8 +42,8 @@ void querywin_create(struct querywin *retval)
 
   /* fill in structure */
   retval->querywin=querywin;
-  retval->query=query;
-  retval->list=list;
+  retval->query_label=query;
+  retval->treeview=list;
 }
 
 

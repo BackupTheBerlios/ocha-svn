@@ -1,4 +1,4 @@
-#ifdef MOCK_QUERYRUNNER_H
+#ifndef MOCK_QUERYRUNNER_H
 #define MOCK_QUERYRUNNER_H
 
 #include "queryrunner.h"
