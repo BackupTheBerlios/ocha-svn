@@ -40,9 +40,8 @@ static void indexer_application_source_notify_remove(struct indexer_source *sour
 /* ------------------------- prototypes: other */
 static gboolean add_source(struct catalog *catalog, const char *path, int depth, char *ignore);
 static gboolean add_source_for_directory(struct catalog *catalog, const char *possibility);
-
 static char *display_name(struct catalog *catalog, int id);
-
+static void remove_exec_percents(char *str);
 
 /* ------------------------- definitions */
 
@@ -131,6 +130,7 @@ static gboolean indexer_application_execute(struct indexer *self, const char *na
                                     uri);
                 } else {
                         int pid;
+                        remove_exec_percents(exec);
                         printf("execute: '%s' terminal=%d\n",
                                exec,
                                (int)terminal);
@@ -320,10 +320,9 @@ static gboolean index_application_cb(struct catalog *catalog,
 
         retval = TRUE;
         if((type==NULL || g_strcasecmp("Application", type)==0)
-                        && !hidden
-                        && !nodisplay
-                        && exec!=NULL
-                        && strstr(exec, "%")==NULL)
+           && !hidden
+           && !nodisplay
+           && exec!=NULL)
         {
                 const char *long_name=description;
                 if(!long_name)
@@ -431,3 +430,29 @@ static char *display_name(struct catalog *catalog, int id)
         return retval;
 }
 
+/**
+ * Remove everything that starts with '%', except
+ * for '%%', which gets transformed into a single '%'
+ * @param str string to modify
+ */
+static void remove_exec_percents(char *str)
+{
+        char *from;
+        char *to = str;
+        for(from=str; *from!='\0'; from++) {
+                if(*from=='%') {
+                        from++; /* skip this */
+                        if(from[1]=='%') {
+                                *to='%';
+                                to++;
+                        }
+                        /* else skip */
+                } else {
+                        if(from>to) {
+                                *to=*from;
+                        }
+                        to++;
+                }
+        }
+        *to='\0';
+}

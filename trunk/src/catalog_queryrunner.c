@@ -303,6 +303,7 @@ static void runquery_thread_close_catalog(struct catalog_queryrunner  *queryrunn
         struct catalog *catalog = queryrunner->catalog;
         queryrunner->catalog=NULL;
         catalog_disconnect(catalog);
+        g_string_truncate(queryrunner->running_query, 0);
 }
 
 static void runquery_thread_execute_query(struct catalog_queryrunner  *queryrunner)
@@ -339,7 +340,7 @@ static void runquery_thread_execute_query(struct catalog_queryrunner  *queryrunn
                __LINE__,
                queryrunner->running_query->str);
 #endif
-        g_string_truncate(queryrunner->running_query, 0);
+
         lock(queryrunner->mutex);
 }
 
