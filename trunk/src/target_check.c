@@ -28,9 +28,6 @@ START_TEST(test_new_url_target_with_url)
    fail_unless(strcmp(url, target->id)==0, "target->id");
    fail_unless(url!=target->id, "target->id not reallocated");
    fail_unless(target->filepath==NULL, "target->filepath");
-   fail_unless(target->mempool!=NULL, "target->mempool");
-   fail_unless(mempool_size(target->mempool)>=(sizeof(struct target)+strlen(name)+strlen(url)),
-			   "suspicious mempool size");
 } 
 END_TEST
 
@@ -83,9 +80,9 @@ START_TEST(test_target_pool)
 {
    struct target *target = target_new_file_target("/tmp/toto");
    test_target_pool_calls=0;
-   mempool_enlist(target->mempool, 
-				  (void*)0x1ee1, 
-				  test_target_pool_cb);
+   target_mempool_enlist(target,
+						 (void*)0x1ee1, 
+						 test_target_pool_cb);
    fail_unless(test_target_pool_calls==0, 
 			   "called too early");
    target_unref(target);
@@ -98,9 +95,9 @@ START_TEST(test_refcounting)
 {
    struct target *target = target_new_file_target("/tmp/toto");
    test_target_pool_calls=0;
-   mempool_enlist(target->mempool, 
-				  (void*)0x1ee1, 
-				  test_target_pool_cb);
+   target_mempool_enlist(target, 
+						 (void*)0x1ee1, 
+						 test_target_pool_cb);
    fail_unless(target==target_ref(target), 
 			   "wrong return value for target_ref()");
    target_unref(target);

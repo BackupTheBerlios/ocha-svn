@@ -52,7 +52,6 @@ struct target
    /** URL to the file if relevant, NULL otherwise. read-only. */
    const gchar* url;
 
-   struct mempool* mempool;
 };
 
 /**
@@ -222,4 +221,26 @@ bool target_execute_action(struct target* target, struct target_action* target_a
  * @return true if an action was removed
  */
 bool target_remove_action(struct target* target, struct target_action* target_action);
+
+/**
+ * Allocate a chunk of memory from the target's memory pool.
+ * 
+ * The memory will be available until the target is destroyed.
+ * @param size size of the memory chunk
+ * @return a pointer to the newly allocated memory
+ */
+gpointer target_mempool_alloc(struct target* target, size_t size);
+
+/**
+ * Enlist some resource into the target's memory pool.
+ *
+ * The resource will be freed at the same time as the
+ * target.
+ * @param target
+ * @param resource
+ * @param freer function that will free the resource
+ * @see mempool_enlist(struct mempool *, void *, mempool_freer_f)
+ */
+void target_mempool_enlist(struct target* target, gpointer resource, mempool_freer_f freer);
+
 #endif
