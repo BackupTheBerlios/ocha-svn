@@ -17,3 +17,15 @@ struct indexer **indexers_list()
 {
     return indexers;
 }
+
+struct indexer *indexers_get(const char *type)
+{
+    g_return_val_if_fail(type!=NULL, NULL);
+   for(struct indexer **ptr=indexers; *ptr; ptr++)
+      {
+         if(strcmp(type, (*ptr)->name)==0)
+            return *ptr;
+      }
+   return NULL;
+}
+

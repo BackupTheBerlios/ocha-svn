@@ -12,4 +12,10 @@
  */
 struct indexer **indexers_list();
 
+/**
+ * Get an indexer by name.
+ * @return an indexer or NULL if not found
+ */
+struct indexer *indexers_get(const char *name);
+
 #endif /*INDEXERS_H*/

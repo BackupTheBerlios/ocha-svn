@@ -2,8 +2,9 @@
 #include "preferences_catalog.h"
 #include "indexers.h"
 #include <gtk/gtk.h>
+#include <string.h>
 
-/** \file implement the API defined in preference_catalog.h */
+/** \file implement the API defined in preferences_catalog.h */
 
 typedef enum {
     /** a column of type STRING that contains the label of
@@ -19,14 +20,25 @@ typedef enum {
     NUMBER_OF_COLUMNS
 } TreeViewColumns;
 
-static GtkTreeModel *createModel(struct catalog *catalog);
+/** Internal data */
+struct preferences_catalog
+{
+    GtkTreeStore *model;
+    GtkTreeView *view;
+    GtkTreeSelection *selection;
+
+    struct catalog *catalog;
+};
+
+static GtkTreeStore *createModel(struct catalog *catalog);
 static void add_indexer(GtkTreeStore *model, struct indexer *indexer, struct catalog *catalog);
 static void add_source(GtkTreeStore *model, GtkTreeIter *parent, struct indexer *indexer, struct catalog *catalog, int source_id);
-static void increase_entry_count(GtkTreeStore *model, GtkTreeIter *iter, unsigned int count);
-static GtkWidget *createView();
+static void update_entry_count(GtkTreeStore *model, GtkTreeIter *iter, unsigned int count, struct catalog *catalog);
+static GtkTreeView *createView();
+static void reload_cb(GtkButton *reload, gpointer userdata);
 
 /* ------------------------- static functions */
-static GtkTreeModel *createModel(struct catalog *catalog)
+static GtkTreeStore *createModel(struct catalog *catalog)
 {
     GtkTreeStore *model = gtk_tree_store_new(NUMBER_OF_COLUMNS,
                                              G_TYPE_STRING/*COLUMN_LABEL*/,
@@ -41,7 +53,7 @@ static GtkTreeModel *createModel(struct catalog *catalog)
             struct indexer *indexer = *indexers;
             add_indexer(model, indexer, catalog);
         }
-    return GTK_TREE_MODEL(model);
+    return model;
 }
 
 static void add_indexer(GtkTreeStore *model, struct indexer *indexer, struct catalog *catalog)
@@ -88,35 +100,54 @@ static void add_source(GtkTreeStore *model,
                                COLUMN_INDEXER_TYPE, indexer->name,
                                COLUMN_SOURCE_ID, source_id,
                                -1);
-            int count=0;
-            if(catalog_get_source_content_count(catalog, source_id, &count))
-                increase_entry_count(model, &iter, count);
+
+
+            update_entry_count(model, &iter, source_id, catalog);
             source->release(source);
         }
 }
-static void increase_entry_count(GtkTreeStore *model, GtkTreeIter *iter, unsigned int count)
+static void update_entry_count(GtkTreeStore *model, GtkTreeIter *iter, unsigned int source_id, struct catalog *catalog)
 {
+    g_return_if_fail(model!=NULL);
+    g_return_if_fail(iter!=NULL);
+    g_return_if_fail(source_id!=0);
+
+    unsigned int count=0;
+    if(!catalog_get_source_content_count(catalog, source_id, &count))
+        return;
+
     unsigned int oldcount=0;
     gtk_tree_model_get(GTK_TREE_MODEL(model), iter,
                        COLUMN_COUNT, &oldcount,
                        -1);
-    count+=oldcount;
     gtk_tree_store_set(model, iter,
                        COLUMN_COUNT, count,
                        -1);
+    int difference = count-oldcount;
 
+    GtkTreeIter current;
     GtkTreeIter parent;
-    if(gtk_tree_model_iter_parent(GTK_TREE_MODEL(model),
-                                  &parent,
-                                  iter))
-        {
-            increase_entry_count(model, &parent, count);
-        }
+    memcpy(&current, iter, sizeof(GtkTreeIter));
+    while(gtk_tree_model_iter_parent(GTK_TREE_MODEL(model),
+                                     &parent,
+                                     &current))
+    {
+        oldcount=0;
+        gtk_tree_model_get(GTK_TREE_MODEL(model), &parent,
+                           COLUMN_COUNT, &oldcount,
+                           -1);
+        gtk_tree_store_set(model, &parent,
+                           COLUMN_COUNT, oldcount+difference,
+                           -1);
+
+        memcpy(&current, &parent, sizeof(GtkTreeIter));
+    }
 }
 
-static GtkWidget *createView(GtkTreeModel *model)
+static GtkTreeView *createView(GtkTreeModel *model)
 {
     GtkWidget *_view = gtk_tree_view_new_with_model(model);
+    gtk_widget_show(_view);
     GtkTreeView *view = GTK_TREE_VIEW(_view);
 
     gtk_tree_view_set_headers_visible(view, TRUE);
@@ -132,17 +163,93 @@ static GtkWidget *createView(GtkTreeModel *model)
                                                 gtk_cell_renderer_text_new(),
                                                 "text", COLUMN_COUNT,
                                                 NULL);
-    return _view;
+    return view;
 }
 
-/* ------------------------- public functions */
-GtkWidget *preferences_catalog_new(struct catalog *catalog)
+static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current)
 {
-    GtkTreeModel* model = createModel(catalog);
-    GtkWidget * view = createView(model);
-    gtk_widget_show(view);
-    g_object_unref(model);
-    model=NULL;
+    g_return_if_fail(prefs!=NULL);
+    g_return_if_fail(current!=NULL);
+
+    GtkTreeStore *model=prefs->model;
+    int source_id;
+    gtk_tree_model_get(GTK_TREE_MODEL(model),
+                       current,
+                       COLUMN_SOURCE_ID,
+                       &source_id,
+                       -1);
+
+    if(source_id!=0)
+        {
+            char *type=NULL;
+            gtk_tree_model_get(GTK_TREE_MODEL(model),
+                               current,
+                               COLUMN_INDEXER_TYPE,
+                               &type,
+                               -1);
+            if(type!=NULL)
+                {
+                    struct indexer *indexer = indexers_get(type);
+                    if(indexer)
+                        {
+                            struct indexer_source *source = indexer->load_source(indexer, prefs->catalog, source_id);
+                            if(source)
+                                {
+                                    source->index(source, prefs->catalog, NULL/*err*/);
+                                    source->release(source);
+                                    update_entry_count(prefs->model,
+                                                       current,
+                                                       source_id,
+                                                       prefs->catalog);
+                                }
+                        }
+                    g_free(type);
+                }
+        }
+    else
+        {
+            GtkTreeIter child;
+            if(gtk_tree_model_iter_children(GTK_TREE_MODEL(model), &child, current))
+                {
+                    do
+                        {
+                            reindex(prefs, &child);
+                        }
+                    while(gtk_tree_model_iter_next(GTK_TREE_MODEL(model), &child));
+                }
+        }
+}
+static void reload_cb(GtkButton *button, gpointer userdata)
+{
+    g_return_if_fail(userdata);
+    struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
+    GtkTreeIter iter;
+    GtkTreeIter child;
+
+    if(gtk_tree_selection_get_selected(prefs->selection,
+                                       NULL/*ptr to model*/,
+                                       &iter))
+    {
+        reindex(prefs, &iter);
+    }
+}
+/* ------------------------- public functions */
+struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
+{
+    g_return_val_if_fail(catalog!=NULL, NULL);
+
+    struct preferences_catalog *prefs = g_new(struct preferences_catalog, 1);
+
+    prefs->model = createModel(catalog);
+    prefs->view = createView(GTK_TREE_MODEL(prefs->model));
+    prefs->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(prefs->view));
+    prefs->catalog=catalog;
+    return prefs;
+}
+
+GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
+{
+
 
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_widget_show(scroll);
@@ -150,8 +257,26 @@ GtkWidget *preferences_catalog_new(struct catalog *catalog)
                                    GTK_POLICY_AUTOMATIC,
                                    GTK_POLICY_AUTOMATIC);
     gtk_container_add(GTK_CONTAINER(scroll),
-                      view);
+                      GTK_WIDGET(prefs->view));
+
+    GtkWidget *buttons = gtk_hbutton_box_new();
+    gtk_widget_show(buttons);
+    gtk_button_box_set_layout(GTK_BUTTON_BOX(buttons),
+                              GTK_BUTTONBOX_END);
 
 
-    return scroll;
+    GtkWidget *reload = gtk_button_new_with_label("Reload");
+    gtk_widget_show(reload);
+    gtk_container_add(GTK_CONTAINER(buttons), reload);
+    g_signal_connect(reload,
+                     "clicked",
+                     G_CALLBACK(reload_cb),
+                     prefs/*userdata*/);
+
+    GtkWidget *vbox = gtk_vbox_new(FALSE/*not homogeneous*/, 4/*spacing*/);
+    gtk_widget_show(vbox);
+    gtk_box_pack_start(GTK_BOX(vbox), scroll, TRUE/*expand*/, TRUE/*fill*/, 0/*padding*/);
+    gtk_box_pack_end(GTK_BOX(vbox), buttons, FALSE/*expand*/, FALSE/*fill*/, 0/*padding*/);
+
+    return vbox;
 }

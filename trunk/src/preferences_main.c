@@ -16,7 +16,8 @@ static void create_window(struct catalog *catalog)
    gtk_widget_show(vbox1);
    gtk_container_add(GTK_CONTAINER(window), vbox1);
 
-   GtkWidget *catalog_widget = preferences_catalog_new(catalog);
+   struct preferences_catalog *prefs=preferences_catalog_new(catalog);
+   GtkWidget *catalog_widget = preferences_catalog_get_widget(prefs);
    gtk_widget_show(catalog_widget);
    gtk_box_pack_start(GTK_BOX(vbox1), catalog_widget, TRUE, TRUE, 0);
 

@@ -29,6 +29,13 @@ struct indexer **indexers_list()
     return indexers;
 }
 
+struct indexer *indexers_get(const char *type)
+{
+    g_return_val_if_fail(type!=NULL, NULL);
+    if(strcmp(type, "name")==0)
+        return &mock_indexer;
+    return NULL;
+}
 
 static gboolean discover(struct indexer *indexer, struct catalog *catalog)
 {

@@ -112,7 +112,6 @@ static gboolean result_callback(struct catalog *catalog,
                                 void *userdata);
 static gboolean query_has_changed(struct catalog_queryrunner *self);
 static void wait_on_condition(struct catalog_queryrunner *self, int wait_ms);
-static struct indexer *find_indexer(const char *type);
 
 static struct result *result_create(struct catalog_queryrunner *runner,
                                     struct indexer *indexer,
@@ -334,7 +333,7 @@ static gboolean result_callback(struct catalog *catalog,
 
    struct catalog_queryrunner *self = CATALOG_QUERYRUNNER(userdata);
 
-   struct indexer *indexer = find_indexer(source_type);
+   struct indexer *indexer = indexers_get(source_type);
    if(!indexer)
        {
            /* it can happen, because indexers may be removed, but it's
@@ -442,16 +441,5 @@ static void stop(struct queryrunner *_self)
       catalog_interrupt(self->catalog);
    g_cond_broadcast(self->cond);
    unlock(self->mutex);
-}
-
-static struct indexer *find_indexer(const char *type)
-{
-    struct indexer **indexers = indexers_list();
-   for(struct indexer **ptr=indexers; *ptr; ptr++)
-      {
-         if(strcmp(type, (*ptr)->name)==0)
-            return *ptr;
-      }
-   return NULL;
 }
 
