@@ -153,9 +153,10 @@ static gboolean run_query(gpointer userdata)
 {
    if(strcmp(running_query->str, query_str->str)!=0)
       {
-         g_string_assign(running_query, query_str->str);
-         resultlist_set_current_query(query_str->str);
-         resultlist_clear();
+         char buffer[query_str->len+1];
+         strcpy(buffer, query_str->str);
+         g_string_assign(running_query, g_strstrip(buffer));
+         resultlist_set_current_query(running_query->str);
          queryrunner->run_query(queryrunner, running_query->str);
       }
    return FALSE;

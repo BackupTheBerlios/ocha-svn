@@ -12,7 +12,7 @@
  * Create the result list.
  *
  * Make sure you call this function before any other
- * in this module.x
+ * in this module.
  */
 void resultlist_init();
 
@@ -42,14 +42,10 @@ struct result *resultlist_get_selected(void);
 void resultlist_add_result(float pertinence, struct result *);
 
 /**
- * Clear the list.
- */
-void resultlist_clear(void);
-
-/**
  * Set the current query, for highlighting it on
  * the result list.
  *
+ * Newly-irrelevant results are removed by this function.
  * @param query new query string to highlight
  */
 void resultlist_set_current_query(const char *query);
