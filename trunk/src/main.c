@@ -20,6 +20,7 @@ static guint32 last_keypress;
 
 static void querywin_start()
 {
+   last_keypress=0;
    queryrunner->start(queryrunner);
    gtk_widget_show(win_data.querywin);
 }
