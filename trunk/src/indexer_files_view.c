@@ -69,6 +69,7 @@ static void recursive_set_sensitive(GtkContainer *parent, gboolean active, GtkWi
 static void include_content_disable_cb(GtkToggleButton *toggle, gpointer userdata);
 static void include_content_reset_depth_cb(GtkToggleButton *toggle, gpointer userdata);
 static void choose_file_cb(GtkButton *toggle, gpointer userdata);
+static gboolean update_path_on_focus_out_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata);
 static void update_path(struct indexer_files_view *view);
 /* ------------------------- public functions */
 
@@ -362,6 +363,10 @@ static void connect_widgets(struct indexer_files_view  *view)
                          G_CALLBACK(choose_file_cb),
                          view);
 
+        g_signal_connect(view->path,
+                         "focus-out-event",
+                         G_CALLBACK(update_path_on_focus_out_cb),
+                         view);
 }
 
 
@@ -632,6 +637,17 @@ static void choose_file_cb(GtkButton *button, gpointer userdata)
                 gtk_entry_set_text(view->path, filename ? filename:"");
                 g_free (filename);
         }
+}
+static gboolean update_path_on_focus_out_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata)
+{
+        struct indexer_files_view *view;
+
+        g_return_val_if_fail(userdata, FALSE);
+        view = (struct indexer_files_view *)userdata;
+        if(!view->disable_cb) {
+                update_path(view);
+        }
+        return FALSE;
 }
 static void update_path(struct indexer_files_view *view)
 {
