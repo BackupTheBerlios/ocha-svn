@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 /** \file Make a connection to the catalog and open a catalog window */
 
 #include "ocha_init.h"
@@ -19,7 +23,7 @@ int main(int argc, char *argv[])
         struct configuration config;
         struct catalog *catalog;
 
-        ocha_init(argc, argv, TRUE/*GUI*/, &config);
+        ocha_init(PACKAGE "_preferences", argc, argv, TRUE/*GUI*/, &config);
         ocha_init_requires_catalog(config.catalog_path);
 
         catalog =  catalog_connect(config.catalog_path, &err);

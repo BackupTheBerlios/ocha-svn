@@ -1,4 +1,6 @@
-#include "config.h"
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <signal.h>
 #include "querywin.h"
@@ -25,6 +27,7 @@
 #include <gdk/gdkx.h>
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
+#include <libgnomeui/libgnomeui.h>
 
 struct keygrab_data
 {
@@ -40,6 +43,7 @@ static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_un
 static void install_keygrab_filters(struct keygrab_data *data);
 static gboolean install_keygrab(const char *accelerator, struct keygrab_data *data);
 static void uninstall_keygrab(void);
+static void init_restart(const char *startup_command, struct configuration *config);
 
 /* ------------------------- main */
 
@@ -52,8 +56,12 @@ int main(int argc, char *argv[])
         struct queryrunner *runner;
         struct keygrab_data keygrab_data;
 
-        ocha_init(argc, argv, TRUE/*has gui*/, &config);
+
+        ocha_init(PACKAGE, argc, argv, TRUE/*has gui*/, &config);
+        init_restart(argv[0], &config);
         ocha_init_requires_catalog(config.catalog_path);
+
+        chdir(g_get_home_dir());
 
         for(i=1; i<argc; i++) {
                 const char *arg = argv[i];
@@ -78,7 +86,6 @@ int main(int argc, char *argv[])
         runner=catalog_queryrunner_new(catalog_path, queue);
 
         querywin_set_queryrunner(runner);
-        querywin_start();
 
         if(!configure_keygrab(&keygrab_data)) {
                 return 10;
@@ -244,5 +251,41 @@ static void uninstall_keygrab(void)
                            AnyKey,
                            AnyModifier,
                            GDK_WINDOW_XID(root));
+        }
+}
+
+/**
+ * Make sure ocha will be restarted by gnome-session next
+ * time the user logs in.
+ */
+static void init_restart(const char *startup_command, struct configuration *config)
+{
+        GnomeClient *client = gnome_master_client();
+        GnomeClientFlags flags = gnome_client_get_flags(client);
+
+        if( (flags&(GNOME_CLIENT_RESTARTED|GNOME_CLIENT_RESTORED)) == 0 ) {
+                gchar *restart[1];
+                if(g_path_is_absolute(startup_command)) {
+                        restart[0] = g_strdup(startup_command);
+                } else {
+                        gchar *curdir = g_get_current_dir();
+                        restart[0] = g_strdup_printf("%s/%s",
+                                                     curdir,
+                                                     startup_command);
+                        g_free(curdir);
+                }
+
+                gnome_client_set_restart_style(client,
+                                               GNOME_RESTART_IMMEDIATELY);
+                gnome_client_set_restart_command(client, 1, (gchar **)restart);
+                gnome_client_request_save (client,
+                                           GNOME_SAVE_LOCAL,
+                                           FALSE/*not shutdown*/,
+                                           GNOME_INTERACT_ERRORS,
+                                           FALSE/*not fast*/,
+                                           TRUE/*global*/);
+                gnome_client_flush(client);
+
+                g_free(restart[0]);
         }
 }

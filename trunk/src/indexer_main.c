@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -40,7 +44,7 @@ int main(int argc, char *argv[])
         struct catalog *catalog;
 
 
-        ocha_init(argc, argv, FALSE/*no UI*/, &config);
+        ocha_init(PACKAGE "_indexer", argc, argv, FALSE/*no UI*/, &config);
 
 
         for(curarg=1; curarg<argc; curarg++) {

@@ -25,10 +25,10 @@ static char *get_catalog_path(void);
 
 /* ------------------------- public functions */
 
-void ocha_init(int argc, char **argv, gboolean ui, struct configuration *config)
+void ocha_init(const char *program, int argc, char **argv, gboolean ui, struct configuration *config)
 {
         g_thread_init(NULL/*vtable*/);
-        gnome_program_init (PACKAGE,
+        gnome_program_init (program,
                             VERSION,
                             ui ? LIBGNOMEUI_MODULE : LIBGNOME_MODULE,
                             argc,
