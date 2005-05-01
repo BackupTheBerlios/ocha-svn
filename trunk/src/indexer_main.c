@@ -94,6 +94,7 @@ int main(int argc, char *argv[])
 
         retval = index_everything(catalog, verbose);
 
+        catalog_timestamp_update(catalog);
         catalog_disconnect(catalog);
         return retval;
 }

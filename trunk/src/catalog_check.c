@@ -406,6 +406,37 @@ START_TEST(test_check_source_create_new)
 }
 END_TEST
 
+START_TEST(test_timestamp)
+{
+        struct catalog *catalog;
+        GTimeVal now;
+        gulong ts;
+
+        printf("--- test_timestamp\n");
+
+        catalog = catalog_connect(PATH, NULL);
+
+        fail_unless(catalog_timestamp_get(catalog)==0,
+                    "expected 0 the 1st time");
+        g_get_current_time(&now);
+
+        catalog_timestamp_update(catalog);
+        ts=catalog_timestamp_get(catalog);
+        fail_unless(ts<=now.tv_sec,
+                    "expected valid timestamp");
+
+        catalog_disconnect(catalog);
+
+        catalog = catalog_connect(PATH, NULL);
+        ts=catalog_timestamp_get(catalog);
+        fail_unless(ts<now.tv_sec,
+                    "expected valid timestamp");
+
+        catalog_disconnect(catalog);
+        printf("--- test_timestamp OK\n");
+}
+END_TEST
+
 START_TEST(test_check_source_transform)
 {
         struct catalog *catalog;
@@ -751,6 +782,7 @@ static Suite *catalog_check_suite(void)
         tcase_add_test(tc_core, test_check_source_keep);
         tcase_add_test(tc_core, test_check_source_create_new);
         tcase_add_test(tc_core, test_check_source_transform);
+        tcase_add_test(tc_core, test_timestamp);
 
         tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
         suite_add_tcase(s, tc_query);

@@ -41,8 +41,8 @@ ocha_SOURCES=ocha_main.c ocha_init.c result_queue.c result_queue.h querywin.h qu
 querywin.h catalog_queryrunner.c catalog_queryrunner.h catalog.c catalog.h catalog_result.c catalog_result.h \
 query.c query.h resultlist.h resultlist.c \
 launchers.c launcher_open.c launcher_openurl.c launcher_application.c desktop_file.c \
-string_utils.h string_utils.c ocha_gconf.c ocha_gconf.h
-ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS)
+string_utils.h string_utils.c ocha_gconf.c ocha_gconf.h schedule.h schedule.c
+ocha_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS) -DBINDIR=\"$(bindir)\"
 ocha_LDADD=$(GTK_LIBS) $(SQLITE_LIBS) $(GNOME_LIBS)
 
 

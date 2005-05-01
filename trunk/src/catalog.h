@@ -111,6 +111,26 @@ typedef gboolean (*catalog_callback_f)(struct catalog *catalog,
                                        void *userdata);
 
 /**
+ * Get the 'last indexed' timestamp.
+ *
+ * The timestamp is not updated automatically; update
+ * is done using catalog_timestamp_update()
+ * @param catalog
+ * @return timestamp, 0 if it was never set
+ */
+gulong catalog_timestamp_get(struct catalog *catalog);
+
+/**
+ * Update the 'last indexed' timestamp.
+ *
+ * The current date (# of seconds since the UNIX epoch)
+ * is used.
+ * @param catalog
+ * @return return FALSE if there was an error
+ */
+gboolean catalog_timestamp_update(struct catalog *gcatalog);
+
+/**
  * Execute a query and add the results into
  * the query runner.
  *

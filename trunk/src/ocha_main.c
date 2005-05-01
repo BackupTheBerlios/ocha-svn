@@ -12,6 +12,7 @@
 #include "resultlist.h"
 #include "ocha_init.h"
 #include "ocha_gconf.h"
+#include "schedule.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
@@ -78,6 +79,8 @@ int main(int argc, char *argv[])
                 }
         }
 
+        schedule_init(&config);
+
         querywin_init();
 
         catalog_path = config.catalog_path;
@@ -90,6 +93,8 @@ int main(int argc, char *argv[])
         if(!configure_keygrab(&keygrab_data)) {
                 return 10;
         }
+
+
         gtk_main();
 
         return 0;

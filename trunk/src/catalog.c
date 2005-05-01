@@ -56,6 +56,7 @@ static gboolean create_tables(sqlite *db, char **errmsg);
 static int result_sqlite_callback(void *userdata, int col_count, char **col_data, char **col_names);
 static void get_id(struct catalog  *catalog, int *id_out);
 static int findid_callback(void *userdata, int column_count, char **result, char **names);
+static int timestamp_callback(void *userdata, int column_count, char **result, char **names);
 static gboolean findentry(struct catalog *catalog, const char *path, int source_id, int *id_out);
 static gboolean source_version(struct catalog *catalog, int source_id, int *version_out);
 
@@ -309,6 +310,35 @@ GQuark catalog_error_quark()
                 initialized=TRUE;
         }
         return catalog_quark;
+}
+
+gulong catalog_timestamp_get(struct catalog *catalog)
+{
+        gulong ts = 0;
+        execute_query_printf(catalog,
+                             timestamp_callback,
+                             &ts/*userdata*/,
+                             "SELECT value FROM history WHERE  event = 'indexed'");
+        return ts;
+}
+
+gboolean catalog_timestamp_update(struct catalog *catalog)
+{
+        GTimeVal now;
+        gulong old = catalog_timestamp_get(catalog);
+        g_get_current_time(&now);
+
+        if(old==0) {
+                return execute_update_printf(catalog,
+                                             TRUE/*autocommit*/,
+                                             "INSERT INTO history (event, value) VALUES ('indexed', '%lu')",
+                                             now.tv_sec);
+        } else {
+                return execute_update_printf(catalog,
+                                             TRUE/*autocommit*/,
+                                             "UPDATE history SET value='%lu' WHERE event='indexed'",
+                                             now.tv_sec);
+        }
 }
 
 gboolean catalog_get_source_content(struct catalog *catalog,
@@ -713,6 +743,13 @@ static gboolean create_tables(sqlite *db, char **errmsg)
                 return FALSE;
         }
 
+        ret = execute_update_nocatalog_printf(db,
+                                              "CREATE TABLE history ( event VARCHAR NOT NULL, value VARCHAR NOT NULL);",
+                                              errmsg);
+        if(ret!=SQLITE_OK) {
+                return FALSE;
+        }
+
         ret = execute_update_nocatalog_printf(db, "COMMIT", errmsg);
         return ret==SQLITE_OK;
 }
@@ -778,6 +815,22 @@ static int findid_callback(void *userdata,
         return 1; /* no need for more results */
 }
 
+
+/**
+ * sqlite callback that expects a timestame (gulong) as the 1st (and only) result
+ */
+static int timestamp_callback(void *userdata,
+                              int column_count,
+                              char **result,
+                              char **names)
+{
+        int *id_out;
+        g_return_val_if_fail(userdata!=NULL, 1);
+        g_return_val_if_fail(column_count>0, 1);
+        id_out =  (gulong *)userdata;
+        *id_out=strtoul(result[0], NULL/*endptr*/, 10/*base*/);
+        return 1; /* no need for more results */
+}
 
 static gboolean findentry(struct catalog *catalog,
                           const char *path,
