@@ -11,6 +11,27 @@
 #define OCHA_GCONF_INDEXER_KEY(indexer, key) OCHA_INDEXERS_PREFIX "/" ##indexer "/" ##key
 #define OCHA_GCONF_ACCELERATOR_KEY OCHA_GCONF_PREFIX "/accelerator"
 #define OCHA_GCONF_ACCELERATOR_KEY_DEFAULT "<Alt>space"
+
+/**
+ * Catalog update schedule (configuration property update_catalog),
+ * set to a value defined in enum OchaGConfUpdateCatalog
+ */
+#define OCHA_GCONF_UPDATE_CATALOG_KEY OCHA_GCONF_PREFIX "/update_catalog"
+/** Default value for configuration update_catalog */
+#define OCHA_GCONF_UPDATE_CATALOG_DEFAULT OCHA_GCONF_UPDATE_CATALOG_EVERY_10_MINUTES
+/** Define the possible value for the configuration porperty update_catalog */
+enum OchaGConfUpdateCatalog
+{
+        OCHA_GCONF_UPDATE_CATALOG_MANUALLY = 0,
+        OCHA_GCONF_UPDATE_CATALOG_EVERY_10_MINUTES,
+        OCHA_GCONF_UPDATE_CATALOG_EVERY_30_MINUTES,
+        OCHA_GCONF_UPDATE_CATALOG_EVERY_HOUR,
+        OCHA_GCONF_UPDATE_CATALOG_EVERY_DAY,
+
+        /** Number of options for UPDATE_CATALOG */
+        OCHA_GCONF_UPDATE_CATALOG_COUNT
+};
+
 /**
  * Get a properly initialized GConf client.
  * The client will be available for as long
