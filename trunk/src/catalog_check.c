@@ -429,7 +429,7 @@ START_TEST(test_timestamp)
 
         catalog = catalog_connect(PATH, NULL);
         ts=catalog_timestamp_get(catalog);
-        fail_unless(ts<now.tv_sec,
+        fail_unless(ts<=now.tv_sec,
                     "expected valid timestamp");
 
         catalog_disconnect(catalog);

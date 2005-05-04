@@ -824,7 +824,7 @@ static int timestamp_callback(void *userdata,
                               char **result,
                               char **names)
 {
-        int *id_out;
+        gulong *id_out;
         g_return_val_if_fail(userdata!=NULL, 1);
         g_return_val_if_fail(column_count>0, 1);
         id_out =  (gulong *)userdata;
