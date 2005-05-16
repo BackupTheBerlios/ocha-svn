@@ -13,6 +13,7 @@
 #include "indexers.h"
 #include "ocha_init.h"
 #include "ocha_gconf.h"
+#include "first_time.h"
 #include "catalog_queryrunner.h"
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
@@ -23,7 +24,6 @@
 
 /* ------------------------- prototypes */
 static void usage(FILE *out);
-static gboolean first_time(gboolean verbose, struct catalog *catalog);
 static int index_everything(struct catalog  *catalog, gboolean verbose);
 
 /* ------------------------- main */
@@ -42,10 +42,7 @@ int main(int argc, char *argv[])
         int retval = 0;
         GError *err = NULL;
         struct catalog *catalog;
-
-
-        ocha_init(PACKAGE "_indexer", argc, argv, FALSE/*no UI*/, &config);
-
+        gboolean first_time=FALSE;
 
         for(curarg=1; curarg<argc; curarg++) {
                 const char *arg=argv[curarg];
@@ -68,15 +65,19 @@ int main(int argc, char *argv[])
                 }
         }
 
+        ocha_init(PACKAGE "_indexer", argc, argv, TRUE/*gui*/, &config);
+
+        catalog_path =  config.catalog_path;
+        catalog =  catalog_connect(catalog_path, &err);
+
         if(curarg!=argc) {
                 fprintf(stderr,
                         "error: too many arguments\n");
                 usage(stderr);
                 exit(111);
         }
-        catalog_path =  config.catalog_path;
-        catalog =  catalog_connect(catalog_path, &err);
 
+        first_time=!ocha_gconf_exists();
         if(catalog==NULL) {
                 fprintf(stderr, "error: could not open or create create catalog at '%s': %s\n",
                         catalog_path,
@@ -84,15 +85,15 @@ int main(int argc, char *argv[])
                 exit(114);
         }
 
-        if(!ocha_gconf_exists()) {
-                if(!first_time(verbose, catalog)) {
-                        catalog_disconnect(catalog);
-                        unlink(catalog_path);
-                        exit(123);
-                }
-        }
 
-        retval = index_everything(catalog, verbose);
+        if(first_time) {
+                if(!first_time_run(catalog)) {
+                        unlink(catalog_path);
+                        retval=128;
+                }
+        } else {
+                retval = index_everything(catalog, verbose);
+        }
 
         catalog_timestamp_update(catalog);
         catalog_disconnect(catalog);
@@ -100,38 +101,6 @@ int main(int argc, char *argv[])
 }
 
 /* ------------------------- static functions */
-static gboolean first_time(gboolean verbose, struct catalog *catalog)
-{
-        struct indexer **indexer_ptr;
-        if(verbose)
-        {
-                printf("First time startup. "
-                       "I'll need to create the catalog and index your files.\n");
-                printf("This could take a while, please be patient.\n");
-                printf("Configuring catalog...\n");
-        }
-
-        for(indexer_ptr = indexers_list(); *indexer_ptr; indexer_ptr++) {
-                struct indexer *indexer = *indexer_ptr;
-                if(verbose)
-                        printf("First-time configuration of module %s...\n",
-                               indexer->name);
-                if(!indexer_discover(indexer, catalog)) {
-                        fprintf(stderr,
-                                "error: first-time configuration of "
-                                "module '%s' failed : %s\n",
-                                indexer->name,
-                                catalog_error(catalog));
-                        return FALSE;
-                }
-        }
-
-        if(verbose) {
-                printf("First time configuration done. Now indexing.\n");
-        }
-        return TRUE;
-}
-
 static int index_everything(struct catalog  *catalog, gboolean verbose)
 {
         int retval=0;

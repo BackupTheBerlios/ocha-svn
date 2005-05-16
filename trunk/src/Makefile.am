@@ -33,7 +33,7 @@ indexer_various_check_SOURCES=indexer_various_check.c indexer_applications.c ind
 indexer_various_check_CFLAGS=$(TEST_CFLAGS) $(GNOME_CFLAGS) 
 indexer_various_check_LDADD=$(TEST_LIBS) 
 
-ocha_indexer_SOURCES=indexer_main.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_files_view.c indexer_files.h indexer_files_view.h  indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c ocha_gconf.h ocha_gconf.c string_utils.h string_utils.c launchers.c launcher_application.c launcher_open.c launcher_openurl.c string_set.h string_set.c
+ocha_indexer_SOURCES=indexer_main.c first_time.h first_time.c catalog.c catalog.h catalog_result.c catalog_result.h indexer_files.c indexer_files_view.c indexer_files.h indexer_files_view.h  indexer_utils.c  catalog_queryrunner.c result_queue.c indexer_applications.c indexer_applications.h desktop_file.h desktop_file.c indexer_mozilla.c indexer_mozilla.h indexers.h indexers.c ocha_init.h ocha_init.c ocha_gconf.h ocha_gconf.c string_utils.h string_utils.c launchers.c launcher_application.c launcher_open.c launcher_openurl.c string_set.h string_set.c 
 ocha_indexer_CFLAGS=$(GNOME_CFLAGS) $(SQLITE_CFLAGS)
 ocha_indexer_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 
