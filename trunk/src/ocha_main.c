@@ -263,11 +263,16 @@ static void uninstall_keygrab(void)
  * Make sure ocha will be restarted by gnome-session next
  * time the user logs in.
  */
-static void dinit_restart(const char *startup_command, struct configuration *config)
+static void init_restart(const char *startup_command, struct configuration *config)
 {
         GnomeClient *client = gnome_master_client();
-        GnomeClientFlags flags = gnome_client_get_flags(client);
+        GnomeClientFlags flags;
 
+        if(client==NULL) {
+                /* I can't do anything */
+                return;
+        }
+        flags = gnome_client_get_flags(client);
 
         if( (flags&(GNOME_CLIENT_RESTARTED|GNOME_CLIENT_RESTORED)) == 0 ) {
                 gchar *restart;
@@ -287,11 +292,10 @@ static void dinit_restart(const char *startup_command, struct configuration *con
                 gnome_client_request_save (client,
                                            GNOME_SAVE_LOCAL,
                                            FALSE/*not shutdown*/,
-                                           GNOME_INTERACT_ERRORS,
-                                           FALSE/*not fast*/,
-                                           TRUE/*global*/);
-                gnome_client_flush(client);
+                                           GNOME_INTERACT_NONE,
+                                           TRUE/*fast*/,
+                                           FALSE/*not global*/);
 
-                g_free(restart[0]);
+                g_free(restart);
         }
 }

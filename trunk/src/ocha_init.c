@@ -3,11 +3,13 @@
 #endif
 
 #include "ocha_init.h"
+#include <libgnome/libgnome.h>
 #include <libgnome/gnome-init.h>
 #include <libgnomeui/gnome-ui-init.h>
 #include <libgnome/gnome-program.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -19,6 +21,12 @@
 #ifndef VERSION
 #define VERSION "0.0"
 #endif
+
+gchar *ocha_init_indexer_argv[] = {
+        BINDIR "/ocha_indexer",
+        NULL
+};
+gint ocha_init_indexer_argc = 1;
 
 /* ------------------------- prototypes */
 static char *get_catalog_path(void);
@@ -39,8 +47,23 @@ void ocha_init(const char *program, int argc, char **argv, gboolean ui, struct c
 void ocha_init_requires_catalog(const char *catalog_path)
 {
         if(!g_file_test(catalog_path, G_FILE_TEST_EXISTS)) {
-                fprintf(stderr, "No catalog: please start the indexer first\n");
-                exit(10);
+                int status = 0;
+                pid_t pid;
+
+                pid = gnome_execute_async(NULL/*current dir*/,
+                                          ocha_init_indexer_argc,
+                                          ocha_init_indexer_argv);
+                if(pid==-1) {
+                        fprintf(stderr,
+                                "ocha:error: indexing failed: could not execute command %s\n",
+                                ocha_init_indexer_argv[0]);
+                        exit(19);
+                }
+                waitpid(pid, &status, 0/*options*/);
+                if(!(WIFEXITED(status) && WEXITSTATUS(status)==0)) {
+                        fprintf(stderr, "First-time indexing failed; can't go on.\n");
+                        exit(10);
+                }
         }
 }
 

@@ -31,4 +31,19 @@ void ocha_init(const char *program, int argc, char **argv, gboolean ui, struct c
  * @param catalog_path catalog location
  */
 void ocha_init_requires_catalog(const char *catalog_path);
+
+/**
+ * Argument list for running ocha_indexer (null-terminated).
+ *
+ * The size of this array is to be found
+ * in ocha_init_indexer_argc
+ * @see ocha_init_indexer_argc
+ */
+extern gchar *ocha_init_indexer_argv[];
+/**
+ * Size of ocha_init_indexer_argv
+ * @see ocha_init_indexer_argv
+ */
+extern gint ocha_init_indexer_argc;
+
 #endif /*OCHA_INIT_H*/

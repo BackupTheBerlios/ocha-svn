@@ -1,5 +1,6 @@
 #include "schedule.h"
 #include "catalog.h"
+#include "ocha_init.h"
 #include <ocha_gconf.h>
 #include <glib.h>
 #include <libgnome/libgnome.h>
@@ -214,17 +215,16 @@ static gulong schedule_get_last_update(void)
  */
 static void schedule_update_now(void)
 {
-        gchar *argv[] = { BINDIR "/ocha_indexer" };
         GTimeVal now;
         int pid;
 
         pid = gnome_execute_async(NULL/*current dir*/,
-                                  1/*argc*/,
-                                  argv);
+                                  ocha_init_indexer_argc,
+                                  ocha_init_indexer_argv);
         if(pid==-1) {
                 fprintf(stderr,
                         "ocha:warning: indexing failed: could not execute command %s\n",
-                        argv[0]);
+                        ocha_init_indexer_argv[0]);
         }
 
         g_get_current_time(&now);
