@@ -322,6 +322,7 @@ static gboolean execute_result(struct result *result)
         if(!result->execute(result, &errs))
         {
                 gdk_beep();
+                g_assert(errs); /* false=>errs should be set */
                 if(errs) {
                         fprintf(stderr,
                                 "execution of %s failed: %s %s\n",

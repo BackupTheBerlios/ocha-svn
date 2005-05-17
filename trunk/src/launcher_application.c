@@ -86,6 +86,7 @@ gboolean launcher_application_execute(struct launcher *launcher,
         if(exec) {
                 g_free(exec);
         }
+        g_assert(retval || err==NULL || *err!=NULL);
         return retval;
 }
 
@@ -165,6 +166,7 @@ static gboolean get_application(const char *uri, char **exec_out, gboolean *term
                 }
                 gnome_desktop_file_free(desktopfile);
         }
+        g_assert(retval || err==NULL || *err!=NULL);
         return retval;
 }
 
@@ -183,6 +185,7 @@ static GnomeDesktopFile *load_desktop_file(const char *uri, GError **err)
         g_return_val_if_fail(err==NULL || *err==NULL, NULL);
 
         retval = gnome_desktop_file_load_uri(uri, err==NULL ? NULL:&gnome_err);
+
         if(gnome_err) {
                 g_set_error(err,
                             LAUNCHER_ERROR,
@@ -192,6 +195,7 @@ static GnomeDesktopFile *load_desktop_file(const char *uri, GError **err)
                             gnome_err->message);
                 g_error_free(gnome_err);
         }
+        g_assert(retval!=NULL || err==NULL || *err!=NULL);
         return retval;
 }
 
