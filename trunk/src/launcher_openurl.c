@@ -59,18 +59,20 @@ static gboolean launcher_openurl_execute(struct launcher *launcher,
                 executed = gnome_execute_async(NULL/*dir*/,
                                                2,
                                                (char * const *)argv);
-                if(!executed)
+                if(!executed) {
                         g_set_error(err,
                                     LAUNCHER_ERROR,
                                     LAUNCHER_EXTERNAL_ERROR,
                                     "error opening URL %s: %s",
                                     url,
-                                    gnome_err->message);
-                g_error_free(gnome_err);
-                return FALSE;
+                                    gnome_err && gnome_err->message ? gnome_err->message:"Unknown error");
+                        return FALSE;
+                }
+                if(gnome_err) {
+                        g_error_free(gnome_err);
+                }
         }
         return TRUE;
-
 }
 
 static gboolean launcher_openurl_validate(struct launcher *launcher,

@@ -322,14 +322,20 @@ static gboolean execute_result(struct result *result)
         if(!result->execute(result, &errs))
         {
                 gdk_beep();
-                fprintf(stderr,
-                        "execution of %s failed: %s %s\n",
-                        result->path,
-                        errs->message,
-                        errs->code==RESULT_ERROR_INVALID_RESULT
-                        ? "(result was invalid)"
-                        : "");
-                g_error_free(errs);
+                if(errs) {
+                        fprintf(stderr,
+                                "execution of %s failed: %s %s\n",
+                                result->path,
+                                errs->message,
+                                errs->code==RESULT_ERROR_INVALID_RESULT
+                                ? "(result was invalid)"
+                                : "");
+                        g_error_free(errs);
+                } else {
+                        fprintf(stderr,
+                                "execution of %s failed: NO ERROR WAS SET BY LAUNCHER\n",
+                                result->path);
+                }
                 return FALSE;
         }
         return TRUE;
