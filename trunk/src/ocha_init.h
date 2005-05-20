@@ -33,6 +33,36 @@ void ocha_init(const char *program, int argc, char **argv, gboolean ui, struct c
 void ocha_init_requires_catalog(const char *catalog_path);
 
 /**
+ * Kill another instance of ocha and remove it from
+ * gnome-session.
+ * @return true if another instance was found and
+ * killed
+ */
+gboolean ocha_init_kill(void);
+
+/**
+ * Check whether another instance of ocha is running.
+ * @return true if another instance is runninng
+ */
+gboolean ocha_init_ocha_is_running(void);
+
+/**
+ * Write the current PID so that this instance of
+ * ocha is registered as being 'the' ocha.
+ *
+ * This function also registers the correct handlers
+ * and gtk sources for answering kill and ping requests
+ * from other processes. This supposes that ocha will
+ * eventually run a gtk loop.
+ *
+ * @return true if it could be done, false
+ * if another instance was found or if some other
+ * error prevented the communication channels from
+ * being setup (error has been displayed to stderr)
+ */
+gboolean ocha_init_create_socket(void);
+
+/**
  * Argument list for running ocha_indexer (null-terminated).
  *
  * The size of this array is to be found
@@ -40,10 +70,12 @@ void ocha_init_requires_catalog(const char *catalog_path);
  * @see ocha_init_indexer_argc
  */
 extern gchar *ocha_init_indexer_argv[];
+
 /**
  * Size of ocha_init_indexer_argv
  * @see ocha_init_indexer_argv
  */
 extern gint ocha_init_indexer_argc;
+
 
 #endif /*OCHA_INIT_H*/

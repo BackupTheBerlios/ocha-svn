@@ -13,6 +13,7 @@
 #include "ocha_init.h"
 #include "ocha_gconf.h"
 #include "schedule.h"
+#include "restart.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
@@ -44,7 +45,6 @@ static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_un
 static void install_keygrab_filters(struct keygrab_data *data);
 static gboolean install_keygrab(const char *accelerator, struct keygrab_data *data);
 static void uninstall_keygrab(void);
-static void init_restart(const char *startup_command, struct configuration *config);
 
 /* ------------------------- main */
 
@@ -57,10 +57,25 @@ int main(int argc, char *argv[])
         struct queryrunner *runner;
         struct keygrab_data keygrab_data;
 
+        for(i=1; i<argc; i++) {
+                const char *arg = argv[i];
+                if(strcmp("--kill", arg)==0) {
+                        return ocha_init_kill() ? 0:99;
+                }
+        }
 
         ocha_init(PACKAGE, argc, argv, TRUE/*has gui*/, &config);
-        init_restart(argv[0], &config);
+        if(ocha_init_ocha_is_running()) {
+                fprintf(stderr, "ocha:error: another instance of ocha is running\n");
+                return 89;
+        }
+        if(!ocha_init_create_socket()) {
+                return 71;
+        }
+
+        restart_register(argv[0]);
         ocha_init_requires_catalog(config.catalog_path);
+
 
         chdir(g_get_home_dir());
 
@@ -256,46 +271,5 @@ static void uninstall_keygrab(void)
                            AnyKey,
                            AnyModifier,
                            GDK_WINDOW_XID(root));
-        }
-}
-
-/**
- * Make sure ocha will be restarted by gnome-session next
- * time the user logs in.
- */
-static void init_restart(const char *startup_command, struct configuration *config)
-{
-        GnomeClient *client = gnome_master_client();
-        GnomeClientFlags flags;
-
-        if(client==NULL) {
-                /* I can't do anything */
-                return;
-        }
-        flags = gnome_client_get_flags(client);
-
-        if( (flags&(GNOME_CLIENT_RESTARTED|GNOME_CLIENT_RESTORED)) == 0 ) {
-                gchar *restart;
-                if(g_path_is_absolute(startup_command)) {
-                        restart = g_strdup(startup_command);
-                } else {
-                        gchar *curdir = g_get_current_dir();
-                        restart = g_strdup_printf("%s/%s",
-                                                  curdir,
-                                                  startup_command);
-                        g_free(curdir);
-                }
-
-                gnome_client_set_restart_style(client,
-                                               GNOME_RESTART_IMMEDIATELY);
-                gnome_client_set_restart_command(client, 1, &restart);
-                gnome_client_request_save (client,
-                                           GNOME_SAVE_LOCAL,
-                                           FALSE/*not shutdown*/,
-                                           GNOME_INTERACT_NONE,
-                                           TRUE/*fast*/,
-                                           FALSE/*not global*/);
-
-                g_free(restart);
         }
 }
