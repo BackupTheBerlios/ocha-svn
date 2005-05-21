@@ -1,13 +1,14 @@
 #include "preferences_general.h"
 #include "ocha_gconf.h"
+#include "ocha_init.h"
 #include <gdk/gdkkeysyms.h>
 #include <X11/keysym.h>
 #include <X11/Xutil.h>
 #include <string.h>
+#include <libgnome/libgnome.h>
 /** \file Implementation of the API defined in preferences_general.h
  *
  */
-
 
 /**
  * Label for possible values for update_catalog, as defined in ocha_gconf.h
@@ -34,6 +35,7 @@ static void update_radio_button_init(GtkWidget **buttons);
 static void update_radio_button_set_state(GtkWidget **buttons);
 static void update_radio_button_cb(GtkToggleButton *buttons, gpointer userdata);
 static void update_radio_button_notify_cb(GConfClient *client, guint id, GConfEntry *entry, gpointer userdata);
+static void start_ocha_cb(GtkButton *button, gpointer userdata);
 
 /* ------------------------- definitions */
 
@@ -115,16 +117,17 @@ GtkWidget *preferences_general_widget_new()
         sched_frame = gtk_frame_new(NULL);
         gtk_widget_show(sched_frame);
         gtk_frame_set_shadow_type(GTK_FRAME(sched_frame), GTK_SHADOW_NONE);
-        gtk_container_set_border_width(GTK_CONTAINER(sched_frame), 12);
         label = gtk_label_new("<b>Catalog Updates</b>");
         gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
         gtk_widget_show(label);
         gtk_frame_set_label_widget(GTK_FRAME(sched_frame), label);
 
-        schedule_vbox = gtk_vbox_new(TRUE/*homogen1eous*/, 0/*spacing*/);
+
+        schedule_vbox = gtk_vbox_new(TRUE/*homogeneous*/, 0/*spacing*/);
         gtk_container_set_border_width(GTK_CONTAINER(schedule_vbox), 12);
         gtk_widget_show(schedule_vbox);
         gtk_container_add(GTK_CONTAINER(sched_frame), schedule_vbox);
+
 
         align = gtk_alignment_new(0.0/*xalign*/, 0.0/*yalign*/, 0/*xscale*/, 0/*yscale*/);
         gtk_widget_show(align);
@@ -155,13 +158,90 @@ GtkWidget *preferences_general_widget_new()
         }
         update_radio_button_init(schedule_items);
 
+        accel_button_init(accel_button);
+
+        align =  gtk_alignment_new(0.5, 0.5, 1, 1);
+        gtk_widget_show(align);
+        gtk_alignment_set_padding(GTK_ALIGNMENT(align),
+                                  0/*top*/,
+                                  0/*bottom*/,
+                                  12/*left*/,
+                                  12/*rigth*/);
+        gtk_container_add(GTK_CONTAINER(align), sched_frame);
+
         gtk_box_pack_start(GTK_BOX(retval),
-                           sched_frame,
+                           align,
                            FALSE,
                            TRUE,
                            0);
 
-        accel_button_init(accel_button);
+        if(!ocha_init_ocha_is_running()) {
+                GtkWidget *line;
+                GtkWidget *label;
+                GtkWidget *image;
+                GtkWidget *href;
+
+                line = gtk_hbox_new(FALSE/*not homogenous*/,
+                                    0/*spacing*/);
+                gtk_widget_show(line);
+
+                image = gtk_image_new_from_stock(GTK_STOCK_DIALOG_WARNING,
+                                                 GTK_ICON_SIZE_MENU);
+                gtk_widget_show(image);
+                gtk_box_pack_start(GTK_BOX(line),
+                                   image,
+                                   FALSE/*expand*/,
+                                   FALSE/*fill*/,
+                                   6/*padding*/);
+                label = gtk_label_new("<span foreground='red'>Ocha is currently disabled.</span>");
+                gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
+                gtk_widget_show(label);
+                gtk_box_pack_start(GTK_BOX(line),
+                                   label,
+                                   FALSE/*expand*/,
+                                   FALSE/*fill*/,
+                                   0/*padding*/);
+
+                label = gtk_label_new("<span foreground='red'><span underline='single'>Start it</span> ?</span>");
+                gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
+                gtk_widget_show(label);
+
+                href = gtk_button_new();
+                gtk_button_set_relief(GTK_BUTTON(href),
+                                      GTK_RELIEF_NONE);
+                gtk_container_add(GTK_CONTAINER(href),
+                                  label);
+                gtk_widget_show(href);
+                gtk_box_pack_start(GTK_BOX(line),
+                                   href,
+                                   FALSE/*expand*/,
+                                   FALSE/*fill*/,
+                                   0/*padding*/);
+
+
+                gtk_widget_show(href);
+
+
+                align =  gtk_alignment_new(0.5, 0.5, 1, 1);
+                gtk_widget_show(align);
+                gtk_alignment_set_padding(GTK_ALIGNMENT(align),
+                                          0/*top*/,
+                                          12/*bottom*/,
+                                          12/*left*/,
+                                          12/*rigth*/);
+                gtk_container_add(GTK_CONTAINER(align), line);
+
+                gtk_box_pack_end(GTK_BOX(retval),
+                                 align,
+                                 TRUE/*expand*/,
+                                 FALSE/*fill*/,
+                                 0/*padding*/);
+
+                g_signal_connect(href,
+                                 "clicked",
+                                 G_CALLBACK(start_ocha_cb),
+                                 align/*userdata*/);
+        }
 
         return retval;
 }
@@ -367,3 +447,31 @@ static void update_radio_button_notify_cb(GConfClient *client, guint id, GConfEn
         update_radio_button_init(buttons);
 }
 
+static void start_ocha_cb(GtkButton *button, gpointer userdata)
+{
+        GtkWidget *hideme = GTK_WIDGET(userdata);
+        static char *ocha_cmd = BINDIR "/ocha";
+        int pid;
+
+        pid=gnome_execute_async(NULL/*current dir*/,
+                                1/*argc*/,
+                                &ocha_cmd);
+        if(pid==-1) {
+                GtkWidget *dialog;
+
+                dialog = gtk_message_dialog_new(GTK_WINDOW(gtk_widget_get_toplevel(hideme)),
+                                                GTK_DIALOG_DESTROY_WITH_PARENT,
+                                                GTK_MESSAGE_ERROR,
+                                                GTK_BUTTONS_CLOSE,
+                                                "Failed to launch Ocha\n%s: %s",
+                                                ocha_cmd,
+                                                strerror(errno));
+                g_signal_connect_swapped (dialog,
+                                          "response",
+                                          G_CALLBACK (gtk_widget_destroy),
+                                          dialog);
+                gtk_widget_show(dialog);
+        } else {
+                gtk_widget_hide(hideme);
+        }
+}
