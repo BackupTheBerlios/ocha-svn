@@ -29,6 +29,7 @@
 #include <gdk/gdkx.h>
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
+#include <libgnome/libgnome.h>
 #include <libgnomeui/libgnomeui.h>
 
 struct keygrab_data
@@ -45,6 +46,7 @@ static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_un
 static void install_keygrab_filters(struct keygrab_data *data);
 static gboolean install_keygrab(const char *accelerator, struct keygrab_data *data);
 static void uninstall_keygrab(void);
+static void already_running(void);
 
 /* ------------------------- main */
 
@@ -66,7 +68,7 @@ int main(int argc, char *argv[])
 
         ocha_init(PACKAGE, argc, argv, TRUE/*has gui*/, &config);
         if(ocha_init_ocha_is_running()) {
-                fprintf(stderr, "ocha:error: another instance of ocha is running\n");
+                already_running();
                 return 89;
         }
         if(!ocha_init_create_socket()) {
@@ -272,4 +274,67 @@ static void uninstall_keygrab(void)
                            AnyModifier,
                            GDK_WINDOW_XID(root));
         }
+}
+
+static void already_running(void)
+{
+        GtkWidget *dialog;
+        GtkWidget *close;
+        GtkWidget *prefs;
+        gchar *accelerator;
+        GError *err = NULL;
+        gint response;
+        static char *preferences_cmd = BINDIR "/ocha_preferences";
+
+        accelerator = gconf_client_get_string(ocha_gconf_get_client(),
+                                              OCHA_GCONF_ACCELERATOR_KEY,
+                                              &err);
+        if(accelerator==NULL) {
+                accelerator=OCHA_GCONF_ACCELERATOR_KEY_DEFAULT;
+                g_error_free(err);
+        }
+
+        dialog = gtk_message_dialog_new(NULL,
+                                        0,
+                                        GTK_MESSAGE_INFO,
+                                        GTK_BUTTONS_NONE,
+                                        "Ocha is already active on your system. To start "
+                                        "a new search, hit %s.\n\n"
+                                        "Alternatively, you can open Ocha's preference panel "
+                                        "or stop Ocha",
+                                        accelerator);
+        prefs=gtk_dialog_add_button(GTK_DIALOG(dialog),
+                              "Open Preferences",
+                              1);
+        gtk_button_set_image(GTK_BUTTON(prefs),
+                             gtk_image_new_from_stock(GTK_STOCK_PREFERENCES,
+                                                      GTK_ICON_SIZE_BUTTON));
+        gtk_dialog_add_button(GTK_DIALOG(dialog),
+                              "Stop Ocha",
+                              2);
+
+        close=gtk_dialog_add_button(GTK_DIALOG(dialog),
+                              "Close",
+                              3);
+        gtk_button_set_image(GTK_BUTTON(close),
+                             gtk_image_new_from_stock(GTK_STOCK_CLOSE,
+                                                      GTK_ICON_SIZE_BUTTON));
+
+        gtk_dialog_set_default_response(GTK_DIALOG(dialog), 3);
+
+        response=gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        switch(response) {
+        case 1: /* preferences */
+                gnome_execute_async(NULL/*current dir*/,
+                                    1/*argc*/,
+                                    &preferences_cmd);
+                break;
+
+        case 2: /* kill ocha */
+                ocha_init_kill();
+                gtk_main();
+                break;
+        }
+
 }
