@@ -2,7 +2,7 @@
 Name=Ocha Search and Launch
 GenericName=
 Comment=Quickly search and launch applications, files and links 
-Categories=Application;Settings;DesktopSettings
+Categories=Application;Utility;
 OnlyShowIn=GNOME
 Encoding=UTF-8
 Exec=ocha
