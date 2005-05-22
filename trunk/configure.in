@@ -66,4 +66,4 @@ AC_SUBST([GNOME_LIBS])
 
 
 dnl Output
-AC_OUTPUT([ Makefile src/Makefile  ])
+AC_OUTPUT([ Makefile src/Makefile data/Makefile ])
