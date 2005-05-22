@@ -9,6 +9,7 @@
 #include "preferences_general.h"
 #include "catalog.h"
 #include "mode_preferences.h"
+#include "mode_install.h"
 #include "gtk/gtk.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +25,8 @@ int mode_preferences(int argc, char *argv[])
         struct configuration config;
         struct catalog *catalog;
 
-        ocha_init(PACKAGE "_preferences", argc, argv, TRUE/*GUI*/, &config);
+        ocha_init(PACKAGE, argc, argv, TRUE/*GUI*/, &config);
+        mode_install_if_necessary(&config);
         ocha_init_requires_catalog(config.catalog_path);
 
         catalog =  catalog_connect(config.catalog_path, &err);

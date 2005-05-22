@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Ocha Search and Launch
+GenericName=
+Comment=Quickly search and launch applications, files and links 
+Categories=Application;Settings;DesktopSettings
+OnlyShowIn=GNOME
+Encoding=UTF-8
+Exec=ocha
+Icon=ocha
+StartupNotify=true
+Terminal=false
+Type=Application

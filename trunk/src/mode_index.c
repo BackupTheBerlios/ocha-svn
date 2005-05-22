@@ -58,7 +58,7 @@ int mode_index(int argc, char *argv[])
                 }
         }
 
-        ocha_init(PACKAGE "_indexer", argc, argv, FALSE/*no gui*/, &config);
+        ocha_init(PACKAGE, argc, argv, FALSE/*no gui*/, &config);
         ocha_init_requires_catalog(config.catalog_path);
         catalog_path =  config.catalog_path;
         catalog =  catalog_connect(catalog_path, &err);

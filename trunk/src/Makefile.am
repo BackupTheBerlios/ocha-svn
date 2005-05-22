@@ -120,6 +120,7 @@ ocha_SOURCES= ocha_main.c \
 	mode_install.c mode_install.h \
 	mode_index.c mode_index.h \
 	mode_preferences.c mode_preferences.h \
+	mode_stop.c mode_stop.h \
         catalog.c catalog.h \
         catalog_queryrunner.c catalog_queryrunner.h \
         catalog_result.c catalog_result.h \

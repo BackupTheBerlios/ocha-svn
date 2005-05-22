@@ -84,6 +84,7 @@ void ocha_init(const char *program, int argc, char **argv, gboolean ui, struct c
                             argv,
                             NULL);
         config->catalog_path=get_catalog_path();
+        config->catalog_is_new=!g_file_test(config->catalog_path, G_FILE_TEST_EXISTS);
 }
 void ocha_init_requires_catalog(const char *catalog_path)
 {

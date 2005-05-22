@@ -49,6 +49,7 @@ struct step
 };
 
 /* ------------------------- prototypes: static functions */
+static int do_install(struct configuration *config);
 static void setup_druid(struct first_time *data);
 static GnomeDruidPage *first_page(struct first_time *data);
 static GnomeDruidPage *indexing_page(struct first_time *data);
@@ -65,18 +66,33 @@ static void handle_errors(struct first_time *data, GError *err);
 
 /* ------------------------- public functions */
 
+void mode_install_if_necessary(struct configuration *config)
+{
+        if(ocha_gconf_exists()) {
+                return;
+        }
+        exit(do_install(config));
+}
+
 int mode_install(int argc, char *argv[])
 {
-        GError *err = NULL;
-        struct first_time data;
         struct configuration config;
-        struct catalog *catalog;
 
-        ocha_init(PACKAGE "_indexer", argc, argv, TRUE/*gui*/, &config);
-        catalog =  catalog_connect(config.catalog_path, &err);
+        ocha_init(PACKAGE, argc, argv, TRUE/*gui*/, &config);
+
+        return do_install(&config);
+}
+
+/* ------------------------- static functions */
+static int do_install(struct configuration  *config) {
+        GError *err = NULL;
+        struct catalog  *catalog;
+        struct first_time data;
+
+        catalog =  catalog_connect(config->catalog_path, &err);
         if(catalog==NULL) {
                 fprintf(stderr, "error: could not open or create catalog at '%s': %s\n",
-                        config.catalog_path,
+                        config->catalog_path,
                         err->message);
                 exit(114);
         }
@@ -96,14 +112,12 @@ int mode_install(int argc, char *argv[])
         catalog_disconnect(catalog);
 
         if(!data.indexed) {
-                unlink(config.catalog_path);
+                unlink(config->catalog_path);
                 return 82;
         }
-
         return 0;
 }
 
-/* ------------------------- static functions */
 static void setup_druid(struct first_time *data)
 {
         GnomeDruid *druid;

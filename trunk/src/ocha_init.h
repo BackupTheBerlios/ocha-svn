@@ -12,6 +12,8 @@ struct configuration
 {
         /** absolute path to the catalog file, which may not exist (call g_free() when you're done) */
         const char *catalog_path;
+        /** TRUE if the catalog has just been created */
+        gboolean catalog_is_new;
 };
 
 
