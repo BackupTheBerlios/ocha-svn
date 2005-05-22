@@ -7,6 +7,7 @@
 #include "ocha_init.h"
 #include "preferences_catalog.h"
 #include "preferences_general.h"
+#include "preferences_stop.h"
 #include "catalog.h"
 #include "mode_preferences.h"
 #include "mode_install.h"
@@ -63,6 +64,7 @@ static void create_window(struct catalog *catalog)
         GtkWidget *close;
         GtkWidget *general_widget;
         GtkWidget *label;
+        GtkWidget *stop;
 
         window =  gtk_window_new(GTK_WINDOW_TOPLEVEL);
         gtk_window_set_title(GTK_WINDOW(window), "Ocha Preferences");
@@ -109,6 +111,17 @@ static void create_window(struct catalog *catalog)
         gtk_widget_show (label);
         gtk_notebook_set_tab_label (GTK_NOTEBOOK (notebook),
                                     gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook), 1),
+                                    label);
+
+        /* notebook page: stop */
+
+        stop = preferences_stop_create();
+        gtk_container_add(GTK_CONTAINER(notebook), stop);
+
+        label = gtk_label_new ("Stop");
+        gtk_widget_show (label);
+        gtk_notebook_set_tab_label (GTK_NOTEBOOK (notebook),
+                                    gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook), 2),
                                     label);
 
 

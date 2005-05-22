@@ -143,6 +143,7 @@ ocha_SOURCES= ocha_main.c \
         ocha_init.c ocha_init.h \
         preferences_catalog.c preferences_catalog.h \
         preferences_general.c preferences_general.h \
+        preferences_stop.c preferences_stop.h \
         restart.c restart.h \
         result_queue.c result_queue.h \
         string_set.c string_set.h \
