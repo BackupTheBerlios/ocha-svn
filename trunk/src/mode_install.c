@@ -26,6 +26,11 @@
                    "Ocha's preference screen.\n\nYou can launch any program, visit any web link in " \
                    "the same way. Press Alt-Space followed by some part of the program name or " \
                    "link title. Use the arrow key to select the program or web link you meant."
+#define FAILED_TEXT "Indexing was successfull, but the deamon could not be started.\n\n" \
+                    "Please have the system administrator of this machine check whether ocha was " \
+                    "installed properly on your system. The daemon should be available at the following " \
+                    "location:\n " BINDIR "/ochad\nbut it is missing or not executable.\n\n" \
+                    "Once this is resolved, try and start Ocha again."
 
 struct first_time
 {
@@ -33,6 +38,7 @@ struct first_time
         struct catalog *catalog;
         gboolean indexed;
         guint timeout_id;
+        gint pid;
         GSList *steps;
         GSList *current_step;
         GtkProgressBar *progress;
@@ -40,6 +46,7 @@ struct first_time
         gdouble progress_step;
         /** Current progress value */
         gdouble progress_current;
+        GnomeDruidPage *last_page;
 };
 
 struct step
@@ -245,6 +252,7 @@ static GnomeDruidPage *last_page(struct first_time *data)
                          G_CALLBACK(last_page_prepare),
                          data);
 
+        data->last_page=GNOME_DRUID_PAGE(page);
         return GNOME_DRUID_PAGE(page);
 }
 
@@ -394,6 +402,19 @@ static void indexing_page_prepare(GnomeDruidPage *page, GnomeDruid *druid, gpoin
 
 static void last_page_prepare(GnomeDruidPage *page, GnomeDruid *druid, gpointer userdata)
 {
+        struct first_time *data;
+
+        g_return_if_fail(userdata);
+        data = (struct first_time *)userdata;
+
+        data->pid = gnome_execute_async(g_get_home_dir(),
+                                        ocha_init_daemon_argc,
+                                        ocha_init_daemon_argv);
+        if(data->pid==-1) {
+                gnome_druid_page_edge_set_text(GNOME_DRUID_PAGE_EDGE(data->last_page),
+                                               FAILED_TEXT);
+        }
+
         g_idle_add(last_page_setup,
                    userdata/*userdata*/);
 }
@@ -401,14 +422,16 @@ static void last_page_prepare(GnomeDruidPage *page, GnomeDruid *druid, gpointer 
 static gboolean last_page_setup(gpointer userdata)
 {
         struct first_time *data;
+        gboolean ochad_running;
 
         g_return_val_if_fail(userdata, FALSE);
         data = (struct first_time *)userdata;
 
+        ochad_running=data->pid>0;
         gnome_druid_set_buttons_sensitive(data->druid,
                                           FALSE/*no back*/,
-                                          TRUE/*next*/,
-                                          FALSE/*no cancel*/,
+                                          ochad_running/*next*/,
+                                          !ochad_running/*cancel*/,
                                           FALSE/*no help*/);
 
         return FALSE;
