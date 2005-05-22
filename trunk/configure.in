@@ -4,7 +4,7 @@ set -e
 dnl Every other copy of the package version number gets its value from here
 dnl package, version, bug-report
 AC_INIT(ocha, 0.1.0, szermatt@gmx.net)
-AC_CONFIG_SRCDIR(src/ocha_main.c)
+AC_CONFIG_SRCDIR(src/ochad_main.c)
 AM_INIT_AUTOMAKE(ocha, 0.1.0)
 
 AM_MAINTAINER_MODE

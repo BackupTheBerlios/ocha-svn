@@ -63,7 +63,7 @@ gboolean ocha_init_ocha_is_running(void);
 gboolean ocha_init_create_socket(void);
 
 /**
- * Argument list for running ocha_indexer (null-terminated).
+ * Argument list for running 'ocha index' (null-terminated).
  *
  * The size of this array is to be found
  * in ocha_init_indexer_argc
@@ -76,6 +76,51 @@ extern gchar *ocha_init_indexer_argv[];
  * @see ocha_init_indexer_argv
  */
 extern gint ocha_init_indexer_argc;
+
+/**
+ * Argument list for running 'ocha install' (null-terminated).
+ *
+ * The size of this array is to be found
+ * in ocha_init_install_argc
+ * @see ocha_init_install_argc
+ */
+extern gchar *ocha_init_install_argv[];
+
+/**
+ * Size of ocha_init_install_argv
+ * @see ocha_init_install_argv
+ */
+extern gint ocha_init_install_argc;
+
+/**
+ * Argument list for running 'ocha preferences' (null-terminated).
+ *
+ * The size of this array is to be found
+ * in ocha_init_preferences_argc
+ * @see ocha_init_preferences_argc
+ */
+extern gchar *ocha_init_preferences_argv[];
+
+/**
+ * Size of ocha_init_preferences_argv
+ * @see ocha_init_preferences_argv
+ */
+extern gint ocha_init_preferences_argc;
+
+/**
+ * Argument list for running 'ochad' (null-terminated).
+ *
+ * The size of this array is to be found
+ * in ocha_init_daemon_argc
+ * @see ocha_init_daemon_argc
+ */
+extern gchar *ocha_init_daemon_argv[];
+
+/**
+ * Size of ocha_init_daemon_argv
+ * @see ocha_init_daemon_argv
+ */
+extern gint ocha_init_daemon_argc;
 
 
 #endif /*OCHA_INIT_H*/

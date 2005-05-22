@@ -450,12 +450,11 @@ static void update_radio_button_notify_cb(GConfClient *client, guint id, GConfEn
 static void start_ocha_cb(GtkButton *button, gpointer userdata)
 {
         GtkWidget *hideme = GTK_WIDGET(userdata);
-        static char *ocha_cmd = BINDIR "/ocha";
         int pid;
 
         pid=gnome_execute_async(NULL/*current dir*/,
-                                1/*argc*/,
-                                &ocha_cmd);
+                                ocha_init_daemon_argc,
+                                ocha_init_daemon_argv);
         if(pid==-1) {
                 GtkWidget *dialog;
 
@@ -464,7 +463,7 @@ static void start_ocha_cb(GtkButton *button, gpointer userdata)
                                                 GTK_MESSAGE_ERROR,
                                                 GTK_BUTTONS_CLOSE,
                                                 "Failed to launch Ocha\n%s: %s",
-                                                ocha_cmd,
+                                                ocha_init_daemon_argv[0],
                                                 strerror(errno));
                 g_signal_connect_swapped (dialog,
                                           "response",

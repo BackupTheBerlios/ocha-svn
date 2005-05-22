@@ -28,7 +28,7 @@
 #define VERSION "0.0"
 #endif
 
-#define SOCKET_PATH "/.ocha/ocha.sock"
+#define SOCKET_PATH "/.ocha/ochad.sock"
 
 #define HELLO "ook?"
 #define HELLO_LEN (strlen(HELLO)+1)
@@ -37,10 +37,31 @@
 #define KILL_LEN (strlen(KILL)+1)
 
 gchar *ocha_init_indexer_argv[] = {
-        BINDIR "/ocha_indexer",
+        BINDIR "/ocha",
+        "index",
         NULL
 };
-gint ocha_init_indexer_argc = 1;
+gint ocha_init_indexer_argc = 2;
+
+gchar *ocha_init_install_argv[] = {
+        BINDIR "/ocha",
+        "install",
+        NULL
+};
+gint ocha_init_install_argc = 2;
+
+gchar *ocha_init_daemon_argv[] = {
+        BINDIR "/ochad",
+        NULL
+};
+gint ocha_init_daemon_argc = 2;
+
+gchar *ocha_init_preferences_argv[] = {
+        BINDIR "/ocha",
+        "preferences",
+        NULL
+};
+gint ocha_init_preferences_argc = 2;
 
 /* ------------------------- prototypes */
 static char *get_catalog_path(void);

@@ -8,6 +8,7 @@
 #include "preferences_catalog.h"
 #include "preferences_general.h"
 #include "catalog.h"
+#include "mode_preferences.h"
 #include "gtk/gtk.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,8 +17,8 @@
 static void destroy_cb(GtkWidget *widget, gpointer userdata);
 static void create_window(struct catalog *catalog);
 
-/* ------------------------- main */
-int main(int argc, char *argv[])
+/* ------------------------- public functions */
+int mode_preferences(int argc, char *argv[])
 {
         GError *err = NULL;
         struct configuration config;

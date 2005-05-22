@@ -8,12 +8,12 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "mode_index.h"
 #include "catalog.h"
 #include "indexer.h"
 #include "indexers.h"
 #include "ocha_init.h"
 #include "ocha_gconf.h"
-#include "first_time.h"
 #include "catalog_queryrunner.h"
 #include <libgnome/gnome-init.h>
 #include <libgnome/gnome-program.h>
@@ -26,14 +26,8 @@
 static void usage(FILE *out);
 static int index_everything(struct catalog  *catalog, gboolean verbose);
 
-/* ------------------------- main */
-static void usage(FILE *out)
-{
-        fprintf(out,
-                "USAGE: indexer [--quiet]\n");
-}
-
-int main(int argc, char *argv[])
+/* ------------------------- public functions */
+int mode_index(int argc, char *argv[])
 {
         int curarg;
         gboolean verbose=TRUE;
@@ -42,7 +36,6 @@ int main(int argc, char *argv[])
         int retval = 0;
         GError *err = NULL;
         struct catalog *catalog;
-        gboolean first_time=FALSE;
 
         for(curarg=1; curarg<argc; curarg++) {
                 const char *arg=argv[curarg];
@@ -65,8 +58,8 @@ int main(int argc, char *argv[])
                 }
         }
 
-        ocha_init(PACKAGE "_indexer", argc, argv, TRUE/*gui*/, &config);
-
+        ocha_init(PACKAGE "_indexer", argc, argv, FALSE/*no gui*/, &config);
+        ocha_init_requires_catalog(config.catalog_path);
         catalog_path =  config.catalog_path;
         catalog =  catalog_connect(catalog_path, &err);
 
@@ -77,23 +70,15 @@ int main(int argc, char *argv[])
                 exit(111);
         }
 
-        first_time=!ocha_gconf_exists();
         if(catalog==NULL) {
-                fprintf(stderr, "error: could not open or create create catalog at '%s': %s\n",
+                fprintf(stderr, "error: could not open or create catalog at '%s': %s\n",
                         catalog_path,
                         err->message);
                 exit(114);
         }
 
 
-        if(first_time) {
-                if(!first_time_run(catalog)) {
-                        unlink(catalog_path);
-                        retval=128;
-                }
-        } else {
-                retval = index_everything(catalog, verbose);
-        }
+        retval = index_everything(catalog, verbose);
 
         catalog_timestamp_update(catalog);
         catalog_disconnect(catalog);
@@ -165,3 +150,12 @@ static int index_everything(struct catalog  *catalog, gboolean verbose)
         }
         return(retval);
 }
+
+/* ------------------------- static functions */
+
+static void usage(FILE *out)
+{
+        fprintf(out,
+                "USAGE: indexer [--quiet]\n");
+}
+
