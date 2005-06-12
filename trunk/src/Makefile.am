@@ -111,7 +111,8 @@ ochad_SOURCES= ochad_main.c \
 	desktop_file.c desktop_file.h \
 	string_utils.h string_utils.c \
 	ocha_gconf.c ocha_gconf.h \
-	schedule.h schedule.c
+	schedule.h schedule.c \
+	accel_button.h accel_button.c
 ochad_CFLAGS=-g $(GTK_CFLAGS) $(SQLITE_CFLAGS) $(GNOME_CFLAGS) -DBINDIR=\"$(bindir)\"
 ochad_LDADD=$(GTK_LIBS) $(SQLITE_LIBS) $(GNOME_LIBS)
 
@@ -147,7 +148,8 @@ ocha_SOURCES= ocha_main.c \
         restart.c restart.h \
         result_queue.c result_queue.h \
         string_set.c string_set.h \
-        string_utils.c string_utils.h 
+        string_utils.c string_utils.h \
+	accel_button.h accel_button.c
 ocha_CFLAGS=$(GNOME_CFLAGS) $(SQLITE_CFLAGS) -DBINDIR=\"$(bindir)\"
 ocha_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 

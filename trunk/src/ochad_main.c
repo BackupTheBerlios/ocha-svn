@@ -14,6 +14,7 @@
 #include "ocha_gconf.h"
 #include "schedule.h"
 #include "restart.h"
+#include "accel_button.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <stdio.h>
@@ -39,14 +40,20 @@ struct keygrab_data
         guint keyval;
 };
 
+static GtkWidget *new_key_ui_dialog;
+static GtkWidget *new_key_ui_dialog_close;
+
 /* ------------------------- prototypes */
-static gboolean configure_keygrab(struct keygrab_data *data);
+static void configure_keygrab(struct keygrab_data *data);
 static void reconfigure_keygrab(GConfClient *caller, guint id, GConfEntry *entry, gpointer userdata);
 static GdkFilterReturn filter_keygrab (GdkXEvent *xevent, GdkEvent *gdk_event_unused, gpointer data);
 static void install_keygrab_filters(struct keygrab_data *data);
 static gboolean install_keygrab(const char *accelerator, struct keygrab_data *data);
 static void uninstall_keygrab(void);
 static void already_running(void);
+static void launch_get_new_key_ui(struct keygrab_data *data);
+static void launch_get_new_key_ui_accept(void);
+static void launch_get_new_key_ui_cb(GtkDialog *dialog, int arg, gpointer userdata);
 
 /* ------------------------- main */
 
@@ -107,10 +114,7 @@ int main(int argc, char *argv[])
 
         querywin_set_queryrunner(runner);
 
-        if(!configure_keygrab(&keygrab_data)) {
-                return 10;
-        }
-
+        configure_keygrab(&keygrab_data);
 
         gtk_main();
 
@@ -119,7 +123,7 @@ int main(int argc, char *argv[])
 
 /* ------------------------- static functions */
 
-static gboolean configure_keygrab(struct keygrab_data *data)
+static void configure_keygrab(struct keygrab_data *data)
 {
         GError *err = NULL;
         gchar *accelerator;
@@ -133,16 +137,15 @@ static gboolean configure_keygrab(struct keygrab_data *data)
                         "error: error accessing gconf configuration : %s",
                         err->message);
                 g_error_free(err);
-                return FALSE;
         }
 
         success=install_keygrab(accelerator ? accelerator:OCHA_GCONF_ACCELERATOR_KEY_DEFAULT,
                                 data);
         g_free(accelerator);
-
         if(!success) {
-                return FALSE;
+                launch_get_new_key_ui(data);
         }
+
         install_keygrab_filters(data);
 
         gconf_client_notify_add(ocha_gconf_get_client(),
@@ -158,16 +161,19 @@ static gboolean configure_keygrab(struct keygrab_data *data)
                         err->message);
                 g_error_free(err);
         }
-
-        return TRUE;
 }
 static void reconfigure_keygrab(GConfClient *caller, guint id, GConfEntry *entry, gpointer userdata)
 {
-        const char *accelerator = gconf_value_get_string(gconf_entry_get_value(entry));
+        const char *accelerator;
         struct keygrab_data *data = (struct keygrab_data *)userdata;
+
         uninstall_keygrab();
+
+        accelerator = gconf_value_get_string(gconf_entry_get_value(entry));
         if(!install_keygrab(accelerator, data)) {
-                gtk_main_quit();
+                launch_get_new_key_ui(data);
+        } else {
+                launch_get_new_key_ui_accept();
         }
 }
 
@@ -199,6 +205,7 @@ static gboolean install_keygrab(const char *accelerator, struct keygrab_data *da
 {
         GdkDisplay *display = gdk_display_get_default();
         int i;
+        int xerr;
 
         g_return_val_if_fail(accelerator, FALSE);
         g_return_val_if_fail(data, FALSE);
@@ -212,6 +219,14 @@ static gboolean install_keygrab(const char *accelerator, struct keygrab_data *da
                         accelerator);
                 return FALSE;
         }
+
+        printf("%s:%d: gdk_error_trap_push\n", /*@nocommit@*/
+               __FILE__,
+               __LINE__
+               );
+
+        gdk_error_trap_push();
+
         data->keycode=XKeysymToKeycode(GDK_DISPLAY(), data->keyval);
         for (i = 0; i < gdk_display_get_n_screens (display); i++) {
                 GdkScreen *screen;
@@ -230,6 +245,17 @@ static gboolean install_keygrab(const char *accelerator, struct keygrab_data *da
                          GrabModeAsync,
                          GrabModeAsync);
         }
+        gdk_flush();
+        xerr=gdk_error_trap_pop();
+        printf("%s:%d: gdk_error_trap_pop\n", /*@nocommit@*/
+               __FILE__,
+               __LINE__
+               );
+
+        if(xerr!=0) {
+                return FALSE;
+        }
+
         printf("ocha: Type %s to open the seach window.\n",
                accelerator);
         return TRUE;
@@ -294,7 +320,7 @@ static void already_running(void)
         }
 
         dialog = gtk_message_dialog_new(NULL,
-                                        0,
+                                        0/*flags*/,
                                         GTK_MESSAGE_INFO,
                                         GTK_BUTTONS_NONE,
                                         "Ocha is already active on your system. To start "
@@ -336,4 +362,100 @@ static void already_running(void)
                 break;
         }
 
+}
+
+/**
+ * Open a dialog that will ask the user
+ * for a new shortcut and then set it using gconf.
+ *
+ * gconf notification will ensure that the new setting
+ * is used.
+ */
+static void launch_get_new_key_ui(struct keygrab_data *data)
+{
+        if(new_key_ui_dialog==NULL) {
+                GtkWidget *close;
+                GtkWidget *quit;
+                GtkWidget *choose;
+                GtkWidget *vbox;
+                GtkWidget *hbox;
+                GtkWidget *label;
+
+                new_key_ui_dialog = gtk_message_dialog_new(NULL,
+                                                0/*flags*/,
+                                                GTK_MESSAGE_ERROR,
+                                                GTK_BUTTONS_NONE,
+                                                "The accelerator Ocha was configured to respond to "
+                                                "is being used by another program.\n\n"
+                                                "Please choose another accelerator for the Ocha search window."
+                                                "Alternatively, you can click on 'Quit' to stop the Ocha daemon." );
+
+                quit=gtk_dialog_add_button(GTK_DIALOG(new_key_ui_dialog),
+                                           "Quit",
+                                           2);
+                gtk_button_set_image(GTK_BUTTON(quit),
+                                     gtk_image_new_from_stock(GTK_STOCK_QUIT,
+                                                              GTK_ICON_SIZE_BUTTON));
+
+                gtk_dialog_set_default_response(GTK_DIALOG(new_key_ui_dialog), 2);
+                close=gtk_dialog_add_button(GTK_DIALOG(new_key_ui_dialog),
+                                           "Close",
+                                           0);
+                gtk_button_set_image(GTK_BUTTON(close),
+                                     gtk_image_new_from_stock(GTK_STOCK_CLOSE,
+                                                              GTK_ICON_SIZE_BUTTON));
+
+                gtk_dialog_set_default_response(GTK_DIALOG(new_key_ui_dialog), 0);
+                new_key_ui_dialog_close=close;
+
+                vbox=GTK_DIALOG(new_key_ui_dialog)->vbox;
+
+                hbox=gtk_hbox_new(FALSE/*not homogenous*/, 12/*spacing*/);
+                gtk_widget_show(hbox);
+                gtk_box_pack_end(GTK_BOX(vbox),
+                                 hbox,
+                                 TRUE,
+                                 TRUE,
+                                 12);
+
+
+                label=gtk_label_new("<b>New accelerator:</b>");
+                gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
+                gtk_widget_show(label);
+                gtk_box_pack_start(GTK_BOX(hbox),
+                                   label,
+                                   FALSE,
+                                   FALSE,
+                                   12);
+
+                choose = accel_button_new();
+                gtk_box_pack_end(GTK_BOX(hbox),
+                                   choose,
+                                   TRUE,
+                                   TRUE,
+                                   12);
+
+                g_signal_connect (new_key_ui_dialog,
+                                  "response",
+                                  G_CALLBACK (launch_get_new_key_ui_cb),
+                                  new_key_ui_dialog/*userdata*/);
+
+        }
+        gtk_widget_set_sensitive(new_key_ui_dialog_close, FALSE);
+        gtk_window_present(GTK_WINDOW(new_key_ui_dialog));
+}
+
+static void launch_get_new_key_ui_cb(GtkDialog *dialog, int arg, gpointer userdata)
+{
+        gtk_widget_hide(GTK_WIDGET(dialog));
+        if(arg==2) {
+                gtk_main_quit();
+        }
+}
+
+static void launch_get_new_key_ui_accept(void)
+{
+        if(new_key_ui_dialog!=NULL) {
+                gtk_widget_set_sensitive(new_key_ui_dialog_close, TRUE);
+        }
 }
