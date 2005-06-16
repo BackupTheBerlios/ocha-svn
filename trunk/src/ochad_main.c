@@ -220,11 +220,6 @@ static gboolean install_keygrab(const char *accelerator, struct keygrab_data *da
                 return FALSE;
         }
 
-        printf("%s:%d: gdk_error_trap_push\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__
-               );
-
         gdk_error_trap_push();
 
         data->keycode=XKeysymToKeycode(GDK_DISPLAY(), data->keyval);
@@ -247,11 +242,6 @@ static gboolean install_keygrab(const char *accelerator, struct keygrab_data *da
         }
         gdk_flush();
         xerr=gdk_error_trap_pop();
-        printf("%s:%d: gdk_error_trap_pop\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__
-               );
-
         if(xerr!=0) {
                 return FALSE;
         }

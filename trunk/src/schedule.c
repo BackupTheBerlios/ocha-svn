@@ -194,12 +194,6 @@ static gulong schedule_get_last_update(void)
                 catalog = catalog_connect(config.catalog_path, NULL/*err*/);
                 if(catalog!=NULL) {
                         last_update=catalog_timestamp_get(catalog);
-                        printf("%s:%d: last_update=%lu\n", /*@nocommit@*/
-                               __FILE__,
-                               __LINE__,
-                               last_update
-                               );
-
                         catalog_disconnect(catalog);
                 } else {
                         last_update=0;

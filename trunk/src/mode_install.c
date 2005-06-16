@@ -278,13 +278,6 @@ static gboolean indexing(gpointer userdata)
 
         druid = GNOME_DRUID(data->druid);
 
-        printf("%s:%d: indexing(steps=0x%lu,current_step=0x%lu)\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__,
-               (gulong)data->steps,
-               (gulong)data->current_step
-               );
-
         if(data->steps==NULL) {
                 GSList *steps = NULL;
                 guint steps_len = 0;
@@ -298,28 +291,13 @@ static gboolean indexing(gpointer userdata)
                 gtk_progress_bar_set_fraction(data->progress, 0.0);
                 gtk_progress_bar_set_text(data->progress, "File discovery");
 
-                printf("%s:%d: discover\n", /*@nocommit@*/
-                       __FILE__,
-                       __LINE__
-                       );
-
                 discover(data->catalog);
-
-                printf("%s:%d: create steps\n", /*@nocommit@*/
-                       __FILE__,
-                       __LINE__
-                       );
 
                 steps=create_steps(data->catalog, &steps_len);
                 data->steps=steps;
                 data->current_step=steps;
                 data->progress_step=1.0/((gdouble)steps_len+1);
                 data->progress_current=0.0;
-
-                printf("%s:%d: preparation DONE\n", /*@nocommit@*/
-                       __FILE__,
-                       __LINE__
-                       );
 
         } else if(data->current_step) {
                 struct step *step = (struct step *)data->current_step->data;
@@ -330,25 +308,11 @@ static gboolean indexing(gpointer userdata)
                 gtk_progress_bar_set_fraction(data->progress, data->progress_current);
 
 
-                printf("%s:%d: source %s/%d\n", /*@nocommit@*/
-                       __FILE__,
-                       __LINE__,
-                       step->indexer->display_name,
-                       step->source_id
-                       );
-
                 source=indexer_load_source(step->indexer, data->catalog, step->source_id);
                 gtk_progress_bar_set_text(data->progress, source->display_name);
                 indexer_source_index(source,  data->catalog, &err);
 
 
-
-                printf("%s:%d: source %s/%d DONE\n", /*@nocommit@*/
-                       __FILE__,
-                       __LINE__,
-                       step->indexer->display_name,
-                       step->source_id
-                       );
 
                 handle_errors(data, err);
 
@@ -360,10 +324,6 @@ static gboolean indexing(gpointer userdata)
                 data->steps=NULL;
                 data->current_step=NULL;
                 data->indexed=TRUE;
-                printf("%s:%d: indexing done\n", /*@nocommit@*/
-                       __FILE__,
-                       __LINE__
-                        );
                 gtk_progress_bar_set_fraction(data->progress, (gdouble)1.0);
                 gtk_progress_bar_set_text(data->progress, "Finished");
                 gnome_druid_set_buttons_sensitive(druid,
@@ -385,11 +345,6 @@ static void indexing_page_prepare(GnomeDruidPage *page, GnomeDruid *druid, gpoin
         g_return_if_fail(userdata);
         data = (struct first_time *)userdata;
 
-
-        printf("%s:%d: indexing_page_prepare\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__
-               );
 
         gnome_druid_set_buttons_sensitive(druid,
                                           FALSE/*no back*/,

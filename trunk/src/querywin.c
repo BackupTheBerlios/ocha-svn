@@ -31,7 +31,6 @@ static gboolean queryrunner_started;
  */
 static gboolean verified=-1;
 
-#define QUERY_TIMEOUT 800
 #define assert_initialized() g_return_if_fail(result_queue)
 #define assert_queryrunner_set() g_return_if_fail(queryrunner);
 
@@ -114,6 +113,10 @@ void querywin_start()
 }
 void querywin_stop()
 {
+        if(!shown) {
+                return;
+        }
+
         assert_initialized();
         assert_queryrunner_set();
 
@@ -143,7 +146,7 @@ void querywin_stop()
 static gboolean focus_out_cb(GtkWidget* widget, GdkEventFocus* ev, gpointer userdata)
 {
         querywin_stop();
-        return FALSE; /*propagate*/
+        return TRUE; /*do not propagate*/
 }
 
 /**
@@ -255,10 +258,7 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey *ev, gpointe
 
         default:
                 if(ev->string && ev->string[0]!='\0') {
-                        if((ev->time-last_keypress)>QUERY_TIMEOUT)
-                                g_string_assign(query_str, ev->string);
-                        else
-                                g_string_append(query_str, ev->string);
+                        g_string_append(query_str, ev->string);
                         set_query_string();
                         last_keypress=ev->time;
                         return TRUE;/*handled*/
