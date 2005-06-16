@@ -308,7 +308,7 @@ static GtkTreeView *createView(GtkTreeModel *model, struct preferences_catalog *
 
         gtk_tree_view_insert_column_with_attributes(view,
                                                     2,
-                                                    "\xe2\x9c\x93" /*CHECK MARK U+2713*/,
+                                                    "",
                                                     enabledRenderer,
                                                     "active", COLUMN_ENABLED,
                                                     NULL);
