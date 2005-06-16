@@ -30,6 +30,8 @@ static void update_radio_button_set_state(GtkWidget **buttons);
 static void update_radio_button_cb(GtkToggleButton *buttons, gpointer userdata);
 static void update_radio_button_notify_cb(GConfClient *client, guint id, GConfEntry *entry, gpointer userdata);
 static void start_ocha_cb(GtkButton *button, gpointer userdata);
+static void remove_notify(GtkWidget *widget, gpointer userdata);
+
 
 /* ------------------------- definitions */
 
@@ -344,4 +346,12 @@ static void start_ocha_cb(GtkButton *button, gpointer userdata)
         } else {
                 gtk_widget_hide(hideme);
         }
+}
+
+static void remove_notify(GtkWidget *widget, gpointer userdata)
+{
+        guint id = GPOINTER_TO_UINT(userdata);
+
+        gconf_client_notify_remove(ocha_gconf_get_client(),
+                                   id);
 }
