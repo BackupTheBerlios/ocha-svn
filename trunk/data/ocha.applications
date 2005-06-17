@@ -1,0 +1,6 @@
+ocha
+        command=ocha
+        name=Ocha Search and Launch
+        can_open_multiple_files=false
+        expects_uris=false
+        requires_terminal=false
