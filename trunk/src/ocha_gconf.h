@@ -17,8 +17,6 @@
  * set to a value defined in enum OchaGConfUpdateCatalog
  */
 #define OCHA_GCONF_UPDATE_CATALOG_KEY OCHA_GCONF_PREFIX "/update_catalog"
-/** Default value for configuration update_catalog */
-#define OCHA_GCONF_UPDATE_CATALOG_DEFAULT OCHA_GCONF_UPDATE_CATALOG_EVERY_10_MINUTES
 /** Define the possible value for the configuration porperty update_catalog */
 enum OchaGConfUpdateCatalog
 {
@@ -31,6 +29,9 @@ enum OchaGConfUpdateCatalog
         /** Number of options for UPDATE_CATALOG */
         OCHA_GCONF_UPDATE_CATALOG_COUNT
 };
+
+/** Default value for configuration update_catalog */
+#define OCHA_GCONF_UPDATE_CATALOG_DEFAULT OCHA_GCONF_UPDATE_CATALOG_EVERY_HOUR
 
 /**
  * Get a properly initialized GConf client.

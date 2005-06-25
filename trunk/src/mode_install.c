@@ -68,6 +68,7 @@ static gboolean last_page_setup(gpointer userdata);
 static void discover(struct catalog *catalog);
 static GSList *create_steps(struct catalog *catalog, guint *count);
 static void handle_errors(struct first_time *data, GError *err);
+static void set_default_configuration(void);
 
 /* ------------------------- definitions */
 
@@ -107,6 +108,7 @@ static int do_install(struct configuration  *config) {
         memset(&data, 0, sizeof(struct first_time));
         data.catalog=catalog;
 
+        set_default_configuration();
         setup_druid(&data);
 
         gtk_main();
@@ -438,4 +440,29 @@ static void handle_errors(struct first_time *data, GError *err)
         }
         fprintf(stderr, "error: %s", err->message);
         g_error_free(err);
+}
+
+/**
+ * Set gconf defaults for the current user.
+ *
+ * This totally violates the idea behind gconf that
+ * administrators can set defaults, choose values
+ * that users cannot change, etc... Yet, ocha
+ * does not use gconf correctly and for the
+ * time being, this will do...
+ *
+ * I ignore errors here just in case an administrator
+ * has really set this up so that there *is* a default...
+ */
+static void set_default_configuration(void)
+{
+        GError *err = NULL;
+
+        gconf_client_set_int(ocha_gconf_get_client(),
+                             OCHA_GCONF_UPDATE_CATALOG_KEY,
+                             OCHA_GCONF_UPDATE_CATALOG_DEFAULT,
+                             &err);
+        if(err) {
+                g_error_free(err);
+        }
 }
