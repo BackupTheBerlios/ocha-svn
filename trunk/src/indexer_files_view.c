@@ -634,12 +634,55 @@ static void choose_file_cb(GtkButton *button, gpointer userdata)
 
         if (changed) {
                 char *filename;
+                int source_id = view->base.source_id;
+
                 filename = gtk_file_chooser_get_filename (view->choose);
                 ocha_gconf_set_source_attribute(INDEXER_NAME,
-                                                view->base.source_id,
+                                                source_id,
                                                 "path",
                                                 filename);
                 gtk_entry_set_text(view->path, filename ? filename:"");
+
+                printf("%s:%d: filename: %s\n", /*@nocommit@*/
+                       __FILE__,
+                       __LINE__,
+                       filename
+                       );
+
+                if(filename && g_file_test(filename, G_FILE_TEST_IS_DIR)) {
+                        char *old_depth;
+
+                        printf("%s:%d: is dir\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__
+                               );
+
+                        old_depth=ocha_gconf_get_source_attribute(INDEXER_NAME,
+                                                                  source_id,
+                                                                  "depth");
+                        printf("%s:%d: depth: '%s'\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__,
+                               old_depth
+                               );
+
+                        if(old_depth || strcmp("0", old_depth)==0) {
+                                printf("%s:%d: set source to 3\n", /*@nocommit@*/
+                                       __FILE__,
+                                       __LINE__
+                                       );
+
+                                ocha_gconf_set_source_attribute(INDEXER_NAME,
+                                                                source_id,
+                                                                "depth",
+                                                                "3");
+                                update_widgets(view);
+                        }
+                        if(old_depth) {
+                                g_free(old_depth);
+                        }
+                }
+
                 g_free (filename);
         }
 }
