@@ -38,10 +38,11 @@
 
 gchar *ocha_init_indexer_argv[] = {
         BINDIR "/ocha",
+        "--nice",
         "index",
         NULL
 };
-gint ocha_init_indexer_argc = 2;
+gint ocha_init_indexer_argc = 3;
 
 gchar *ocha_init_install_argv[] = {
         BINDIR "/ocha",
@@ -54,7 +55,7 @@ gchar *ocha_init_daemon_argv[] = {
         BINDIR "/ochad",
         NULL
 };
-gint ocha_init_daemon_argc = 2;
+gint ocha_init_daemon_argc = 1;
 
 gchar *ocha_init_preferences_argv[] = {
         BINDIR "/ocha",

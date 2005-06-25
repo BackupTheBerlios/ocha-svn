@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include "mode_index.h"
 #include "catalog.h"
 #include "indexer.h"
@@ -45,6 +47,9 @@ int mode_index(int argc, char *argv[])
                    || strcmp("--help", arg)==0) {
                         usage(stdout);
                         exit(0);
+                } else if(strcmp("--nice", arg)==0) {
+                        /*nice(19);*/
+                        setpriority(PRIO_PROCESS, 0/*current process*/, 19);
                 } else if(strcmp("--quiet", arg)==0) {
                         verbose=FALSE;
                 } else if(*arg=='-') {
