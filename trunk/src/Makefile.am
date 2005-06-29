@@ -14,7 +14,8 @@ noinst_PROGRAMS= \
 	indexer_various_check \
 	catalog_queryrunner_check \
 	string_utils_check \
-	contentlist_check
+	contentlist_check \
+	parse_uri_list_next_check
 
 TESTS= \
 	result_queue_check \
@@ -22,7 +23,13 @@ TESTS= \
 	query_check \
 	indexer_various_check \
 	catalog_queryrunner_check \
-	contentlist_check
+	contentlist_check \
+	parse_uri_list_next_check
+
+parse_uri_list_next_check_SOURCES=parse_uri_list_next_check.c \
+	parse_uri_list_next.c parse_uri_list_next.h
+parse_uri_list_next_check_CFLAGS=$(TEST_CFLAGS) $(GNOME_CFLAGS)
+parse_uri_list_next_check_LDADD=$(TEST_LIBS)  $(GNOME_LIBS)
 
 query_check_SOURCES=query_check.c \
 	query.c query.h
@@ -89,7 +96,7 @@ indexer_various_check_SOURCES=indexer_various_check.c \
         launcher_open.c \
         launcher_openurl.c \
         string_set.h \
-        string_set.c
+        string_set.c 
 indexer_various_check_CFLAGS=$(TEST_CFLAGS) $(GNOME_CFLAGS) 
 indexer_various_check_LDADD=$(TEST_LIBS) 
 
@@ -149,7 +156,9 @@ ocha_SOURCES= ocha_main.c \
         result_queue.c result_queue.h \
         string_set.c string_set.h \
         string_utils.c string_utils.h \
-	accel_button.h accel_button.c
+	accel_button.h accel_button.c \
+	parse_uri_list_next.h parse_uri_list_next.c
+
 ocha_CFLAGS=$(GNOME_CFLAGS) $(SQLITE_CFLAGS) -DBINDIR=\"$(bindir)\"
 ocha_LDADD=$(GNOME_LIBS) $(SQLITE_LIBS)
 

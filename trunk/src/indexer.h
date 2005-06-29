@@ -112,6 +112,28 @@ struct indexer
         struct indexer_source *(*new_source)(struct indexer *, struct catalog *catalog, GError **err);
 
         /**
+         * Create a new source given an URI.
+         *
+         * Some indexers will not allow the creation of
+         * new sources, in which case this function may be null.
+         *
+         * The indexer should check the URI, make sure it's something it
+         * can handle and if it is, create and return a new source.
+         *
+         * It's very likely that sources will be given URIs they cannot handle.
+         *
+         * @param indexer
+         * @param uri URI to create a new source for
+         * @param catalog
+         * @param err pointer that will receive a GError. May be null. If it's
+         * not null, *err should be NULL.
+         * @return a new source or NULL. It's not always an error for this function
+         * to return NULL. Check *err to know whether it was an error or whether
+         * the uri was refused.
+         */
+        struct indexer_source *(*new_source_for_uri)(struct indexer *, const char *uri, struct catalog *catalog, GError **err);
+
+        /**
          * Create an indexer view.
          *
          * The view can display any source. By default, it
@@ -258,8 +280,9 @@ static inline struct indexer_source *indexer_load_source(struct indexer *self, s
  * new sources, in which case this function may
  * be null.
  *
- * This is a shortcut for indexer->new_source()
- * @param indexer
+ * This is a shortcut for indexer->new_source(). If
+ * new_source is null, then it'll always return null.
+ * @param self indexer
  * @param catalog catalog to register the source in
  * @param err error structure (may be null)
  * @return a new, uninitialized source, to be freed the usual way or
@@ -268,8 +291,44 @@ static inline struct indexer_source *indexer_load_source(struct indexer *self, s
 static inline struct indexer_source *indexer_new_source(struct indexer *self, struct catalog *catalog, GError **err)
 {
         g_return_val_if_fail(self, NULL);
+        if(self->new_source==NULL) {
+                return NULL;
+        }
         return self->new_source(self, catalog, err);
 }
+
+/**
+ * Create a new source given an URI.
+ *
+ * Some indexers will not allow the creation of
+ * new sources, in which case this function may be null.
+ *
+ * The indexer should check the URI, make sure it's something it
+ * can handle and if it is, create and return a new source.
+ *
+ * It's very likely that sources will be given URIs they cannot handle.
+ *
+ * This is a shortcut for indexer->new_source_for_uri(). If new_source_for_uri
+ * is null, then it'll always return null.
+ *
+ * @param self indexer
+ * @param uri URI to create a new source for
+ * @param catalog
+ * @param err pointer that will receive a GError. May be null. If it's
+ * not null, *err should be NULL.
+ * @return a new source or NULL. It's not always an error for this function
+ * to return NULL. Check *err to know whether it was an error or whether
+ * the uri was refused.
+ */
+static inline struct indexer_source *indexer_new_source_for_uri(struct indexer *self , const char *uri, struct catalog *catalog, GError **err)
+{
+        g_return_val_if_fail(self, NULL);
+        if(self->new_source_for_uri==NULL) {
+                return NULL;
+        }
+        return self->new_source_for_uri(self, uri, catalog, err);
+}
+
 
 /**
  * Create an indexer view.

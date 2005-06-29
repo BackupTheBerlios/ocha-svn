@@ -27,10 +27,17 @@
 
 #define INDEXER_NAME "files"
 
+/**
+ * Standard depth for a directory, used when
+ * creating sources from URI
+ */
+#define DEFAULT_DIRECTORY_DEPTH 3
+
 /* ------------------------- prototypes: indexer_files */
 static struct indexer_source *indexer_files_load_source(struct indexer *self, struct catalog *catalog, int id);
 static gboolean indexer_files_discover(struct indexer *indexer, struct catalog *catalog);
 static struct indexer_source *indexer_files_new_source(struct indexer *indexer, struct catalog *catalog, GError **err);
+static struct indexer_source *indexer_files_new_source_for_uri(struct indexer *indexer, const char *uri, struct catalog *catalog, GError **err);
 
 /* ------------------------- prototypes: indexer_files_source */
 static void indexer_files_source_release(struct indexer_source *source);
@@ -43,6 +50,7 @@ static gboolean add_source(struct catalog *catalog, const char *path, gboolean s
 static gboolean index_file_cb(struct catalog *catalog, int source_id, const char *path, const char *filename, GError **err, gpointer userdata);
 static gboolean has_gnome_mime_command(const char *path);
 static char *display_name(struct catalog *catalog, int id);
+static struct indexer_source *new_source(struct indexer *indexer, struct catalog *catalog, const char *uri, int depth, GError **err);
 
 /* ------------------------- definitions */
 
@@ -62,6 +70,7 @@ struct indexer indexer_files = {
         indexer_files_discover,
         indexer_files_load_source,
         indexer_files_new_source,
+        indexer_files_new_source_for_uri,
         indexer_files_view_new
 };
 
@@ -142,22 +151,43 @@ static struct indexer_source *indexer_files_new_source(struct indexer *indexer,
                                                        struct catalog *catalog,
                                                        GError **err)
 {
-        int id=-1;
-
-        g_return_val_if_fail(indexer, NULL);
-        g_return_val_if_fail(err==NULL || (*err==NULL), NULL);
-
-        if(add_source(catalog,
-                      NULL/*no path*/, FALSE/*not system*/,
-                      0/*ignore content*/,
-                      NULL/*default ignore*/,
-                      &id)) {
-                return indexer_files_load_source(indexer, catalog, id);
-        }
-        return NULL;
+        return new_source(indexer,
+                          catalog,
+                          NULL/*uri*/,
+                          0/*depth*/,
+                          err);
 }
 
+static struct indexer_source *indexer_files_new_source_for_uri(struct indexer *indexer, const char *uri, struct catalog *catalog, GError **err)
+{
+        GnomeVFSResult ret;
+        GnomeVFSFileInfo *info;
+        struct indexer_source *source = NULL;
 
+        g_return_val_if_fail(indexer, NULL);
+        g_return_val_if_fail(uri, NULL);
+        g_return_val_if_fail(err==NULL || (*err==NULL), NULL);
+
+        if(g_str_has_prefix(uri, "file:")) {
+                info = gnome_vfs_file_info_new();
+                ret=gnome_vfs_get_file_info(uri, info, GNOME_VFS_FILE_INFO_DEFAULT);
+                if(ret==GNOME_VFS_OK) {
+                        if(GNOME_VFS_FILE_TYPE_DIRECTORY==info->type
+                           && GNOME_VFS_FILE_INFO_LOCAL(info)) {
+
+                                char *path = gnome_vfs_get_local_path_from_uri(uri);
+                                source = new_source(indexer,
+                                                    catalog,
+                                                    path,
+                                                    DEFAULT_DIRECTORY_DEPTH,
+                                                    err);
+                                g_free(path);
+                        }
+                }
+                gnome_vfs_file_info_unref(info);
+        }
+        return source;
+}
 
 /* ------------------------- member functions: indexer_files_source */
 static void indexer_files_source_release(struct indexer_source *source)
@@ -349,3 +379,30 @@ static char *display_name(struct catalog *catalog, int id)
         return retval;
 }
 
+static struct indexer_source *new_source(struct indexer *indexer,
+                                         struct catalog *catalog,
+                                         const char *path,
+                                         int depth,
+                                         GError **err)
+{
+        int id=-1;
+
+        g_return_val_if_fail(indexer, NULL);
+        g_return_val_if_fail(err==NULL || (*err==NULL), NULL);
+
+
+        if(add_source(catalog,
+                      path,
+                      FALSE/*not system*/,
+                      depth,
+                      NULL/*default ignore*/,
+                      &id)) {
+                return indexer_files_load_source(indexer, catalog, id);
+        } else {
+                g_set_error(err,
+                            g_quark_from_string(INDEXER_ERROR_DOMAIN_NAME),
+                            INDEXER_CATALOG_ERROR,
+                            catalog_error(catalog));
+                return NULL;
+        }
+}

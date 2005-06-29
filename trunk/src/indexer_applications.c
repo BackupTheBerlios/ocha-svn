@@ -60,6 +60,7 @@ struct indexer indexer_applications = {
         indexer_application_discover,
         indexer_application_load_source,
         NULL/*new_source*/,
+        NULL/*new_source_for_uri*/,
         indexer_applications_new_view,
 };
 

@@ -70,6 +70,7 @@ struct indexer indexer_mozilla = {
         indexer_mozilla_discover,
         indexer_mozilla_load,
         NULL/*new_source*/,
+        NULL/*new_source_for_uri*/,
         indexer_mozilla_new_view
 };
 

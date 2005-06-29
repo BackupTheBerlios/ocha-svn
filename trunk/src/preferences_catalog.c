@@ -2,9 +2,11 @@
 #include "preferences_catalog.h"
 #include "indexers.h"
 #include "indexer_view.h"
+#include "parse_uri_list_next.h"
 #include "ocha_gconf.h"
 #include <gtk/gtk.h>
 #include <string.h>
+#include <libgnomevfs/gnome-vfs.h>
 
 /** \file implement the API defined in preferences_catalog.h */
 
@@ -55,24 +57,35 @@ struct preferences_catalog
 };
 
 /* ------------------------- prototypes */
-static GtkListStore *createModel(struct catalog *catalog);
+static GtkListStore *create_model(struct catalog *catalog);
 static void add_indexer(GtkListStore *model, struct indexer *indexer, struct catalog *catalog);
 static gboolean find_iter_for_source(GtkListStore *model, int goal_id, GtkTreeIter *iter_out);
 static void display_name_changed(struct indexer_source *source, gpointer userdata);
 static void add_source(GtkListStore *model, struct indexer *indexer, struct catalog *catalog, int source_id, GtkTreeIter *iter_out);
 static void update_entry_count(GtkListStore *model, GtkTreeIter *iter, unsigned int source_id, struct catalog *catalog);
-static GtkTreeView *createView(GtkTreeModel *model, struct preferences_catalog *prefs);
+static GtkTreeView *create_view(GtkTreeModel *model, struct preferences_catalog *prefs);
 static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current);
 static void reload_cb(GtkButton *button, gpointer userdata);
 static void update_properties(struct preferences_catalog  *prefs);
 static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userdata);
 static void select_row(struct preferences_catalog  *prefs, GtkTreeIter *source_iter);
+static void register_new_source(struct preferences_catalog  *prefs, struct indexer  *indexer, struct indexer_source  *source);
 static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer userdata);
 static void new_source_popup_cb(GtkButton *button, gpointer userdata);
 static void delete_cb(GtkButton *button, gpointer userdata);
 static GtkWidget *init_widget(struct preferences_catalog *prefs);
 static gint list_sort_cb(GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b, gpointer userdata);
 static void source_enabled_toggle_cb(GtkCellRendererToggle *cell, gchar *path_string, gpointer userdata);
+static void install_drop(struct preferences_catalog *prefs);
+static void drop_cb(GtkWidget *widget, GdkDragContext *drag_context, gint x, gint y, GtkSelectionData *data, guint info, guint time, gpointer userdata);
+static gboolean add_directory_uri(struct preferences_catalog *prefs, const gchar *uri);
+
+/* ------------------------- data */
+GtkTargetEntry drop_targets[] = {
+        { "text/uri-list", 0 , 0 },
+        { "text/plain", 0 , 0 } /* for Firefox */
+};
+#define drop_targets_len (sizeof(drop_targets)/sizeof(GtkTargetEntry))
 
 /* ------------------------- public functions */
 static int count_indexers(struct indexer **indexers)
@@ -102,11 +115,11 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
         prefs->pai[indexer_count].indexer=NULL;
         prefs->pai[indexer_count].prefs=NULL;
 
-        prefs->model = createModel(catalog);
+        prefs->model = create_model(catalog);
 
 
 
-        prefs->view = createView(GTK_TREE_MODEL(prefs->model), prefs);
+        prefs->view = create_view(GTK_TREE_MODEL(prefs->model), prefs);
         prefs->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(prefs->view));
         prefs->properties=indexer_view_new(catalog);
         prefs->widget = init_widget(prefs);
@@ -116,6 +129,7 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
                          G_CALLBACK(row_selection_changed_cb),
                          prefs);
 
+        install_drop(prefs);
 
         return prefs;
 }
@@ -126,7 +140,7 @@ GtkWidget *preferences_catalog_get_widget(struct preferences_catalog *prefs)
 }
 
 /* ------------------------- static functions */
-static GtkListStore *createModel(struct catalog *catalog)
+static GtkListStore *create_model(struct catalog *catalog)
 {
         GtkListStore *model;
         struct indexer **indexers;
@@ -270,7 +284,7 @@ static void update_entry_count(GtkListStore *model,
                            -1);
 }
 
-static GtkTreeView *createView(GtkTreeModel *model, struct preferences_catalog *prefs)
+static GtkTreeView *create_view(GtkTreeModel *model, struct preferences_catalog *prefs)
 {
         GtkWidget *_view = gtk_tree_view_new_with_model(model);
         GtkTreeView *view = GTK_TREE_VIEW(_view);
@@ -475,6 +489,20 @@ static void select_row(struct preferences_catalog  *prefs, GtkTreeIter *source_i
         gtk_tree_selection_select_iter(prefs->selection, source_iter);
 }
 
+static void register_new_source(struct preferences_catalog  *prefs, struct indexer  *indexer, struct indexer_source  *source)
+{
+        GtkTreeIter source_iter;
+        add_source(GTK_LIST_STORE(prefs->model),
+                   indexer,
+                   prefs->catalog,
+                   source->id,
+                   &source_iter);
+
+        select_row(prefs, &source_iter);
+
+}
+
+
 
 static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer userdata)
 {
@@ -490,14 +518,7 @@ static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer use
 
         source = indexer_new_source(indexer, prefs->catalog, NULL/*err*/);
         if(source) {
-                GtkTreeIter source_iter;
-                add_source(GTK_LIST_STORE(prefs->model),
-                           indexer,
-                           prefs->catalog,
-                           source->id,
-                           &source_iter);
-
-                select_row(prefs, &source_iter);
+                register_new_source(prefs, indexer, source);
                 indexer_source_release(source);
         }
 }
@@ -789,4 +810,115 @@ static void source_enabled_toggle_cb(GtkCellRendererToggle *cell, gchar *path_st
                                            -1);
                 }
         }
+}
+
+/**
+ * Setup the list as a GTK drop source.
+ *
+ * @param prefs a preferences_catalog with all its fields initialized
+ */
+static void install_drop(struct preferences_catalog *prefs)
+{
+        gtk_drag_dest_set(GTK_WIDGET(prefs->view),
+                          GTK_DEST_DEFAULT_ALL,
+                          drop_targets,
+                          drop_targets_len,
+                          GDK_ACTION_COPY
+                          | GDK_ACTION_MOVE
+                          | GDK_ACTION_LINK
+                          | GDK_ACTION_DEFAULT);
+        g_signal_connect(prefs->view,
+                         "drag_data_received",
+                         G_CALLBACK(drop_cb),
+                         prefs);
+}
+
+static void drop_cb(GtkWidget *widget, GdkDragContext *drag_context, gint x, gint y, GtkSelectionData *data, guint info, guint time, gpointer userdata)
+{
+        struct preferences_catalog *prefs;
+        gboolean success = TRUE;
+        int added=0;
+
+        g_return_if_fail(data!=NULL);
+        g_return_if_fail(userdata!=NULL);
+
+        printf("%s:%d: drop_cb length=%d, format=%d\n", /*@nocommit@*/
+               __FILE__,
+               __LINE__,
+               data->length,
+               data->format
+               );
+        prefs = (struct preferences_catalog *)userdata;
+
+        if(data->length>=0 && data->format==8 ) {
+                GString *buffer;
+                gchar *iter_data;
+                gint iter_length;
+
+                fwrite(data->data, data->length, 1, stdout); /*@nocommit@*/
+                fwrite("\n", 1, 1, stdout); /*@nocommit@*/
+                fflush(stdout);/*@nocommit@*/
+
+                buffer = g_string_new("");
+
+                iter_data = (gchar *)data->data;
+                iter_length = data->length;
+                success=TRUE;
+                while(parse_uri_list_next(&iter_data, &iter_length, buffer)) {
+                        if(add_directory_uri(prefs, buffer->str)) {
+                                added++;
+                        } else {
+                                success=FALSE;
+                        }
+
+                }
+                g_string_free(buffer, TRUE/*free content*/);
+        }
+        gtk_drag_finish (drag_context, success && added>0, FALSE, time);
+}
+static gboolean add_directory_uri(struct preferences_catalog *prefs, const gchar *uri)
+{
+        struct indexer **indexers = indexers_list();
+        int i;
+
+        printf("%s:%d: add_directory_uri(%s)\n", /*@nocommit@*/
+               __FILE__,
+               __LINE__,
+               uri
+               );
+
+        for(i=0; indexers[i]!=NULL; i++) {
+                GError *err = NULL;
+                struct indexer_source *source;
+                struct indexer *indexer = indexers[i];
+                source = indexer_new_source_for_uri(indexer,
+                                                    uri,
+                                                    prefs->catalog,
+                                                    &err);
+                if(source!=NULL) {
+                        printf("%s:%d: added %s: %s(%d)\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__,
+                               indexer->display_name,
+                               source->display_name,
+                               source->id
+                               );
+                        register_new_source(prefs, indexer, source);
+                        indexer_source_release(source);
+                        return TRUE;
+                }
+                if(err!=NULL) {
+                        g_warning("TODO: display error: %s",
+                                  err->message);
+                        g_error_free(err);
+                }
+        }
+        printf("%s:%d: no indexer accepted it: %s\n", /*@nocommit@*/
+               __FILE__,
+               __LINE__,
+               uri
+               );
+        g_warning("TODO: display message saying that uri was refused: %s", uri);
+
+        return FALSE;
 }
