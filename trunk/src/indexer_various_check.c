@@ -397,6 +397,18 @@ GnomeVFSResult gnome_vfs_read_entire_file(const char *uri, int *file_size, char 
 {
         return 0;
 }
+GnomeVFSFileInfo *gnome_vfs_file_info_new(void)
+{
+        return NULL;
+}
+void gnome_vfs_file_info_unref(GnomeVFSFileInfo *info)
+{
+}
+
+char *gnome_vfs_get_local_path_from_uri      (const char      *uri)
+{
+        return NULL;
+}
 
 /* ------------------------- test suite */
 

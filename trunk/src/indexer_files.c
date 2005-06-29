@@ -176,12 +176,14 @@ static struct indexer_source *indexer_files_new_source_for_uri(struct indexer *i
                            && GNOME_VFS_FILE_INFO_LOCAL(info)) {
 
                                 char *path = gnome_vfs_get_local_path_from_uri(uri);
-                                source = new_source(indexer,
-                                                    catalog,
-                                                    path,
-                                                    DEFAULT_DIRECTORY_DEPTH,
-                                                    err);
-                                g_free(path);
+                                if(path) {
+                                        source = new_source(indexer,
+                                                            catalog,
+                                                            path,
+                                                            DEFAULT_DIRECTORY_DEPTH,
+                                                            err);
+                                        g_free(path);
+                                }
                         }
                 }
                 gnome_vfs_file_info_unref(info);
