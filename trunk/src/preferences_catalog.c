@@ -79,6 +79,7 @@ static void source_enabled_toggle_cb(GtkCellRendererToggle *cell, gchar *path_st
 static void install_drop(struct preferences_catalog *prefs);
 static void drop_cb(GtkWidget *widget, GdkDragContext *drag_context, gint x, gint y, GtkSelectionData *data, guint info, guint time, gpointer userdata);
 static gboolean add_directory_uri(struct preferences_catalog *prefs, const gchar *uri);
+static void display_dnd_errors(struct preferences_catalog *prefs, GSList *errors);
 
 /* ------------------------- data */
 GtkTargetEntry drop_targets[] = {
@@ -838,26 +839,18 @@ static void drop_cb(GtkWidget *widget, GdkDragContext *drag_context, gint x, gin
         struct preferences_catalog *prefs;
         gboolean success = TRUE;
         int added=0;
+        GSList *errors = NULL;
 
         g_return_if_fail(data!=NULL);
         g_return_if_fail(userdata!=NULL);
 
-        printf("%s:%d: drop_cb length=%d, format=%d\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__,
-               data->length,
-               data->format
-               );
         prefs = (struct preferences_catalog *)userdata;
+
 
         if(data->length>=0 && data->format==8 ) {
                 GString *buffer;
                 gchar *iter_data;
                 gint iter_length;
-
-                fwrite(data->data, data->length, 1, stdout); /*@nocommit@*/
-                fwrite("\n", 1, 1, stdout); /*@nocommit@*/
-                fflush(stdout);/*@nocommit@*/
 
                 buffer = g_string_new("");
 
@@ -868,11 +861,19 @@ static void drop_cb(GtkWidget *widget, GdkDragContext *drag_context, gint x, gin
                         if(add_directory_uri(prefs, buffer->str)) {
                                 added++;
                         } else {
+                                errors=g_slist_append(errors,
+                                                      g_strdup(buffer->str));
                                 success=FALSE;
                         }
 
                 }
                 g_string_free(buffer, TRUE/*free content*/);
+
+                if(errors!=NULL) {
+                        display_dnd_errors(prefs, errors);
+                        g_slist_foreach(errors, (GFunc)g_free, NULL/*userdata*/);
+                        g_slist_free(errors);
+                }
         }
         gtk_drag_finish (drag_context, success && added>0, FALSE, time);
 }
@@ -880,12 +881,6 @@ static gboolean add_directory_uri(struct preferences_catalog *prefs, const gchar
 {
         struct indexer **indexers = indexers_list();
         int i;
-
-        printf("%s:%d: add_directory_uri(%s)\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__,
-               uri
-               );
 
         for(i=0; indexers[i]!=NULL; i++) {
                 GError *err = NULL;
@@ -896,29 +891,51 @@ static gboolean add_directory_uri(struct preferences_catalog *prefs, const gchar
                                                     prefs->catalog,
                                                     &err);
                 if(source!=NULL) {
-                        printf("%s:%d: added %s: %s(%d)\n", /*@nocommit@*/
-                               __FILE__,
-                               __LINE__,
-                               indexer->display_name,
-                               source->display_name,
-                               source->id
-                               );
                         register_new_source(prefs, indexer, source);
                         indexer_source_release(source);
                         return TRUE;
                 }
                 if(err!=NULL) {
-                        g_warning("TODO: display error: %s",
-                                  err->message);
                         g_error_free(err);
                 }
         }
-        printf("%s:%d: no indexer accepted it: %s\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__,
-               uri
-               );
-        g_warning("TODO: display message saying that uri was refused: %s", uri);
-
         return FALSE;
+}
+/**
+ * Open a dialog box to report URLs that could not be used to
+ * create new catalogs.
+ */
+static void display_dnd_errors(struct preferences_catalog *prefs, GSList *errors)
+{
+        GtkWidget *dialog;
+        GString *buffer = g_string_new("");
+        GSList *item;
+
+        g_string_append(buffer, "No catalogs could be created for the following ");
+        if(g_slist_length(errors)>1) {
+                g_string_append(buffer, "URI's");
+        } else {
+                g_string_append(buffer, "URI");
+        }
+        g_string_append_c(buffer, '\n');
+
+        for(item=errors; item!=NULL; item=g_slist_next(item)) {
+                g_string_append_c(buffer, ' ');
+                g_string_append(buffer, (char *)item->data);
+                g_string_append_c(buffer, '\n');
+        }
+        g_string_append(buffer, "\nOcha can currently only index local directories, not files or SMB shares.");
+
+        dialog = gtk_message_dialog_new(GTK_WINDOW(gtk_widget_get_toplevel(prefs->widget)),
+                                        0/*flags*/,
+                                        GTK_MESSAGE_ERROR,
+                                        GTK_BUTTONS_CLOSE,
+                                        buffer->str);
+        g_signal_connect_swapped (dialog,
+                                  "response",
+                                  G_CALLBACK (gtk_widget_destroy),
+                                  dialog);
+        gtk_widget_show(dialog);
+
+        g_string_free(buffer, TRUE/*with content*/);
 }

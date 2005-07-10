@@ -643,35 +643,13 @@ static void choose_file_cb(GtkButton *button, gpointer userdata)
                                                 filename);
                 gtk_entry_set_text(view->path, filename ? filename:"");
 
-                printf("%s:%d: filename: %s\n", /*@nocommit@*/
-                       __FILE__,
-                       __LINE__,
-                       filename
-                       );
-
                 if(filename && g_file_test(filename, G_FILE_TEST_IS_DIR)) {
                         char *old_depth;
-
-                        printf("%s:%d: is dir\n", /*@nocommit@*/
-                               __FILE__,
-                               __LINE__
-                               );
 
                         old_depth=ocha_gconf_get_source_attribute(INDEXER_NAME,
                                                                   source_id,
                                                                   "depth");
-                        printf("%s:%d: depth: '%s'\n", /*@nocommit@*/
-                               __FILE__,
-                               __LINE__,
-                               old_depth
-                               );
-
                         if(old_depth || strcmp("0", old_depth)==0) {
-                                printf("%s:%d: set source to 3\n", /*@nocommit@*/
-                                       __FILE__,
-                                       __LINE__
-                                       );
-
                                 ocha_gconf_set_source_attribute(INDEXER_NAME,
                                                                 source_id,
                                                                 "depth",
