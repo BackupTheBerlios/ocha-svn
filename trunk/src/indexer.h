@@ -466,9 +466,9 @@ static inline void indexer_source_release(struct indexer_source *source)
  * @return an id to use to remove the notification request
  */
 static inline guint indexer_source_notify_display_name_change(struct indexer_source *source,
-                struct catalog *catalog,
-                indexer_source_notify_f notify,
-                gpointer userdata)
+                                                              struct catalog *catalog,
+                                                              indexer_source_notify_f notify,
+                                                              gpointer userdata)
 {
         g_return_val_if_fail(source, 0);
         return source->notify_display_name_change(source,

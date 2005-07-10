@@ -372,12 +372,14 @@ static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current)
                                         indexer_source_index(source,
                                                              prefs->catalog,
                                                              NULL/*err*/);
+                                        indexer_views_refresh_source(prefs->indexer_views,
+                                                                     indexer,
+                                                                     source);
                                         indexer_source_release(source);
                                         update_entry_count(prefs->model,
                                                            current,
                                                            source_id,
                                                            prefs->catalog);
-                                        indexer_views_refresh(prefs->indexer_views);
                                 }
                         }
                         g_free(type);
@@ -521,6 +523,7 @@ static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer use
         source = indexer_new_source(indexer, prefs->catalog, NULL/*err*/);
         if(source) {
                 register_new_source(prefs, indexer, source);
+                indexer_views_open(prefs->indexer_views, indexer, source);
                 indexer_source_release(source);
         }
 }
@@ -575,6 +578,7 @@ static void delete_cb(GtkButton *button, gpointer userdata)
                                                         }
                                                 }
                                         }
+                                        indexer_views_delete_source(prefs->indexer_views, indexer, source);
                                         indexer_source_destroy(source, prefs->catalog);
                                 }
                         }
