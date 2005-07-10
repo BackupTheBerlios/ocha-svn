@@ -1,7 +1,7 @@
 
 #include "preferences_catalog.h"
 #include "indexers.h"
-#include "indexer_view.h"
+#include "indexer_views.h"
 #include "parse_uri_list_next.h"
 #include "ocha_gconf.h"
 #include <gtk/gtk.h>
@@ -44,10 +44,9 @@ struct preferences_catalog
         GtkWidget *refresh_button;
         /** root widget, retured by get_widget */
         GtkWidget *widget;
-        GtkLabel *properties_title;
 
         struct catalog *catalog;
-        struct indexer_view *properties;
+        struct indexer_views *indexer_views;
 
         /**
          * A prefs_and_indexer structure
@@ -68,6 +67,7 @@ static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current);
 static void reload_cb(GtkButton *button, gpointer userdata);
 static void update_properties(struct preferences_catalog  *prefs);
 static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userdata);
+static void row_activated_cb(GtkTreeView *treeview, GtkTreePath *arg1, GtkTreeViewColumn *viewColumn, gpointer userdata);
 static void select_row(struct preferences_catalog  *prefs, GtkTreeIter *source_iter);
 static void register_new_source(struct preferences_catalog  *prefs, struct indexer  *indexer, struct indexer_source  *source);
 static void new_source_button_or_item_cb(GtkWidget *button_or_item, gpointer userdata);
@@ -122,12 +122,16 @@ struct preferences_catalog *preferences_catalog_new(struct catalog *catalog)
 
         prefs->view = create_view(GTK_TREE_MODEL(prefs->model), prefs);
         prefs->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(prefs->view));
-        prefs->properties=indexer_view_new(catalog);
+        prefs->indexer_views=indexer_views_new(catalog);
         prefs->widget = init_widget(prefs);
 
         g_signal_connect(prefs->selection,
                          "changed",
                          G_CALLBACK(row_selection_changed_cb),
+                         prefs);
+        g_signal_connect(prefs->view,
+                         "row-activated",
+                         G_CALLBACK(row_activated_cb),
                          prefs);
 
         install_drop(prefs);
@@ -333,6 +337,7 @@ static GtkTreeView *create_view(GtkTreeModel *model, struct preferences_catalog 
         return view;
 }
 
+
 static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current)
 {
         GtkListStore *model;
@@ -372,7 +377,7 @@ static void reindex(struct preferences_catalog *prefs, GtkTreeIter *current)
                                                            current,
                                                            source_id,
                                                            prefs->catalog);
-                                        indexer_view_refresh(prefs->properties);
+                                        indexer_views_refresh(prefs->indexer_views);
                                 }
                         }
                         g_free(type);
@@ -404,6 +409,7 @@ static void reload_cb(GtkButton *button, gpointer userdata)
         }
 }
 
+
 static void update_properties(struct preferences_catalog  *prefs)
 {
         GtkTreeIter iter;
@@ -425,24 +431,14 @@ static void update_properties(struct preferences_catalog  *prefs)
                                                                    prefs->catalog,
                                                                    source_id);
                                         if(source) {
-                                                indexer_view_attach_source(prefs->properties,
-                                                                           indexer,
-                                                                           source);
+                                                indexer_views_open(prefs->indexer_views, indexer, source);
                                                 indexer_source_release(source);
                                         }
 
-                                } else {
-                                        indexer_view_attach_indexer(prefs->properties,
-                                                                    indexer);
                                 }
-                                gtk_label_set_text(prefs->properties_title,
-                                                   indexer->display_name);
                         }
                         g_free(type);
                 }
-        } else {
-                indexer_view_detach(prefs->properties);
-                gtk_label_set_text(prefs->properties_title, "");
         }
 }
 
@@ -453,8 +449,6 @@ static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userd
         GtkTreeIter iter;
         struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
         g_return_if_fail(prefs);
-
-        update_properties(prefs);
 
         if(gtk_tree_selection_get_selected(selection, NULL/*model_ptr*/, &iter)) {
                 gtk_tree_model_get(GTK_TREE_MODEL(prefs->model), &iter,
@@ -468,6 +462,13 @@ static void row_selection_changed_cb(GtkTreeSelection *selection, gpointer userd
         }
 }
 
+static void row_activated_cb(GtkTreeView *treeview, GtkTreePath *path, GtkTreeViewColumn *viewColumn, gpointer userdata)
+{
+        struct preferences_catalog *prefs = (struct preferences_catalog *)userdata;
+        g_return_if_fail(prefs);
+
+        update_properties(prefs);
+}
 
 /**
  * Make sure the row is visible and then select it
@@ -592,11 +593,6 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
         GtkWidget *del;
         GtkWidget *reload;
         GtkWidget *vbox;
-        GtkWidget *properties_label;
-        PangoAttrList *attrs;
-        GtkWidget *properties_frame;
-        GtkWidget *twopanes;
-
 
         scroll =  gtk_scrolled_window_new(NULL, NULL);
         gtk_widget_show(scroll);
@@ -695,40 +691,9 @@ static GtkWidget *init_widget(struct preferences_catalog *prefs)
                          FALSE/*expand*/,
                          FALSE/*fill*/,
                          0/*padding*/);
+        gtk_container_set_border_width(GTK_CONTAINER(vbox), 12);
 
-        properties_label =  gtk_label_new("");
-        gtk_widget_show(properties_label);
-        prefs->properties_title=GTK_LABEL(properties_label);
-
-        attrs =  pango_attr_list_new();
-        pango_attr_list_insert(attrs,
-                               pango_attr_weight_new(PANGO_WEIGHT_BOLD));
-        gtk_label_set_attributes(GTK_LABEL(properties_label),
-                                 attrs);
-        pango_attr_list_unref(attrs);
-
-        properties_frame =  gtk_frame_new("");
-        gtk_widget_show(properties_frame);
-        gtk_frame_set_shadow_type(GTK_FRAME(properties_frame),
-                                  GTK_SHADOW_NONE);
-        gtk_frame_set_label_widget(GTK_FRAME(properties_frame),
-                                   properties_label);
-        gtk_container_add(GTK_CONTAINER(properties_frame),
-                          indexer_view_widget(prefs->properties));
-
-        twopanes =  gtk_hpaned_new();
-        gtk_widget_show(twopanes);
-        gtk_paned_pack1(GTK_PANED(twopanes),
-                        vbox,
-                        FALSE/*resize*/,
-                        FALSE/*shrink*/);
-        gtk_paned_pack2(GTK_PANED(twopanes),
-                        properties_frame,
-                        TRUE/*resize*/,
-                        TRUE/*shrink*/);
-        gtk_container_set_border_width(GTK_CONTAINER(twopanes), 12);
-
-        return twopanes;
+        return vbox;
 }
 
 static gint list_sort_cb(GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b, gpointer userdata)
@@ -939,3 +904,5 @@ static void display_dnd_errors(struct preferences_catalog *prefs, GSList *errors
 
         g_string_free(buffer, TRUE/*with content*/);
 }
+
+

@@ -142,6 +142,7 @@ ocha_SOURCES= ocha_main.c \
         indexer_mozilla.c indexer_mozilla.h \
         indexer_utils.c indexer_utils.h \
         indexer_view.c indexer_view.h \
+        indexer_views.c indexer_views.h \
         indexers.c indexers.h \
         launcher_application.c launcher_application.h \
         launcher_open.c launcher_open.h \
