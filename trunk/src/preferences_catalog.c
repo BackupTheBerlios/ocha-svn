@@ -583,8 +583,9 @@ static void delete_cb(GtkButton *button, gpointer userdata)
                                 }
                         }
                 }
-                if(type)
+                if(type) {
                         g_free(type);
+                }
         }
 }
 

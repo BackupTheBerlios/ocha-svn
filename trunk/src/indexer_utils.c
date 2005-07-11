@@ -272,9 +272,9 @@ guint source_attribute_change_notify_add(struct indexer *indexer,
                 indexer_source_notify_f callback,
                 gpointer callback_userdata)
 {
-        gboolean retval;
         struct attribute_change_notify_userdata *userdata;
         char *key;
+        guint retval;
 
         key =  ocha_gconf_get_source_attribute_key(indexer->name, source_id, attribute);
 
@@ -285,17 +285,12 @@ guint source_attribute_change_notify_add(struct indexer *indexer,
         userdata->source_id=source_id;
         userdata->catalog=catalog;
 
-        retval = TRUE;
-        if(!gconf_client_notify_add(ocha_gconf_get_client(),
-                                    key,
-                                    attribute_change_notify_cb,
-                                    userdata,
-                                    g_free/*free userdata*/,
-                                    NULL/*err*/))
-        {
-                g_free(userdata);
-                retval=FALSE;
-        }
+        retval=gconf_client_notify_add(ocha_gconf_get_client(),
+                                       key,
+                                       attribute_change_notify_cb,
+                                       userdata,
+                                       g_free/*free userdata*/,
+                                       NULL/*err*/);
         g_free(key);
         return retval;
 }
