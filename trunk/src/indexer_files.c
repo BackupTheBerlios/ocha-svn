@@ -239,25 +239,11 @@ static guint indexer_files_source_notify_add(struct indexer_source *source,
                                                     notify,
                                                     userdata);
 
-        printf("%s:%d: add_notification for %s: %u\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__,
-               source->display_name,
-               retval
-               );
-
         return retval;
 }
 static void indexer_files_source_notify_remove(struct indexer_source *source,
                                                guint id)
 {
-        printf("%s:%d: remove_notification for %s (%u)\n", /*@nocommit@*/
-               __FILE__,
-               __LINE__,
-               source->display_name,
-               id
-               );
-
         source_attribute_change_notify_remove(id);
 }
 

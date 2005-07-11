@@ -21,7 +21,14 @@ struct indexer_views_item
 struct indexer_views
 {
         struct catalog *catalog;
-        struct indexer_views_item *item;
+        /**
+         * int x struct indexer_views_item *.
+         *
+         * source_id -> item.
+         * items are not freed automatically when
+         * they're removed
+         */
+        GHashTable *items;
 };
 
 /* ------------------------- prototypes: static functions */
@@ -30,10 +37,13 @@ static gboolean destroy_event_cb(GtkWidget *widget, GdkEvent *event, gpointer us
 static void update_display_name(struct indexer_views_item *item, struct indexer_source *source);
 static void display_name_change_cb(struct indexer_source *source, gpointer userdata);
 static struct indexer_views_item *indexer_views_item_new(struct indexer_views *views, struct indexer *indexer, struct indexer_source *source);
+static void indexer_views_items_foreach_free(gpointer key, gpointer value, gpointer userdata);
 static void indexer_views_item_init(struct indexer_views *views, struct indexer_views_item *item);
 static void indexer_views_item_free(struct indexer_views_item *item);
 static void indexer_views_item_refresh(struct indexer_views_item  *item, struct indexer_source  *source);
 static void indexer_views_item_set_source(struct indexer_views_item  *item, struct indexer  *indexer, struct indexer_source  *source);
+static void indexer_views_item_remove(struct indexer_views_item *item);
+static struct indexer_views_item *find_item(struct indexer_views *views, int source_id);
 
 /* ------------------------- definitions */
 
@@ -45,7 +55,7 @@ struct indexer_views *indexer_views_new(struct catalog *catalog)
         views = g_new(struct indexer_views, 1);
         memset(views, 0, sizeof(struct indexer_views));
         views->catalog=catalog;
-
+        views->items = g_hash_table_new(g_direct_hash, g_direct_equal);
         return views;
 }
 
@@ -54,21 +64,21 @@ void indexer_views_free(struct indexer_views *views)
         g_return_if_fail(views!=NULL);
 
 
-        if(views->item) {
-                indexer_views_item_free(views->item);
-                views->item=NULL;
-        }
+        g_hash_table_foreach(views->items, (GHFunc)indexer_views_items_foreach_free, NULL/*userdata*/);
+        g_hash_table_destroy(views->items);
 
         g_free(views);
 }
 
 void indexer_views_refresh_source(struct indexer_views *views, struct indexer  *indexer, struct indexer_source  *source)
 {
+        struct indexer_views_item *item;
         g_return_if_fail(views);
         g_return_if_fail(source);
 
-        if(views->item!=NULL) {
-                indexer_views_item_refresh(views->item, source);
+        item=find_item(views, source->id);
+        if(item) {
+                indexer_views_item_refresh(item, source);
         }
 }
 
@@ -78,26 +88,30 @@ void indexer_views_delete_source(struct indexer_views *views, struct indexer  *i
         g_return_if_fail(views);
         g_return_if_fail(source);
 
-        item=views->item;
-
-        if(item!=NULL && source->id==item->source_id) {
+        item=find_item(views, source->id);
+        if(item!=NULL) {
+                indexer_views_item_remove(item);
                 indexer_views_item_free(item);
-                views->item=NULL;
         }
 }
 
 
 void indexer_views_open(struct indexer_views  *views, struct indexer  *indexer, struct indexer_source  *source)
 {
+        struct indexer_views_item *item;
         g_return_if_fail(views);
         g_return_if_fail(indexer);
         g_return_if_fail(source);
 
-        if(views->item) {
-                indexer_views_item_free(views->item);
-                views->item=NULL;
+        item=find_item(views, source->id);
+        if(item) {
+                gtk_window_present(GTK_WINDOW(item->window));
+        } else {
+                item=indexer_views_item_new(views, indexer, source);
+                g_hash_table_insert(views->items,
+                                    GINT_TO_POINTER(source->id),
+                                    item);
         }
-        views->item=indexer_views_item_new(views, indexer, source);
 }
 
 
@@ -111,9 +125,7 @@ static void close_cb(GtkButton *button, gpointer userdata)
 
         item=(struct indexer_views_item *)userdata;
 
-        if(item->views->item==item) {
-                item->views->item=NULL;
-        }
+        indexer_views_item_remove(item);
         indexer_views_item_free(item);
 }
 
@@ -124,9 +136,7 @@ static gboolean destroy_event_cb(GtkWidget *widget, GdkEvent *event, gpointer us
         g_return_val_if_fail(userdata, TRUE);
 
         item=(struct indexer_views_item *)userdata;
-        if(item->views->item==item) {
-                item->views->item=NULL;
-        }
+        indexer_views_item_remove(item);
         indexer_views_item_free(item);
 
         return TRUE/*handled, don't propagate*/;
@@ -175,6 +185,16 @@ static void indexer_views_item_init(struct indexer_views *views, struct indexer_
         item->views = views;
 }
 
+static void indexer_views_items_foreach_free(gpointer key, gpointer value, gpointer userdata)
+{
+        struct indexer_views_item *item;
+
+        g_return_if_fail(value);
+
+        item=(struct indexer_views_item *)value;
+
+        indexer_views_item_free(item);
+}
 static void indexer_views_item_free(struct indexer_views_item *item)
 {
         struct indexer_source *source;
@@ -276,4 +296,21 @@ static void indexer_views_item_set_source(struct indexer_views_item  *item, stru
 
 
         gtk_window_present(GTK_WINDOW(item->window));
+}
+
+static void indexer_views_item_remove(struct indexer_views_item *item)
+{
+        g_return_if_fail(item);
+        g_return_if_fail(item->views);
+
+        g_hash_table_remove(item->views->items,
+                            GINT_TO_POINTER(item->source_id));
+}
+
+static struct indexer_views_item *find_item(struct indexer_views *views, int source_id)
+{
+        g_return_val_if_fail(views, NULL);\
+        g_return_val_if_fail(source_id>0, NULL);
+
+        return (struct indexer_views_item *)g_hash_table_lookup(views->items, GINT_TO_POINTER(source_id));
 }
