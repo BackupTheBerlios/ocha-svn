@@ -49,6 +49,8 @@ START_TEST(test_new_get_set)
                             "could get content not initialized");
                 mark_point();
                 enabled = (i%2)==0;
+                enabled_out = !enabled;
+
                 contentlist_set(list,
                                 i,
                                 100+i/*id*/,
@@ -58,6 +60,7 @@ START_TEST(test_new_get_set)
                 mark_point();
                 fail_unless(contentlist_get(list, i, &id_out, &name_out, &long_name_out, &enabled_out),
                             "could not get initialized content");
+
                 mark_point();
                 printf("[%d] id=%d, name='%s', long_name='%s'\n",
                        i, id_out, name_out, long_name_out);
@@ -72,7 +75,7 @@ START_TEST(test_new_get_set)
                             "wrong long_name");
                 fail_unless(long_name!=long_name_out,
                             "long_name not strdup'ed");
-                fail_unless(enabled_out!=enabled,
+                fail_unless((enabled_out && enabled) || (!enabled_out && !enabled),
                             "wrong value for enabled");
         }
         g_object_unref(list);

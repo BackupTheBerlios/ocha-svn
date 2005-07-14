@@ -1298,6 +1298,12 @@ GnomeDesktopFile *gnome_desktop_file_load_uri(const char *uri, GError **err)
                                     (gulong)size);
 
                 } else {
+                        printf("%s:%d: gnome_vfs_open(%s)\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__,
+                               uri
+                               );
+
                         result = gnome_vfs_open(&handle, uri, GNOME_VFS_OPEN_READ);
                         if(result==GNOME_VFS_OK) {
                                 char *buffer = g_malloc(size+1);

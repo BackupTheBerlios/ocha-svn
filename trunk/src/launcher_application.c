@@ -180,11 +180,22 @@ static GnomeDesktopFile *load_desktop_file(const char *uri, GError **err)
 {
         GnomeDesktopFile *retval;
         GError *gnome_err = NULL;
+        char *path;
 
         g_return_val_if_fail(uri, NULL);
         g_return_val_if_fail(err==NULL || *err==NULL, NULL);
 
-        retval = gnome_desktop_file_load_uri(uri, err==NULL ? NULL:&gnome_err);
+        path=gnome_vfs_get_local_path_from_uri(uri);
+        if(path==NULL) {
+                g_set_error(err,
+                            LAUNCHER_ERROR,
+                            LAUNCHER_INVALID_URI,
+                            "Error parsing %s: not a local file",
+                            uri);
+                g_error_free(gnome_err);
+        }
+
+        retval = gnome_desktop_file_load(path, err==NULL ? NULL:&gnome_err);
 
         if(gnome_err) {
                 g_set_error(err,
