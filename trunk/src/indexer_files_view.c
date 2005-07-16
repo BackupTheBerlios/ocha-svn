@@ -28,6 +28,10 @@
 struct indexer_files_view
 {
         struct indexer_source_view base;
+
+        /** => read-only and only 'path' is taken into account */
+        gboolean pseudo;
+
         /** Disable most callbacks when this is true */
         gboolean disable_cb;
 
@@ -43,8 +47,6 @@ struct indexer_files_view
         GtkLabel *depth_value;
         /** The scale that lets one choose the depth */
         GtkRange *depth;
-        /** The entry box for 'Includes' */
-        GtkEntry *includes;
         /** The entry boy for 'Excludes' */
         GtkEntry *excludes;
         /** The root of the widgets that should be disabled if include_contents==false */
@@ -57,6 +59,7 @@ static void indexer_files_view_detach(struct indexer_source_view *view);
 static void indexer_files_view_release(struct indexer_source_view *view);
 
 /* ------------------------- prototypes: other */
+static struct indexer_source_view *create_view(struct indexer *indexer, gboolean real);
 static GtkWidget *create_widget(struct indexer_files_view *view);
 static void update_widgets(struct indexer_files_view *view);
 static void update_from_text_fields(struct indexer_files_view *view);
@@ -71,31 +74,16 @@ static void include_content_reset_depth_cb(GtkToggleButton *toggle, gpointer use
 static void choose_file_cb(GtkButton *toggle, gpointer userdata);
 static gboolean update_path_on_focus_out_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata);
 static void update_path(struct indexer_files_view *view);
+
 /* ------------------------- public functions */
 
 struct indexer_source_view *indexer_files_view_new(struct indexer *indexer)
 {
-        struct indexer_files_view *retval;
-        g_return_val_if_fail(indexer!=NULL, NULL);
-
-        retval=g_new(struct indexer_files_view, 1);
-        memset(retval, 0, sizeof(struct indexer_files_view));
-
-        retval->base.indexer = indexer;
-        retval->base.source_id=-1;
-        retval->disable_cb=TRUE;
-        retval->base.widget = create_widget(retval);
-        g_object_ref(retval->base.widget);
-        gtk_widget_show(retval->base.widget);
-
-        retval->base.attach=indexer_files_view_attach;
-        retval->base.detach=indexer_files_view_detach;
-        retval->base.release=indexer_files_view_release;
-
-        update_widgets(retval);
-        connect_widgets(retval);
-
-        return &retval->base;
+        return create_view(indexer, TRUE/*real*/);
+}
+struct indexer_source_view *indexer_files_view_new_pseudo_view(struct indexer *indexer)
+{
+        return create_view(indexer, FALSE/*not real*/);
 }
 /* ------------------------- member function (indexer_files_view) */
 static void indexer_files_view_attach(struct indexer_source_view *_view, struct indexer_source *source)
@@ -151,6 +139,36 @@ static void indexer_files_view_release(struct indexer_source_view *_view)
 
 
 /* ------------------------- static functions */
+
+static struct indexer_source_view *create_view(struct indexer *indexer, gboolean real)
+{
+        struct indexer_files_view *retval;
+        g_return_val_if_fail(indexer!=NULL, NULL);
+
+        retval=g_new(struct indexer_files_view, 1);
+        memset(retval, 0, sizeof(struct indexer_files_view));
+
+        retval->pseudo=!real;
+        retval->base.indexer = indexer;
+        retval->base.source_id=-1;
+        retval->disable_cb=TRUE;
+        retval->base.widget = create_widget(retval);
+        g_object_ref(retval->base.widget);
+        gtk_widget_show(retval->base.widget);
+
+        retval->base.attach=indexer_files_view_attach;
+        retval->base.detach=indexer_files_view_detach;
+        retval->base.release=indexer_files_view_release;
+
+        update_widgets(retval);
+        if(real) {
+                connect_widgets(retval);
+        }
+
+        return &retval->base;
+}
+
+
 static GtkWidget *create_widget(struct indexer_files_view *view)
 {
         GtkWidget *retval;
@@ -163,13 +181,11 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
         GtkWidget *frame_bottom;
         GtkWidget *frame_bottom_label;
         GtkWidget *bottom_table;
-        GtkWidget *include_label;
         GtkWidget *exclude_label;
         GtkWidget *include_contents;
         GtkWidget *depth_label;
         GtkWidget *depth_value;
         PangoAttrList *attrs;
-        GtkWidget *include;
         GtkWidget *exclude;
         GtkWidget *depth;
         GtkWidget *filler;
@@ -240,16 +256,9 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
         gtk_container_add(GTK_CONTAINER(align), bottom_table);
         gtk_container_set_border_width(GTK_CONTAINER(bottom_table), 4);
 
-        include_label =  gtk_label_new("Include: ");
-        gtk_widget_show(include_label);
-        gtk_table_attach(GTK_TABLE(bottom_table), include_label, 0, 1, 1, 2,
-                         (GtkAttachOptions)(GTK_FILL),
-                         (GtkAttachOptions)(0), 0, 0);
-        gtk_misc_set_alignment(GTK_MISC(include_label), 0, 0.5);
-
         exclude_label =  gtk_label_new("Exclude:");
         gtk_widget_show(exclude_label);
-        gtk_table_attach(GTK_TABLE(bottom_table), exclude_label, 0, 1, 2, 3,
+        gtk_table_attach(GTK_TABLE(bottom_table), exclude_label, 0, 1, 1, 2,
                          (GtkAttachOptions)(GTK_FILL),
                          (GtkAttachOptions)(0), 0, 0);
         gtk_misc_set_alignment(GTK_MISC(exclude_label), 0, 0.5);
@@ -279,15 +288,9 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
         gtk_label_set_attributes(GTK_LABEL(depth_value), attrs);
         pango_attr_list_unref(attrs);
 
-        include =  gtk_entry_new();
-        gtk_widget_show(include);
-        gtk_table_attach(GTK_TABLE(bottom_table), include, 1, 2, 1, 2,
-                         (GtkAttachOptions)(GTK_EXPAND | GTK_FILL),
-                         (GtkAttachOptions)(0), 4, 0);
-
         exclude =  gtk_entry_new();
         gtk_widget_show(exclude);
-        gtk_table_attach(GTK_TABLE(bottom_table), exclude, 1, 2, 2, 3,
+        gtk_table_attach(GTK_TABLE(bottom_table), exclude, 1, 2, 1, 2,
                          (GtkAttachOptions)(GTK_EXPAND | GTK_FILL),
                          (GtkAttachOptions)(0), 4, 0);
         depth =  gtk_vscale_new_with_range(1.0/*min*/,
@@ -307,7 +310,7 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
                          (GtkAttachOptions)(GTK_EXPAND), 0, 0);
         gtk_misc_set_alignment(GTK_MISC(filler), 0, 0.5);
 
-        explanation =  gtk_label_new("Fill include/exclude with comma-separated "
+        explanation =  gtk_label_new("Fill <i>exclude</i> with comma-separated "
                                      "patterns to be applied to files or directories "
                                      "inside the current folder.\n"
                                      "Example: <i>*.txt,*.gif,*.jpg</i>");
@@ -325,7 +328,6 @@ static GtkWidget *create_widget(struct indexer_files_view *view)
         view->choose_button=GTK_BUTTON(choose_button);
         view->depth_value=GTK_LABEL(depth_value);
         view->depth=GTK_RANGE(depth);
-        view->includes=GTK_ENTRY(include);
         view->excludes=GTK_ENTRY(exclude);
         view->contentWidgetsRoot=GTK_CONTAINER(bottom_table);
         return retval;
@@ -394,15 +396,22 @@ static void update_widgets(struct indexer_files_view *view)
                 current_path = ocha_gconf_get_source_attribute(indexer_name,
                                                                source_id,
                                                                "path");
-                current_ignore = ocha_gconf_get_source_attribute(indexer_name,
-                                                                 source_id,
-                                                                 "ignore");
-
-                current_depth = ocha_gconf_get_source_attribute(indexer_name,
-                                                                source_id,
-                                                                "depth");
                 system = ocha_gconf_is_system(indexer_name, source_id);
-                readonly = system;
+                if(view->pseudo) {
+                        current_ignore=NULL;
+                        current_depth=NULL;
+                        readonly=TRUE;
+                } else {
+                        current_ignore = ocha_gconf_get_source_attribute(indexer_name,
+                                                                         source_id,
+                                                                         "ignore");
+
+                        current_depth = ocha_gconf_get_source_attribute(indexer_name,
+                                                                        source_id,
+                                                                        "depth");
+
+                        readonly = system;
+                }
         }
 
         current_depth_i =  current_depth ? atoi(current_depth):1;
@@ -435,7 +444,9 @@ static void update_widgets(struct indexer_files_view *view)
 
 static void update_from_text_fields(struct indexer_files_view *view)
 {
-        update_path(view);
+        if(!view->pseudo) {
+                update_path(view);
+        }
 }
 
 static void depth_changed_cb(GtkRange *range, gpointer userdata)
@@ -447,7 +458,10 @@ static void depth_changed_cb(GtkRange *range, gpointer userdata)
 
         g_return_if_fail(range);
         g_return_if_fail(userdata);
+
         view = (struct indexer_files_view *)userdata;
+        g_return_if_fail(!view->pseudo);
+
         if(view->disable_cb) {
                 return;
         }
@@ -497,6 +511,8 @@ static void exclude_changed_cb(GtkEditable *widget, gpointer userdata)
         g_return_if_fail(widget);
         g_return_if_fail(userdata);
         view = (struct indexer_files_view *)userdata;
+        g_return_if_fail(!view->pseudo);
+
         if(view->disable_cb) {
                 return;
         }
@@ -519,6 +535,7 @@ static void include_content_set_attribute_cb(GtkToggleButton *toggle, gpointer u
         g_return_if_fail(toggle);
         g_return_if_fail(userdata);
         view = (struct indexer_files_view *)userdata;
+        g_return_if_fail(!view->pseudo);
         if(view->disable_cb) {
                 return;
         }
@@ -604,6 +621,7 @@ static void choose_file_cb(GtkButton *button, gpointer userdata)
 
         g_return_if_fail(userdata);
         view = (struct indexer_files_view *)userdata;
+        g_return_if_fail(!view->pseudo);
         if(view->disable_cb) {
                 return;
         }
@@ -680,6 +698,7 @@ static void update_path(struct indexer_files_view *view)
         const char *path;
         char *oldpath;
         g_return_if_fail(view);
+        g_return_if_fail(!view->pseudo);
         if(view->base.source_id<=0) {
                 return;
         }

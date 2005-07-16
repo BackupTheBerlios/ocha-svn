@@ -2,6 +2,7 @@
 #include "indexer_utils.h"
 #include "ocha_gconf.h"
 #include "launcher_openurl.h"
+#include "indexer_files_view.h"
 #include <libgnome/gnome-url.h>
 #include <libgnome/gnome-exec.h>
 #include <libgnome/gnome-util.h>
@@ -35,7 +36,6 @@ struct discovered
 
 static struct indexer_source *indexer_mozilla_load(struct indexer *self, struct catalog *catalog, int id);
 static gboolean indexer_mozilla_discover(struct indexer *indexer, struct catalog *catalog);
-static struct indexer_source_view *indexer_mozilla_new_view(struct indexer *indexer);
 
 /* ------------------------- prototypes: indexer_mozilla_source */
 static void indexer_mozilla_source_release(struct indexer_source *source);
@@ -52,11 +52,6 @@ static void discover_add_profiles_file(GArray *discovereds, const char *path);
 gboolean discover_callback(struct catalog *catalog, int ignored, const char *path, const char *filename, GError **err, gpointer userdata);
 static char *display_name(struct catalog *catalog, int id);
 
-/* ------------------------- prototypes: indexer_source_view */
-static void indexer_mozilla_source_view_attach(struct indexer_source_view *view, struct indexer_source *);
-static void indexer_mozilla_source_view_detach(struct indexer_source_view *view);
-static void indexer_mozilla_source_view_release(struct indexer_source_view *view);
-
 /* ------------------------- definitions */
 struct indexer indexer_mozilla = {
         INDEXER_NAME,
@@ -71,7 +66,7 @@ struct indexer indexer_mozilla = {
         indexer_mozilla_load,
         NULL/*new_source*/,
         NULL/*new_source_for_uri*/,
-        indexer_mozilla_new_view
+        indexer_files_view_new_pseudo_view
 };
 
 /* ------------------------- public functions */
@@ -152,24 +147,6 @@ static gboolean indexer_mozilla_discover(struct indexer *indexer,
         return retval;
 }
 
-static struct indexer_source_view *indexer_mozilla_new_view(struct indexer *indexer)
-{
-        struct indexer_source_view *retval;
-        g_return_val_if_fail(indexer!=NULL, NULL);
-
-        retval=g_new(struct indexer_source_view, 1);
-        retval->indexer = indexer;
-        retval->widget = gtk_label_new("");
-        g_object_ref(retval->widget);
-        gtk_widget_show(retval->widget);
-
-        retval->attach=indexer_mozilla_source_view_attach;
-        retval->detach=indexer_mozilla_source_view_detach;
-        retval->release=indexer_mozilla_source_view_release;
-
-        return retval;
-
-}
 
 /* ------------------------- member functions: indexer_mozilla_source */
 static void indexer_mozilla_source_release(struct indexer_source *source)
@@ -230,31 +207,6 @@ static void indexer_mozilla_source_notify_remove(struct indexer_source *source,
         source_attribute_change_notify_remove(id);
 
 }
-
-/* ------------------------- member functions (indexer_source_view) */
-static void indexer_mozilla_source_view_attach(struct indexer_source_view *view, struct indexer_source *source)
-{
-        g_return_if_fail(view!=NULL);
-        g_return_if_fail(source);
-
-        view->source_id=source->id;
-        gtk_label_set_text(GTK_LABEL(view->widget),
-                           source->display_name);
-}
-
-static void indexer_mozilla_source_view_detach(struct indexer_source_view *view)
-{
-        g_return_if_fail(view!=NULL);
-        view->source_id=-1;
-}
-
-static void indexer_mozilla_source_view_release(struct indexer_source_view *view)
-{
-        g_return_if_fail(view!=NULL);
-        g_object_unref(view->widget);
-        g_free(view);
-}
-
 
 /* ------------------------- static functions */
 

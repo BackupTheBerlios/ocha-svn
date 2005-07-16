@@ -13,6 +13,7 @@
 #include <libgnome/gnome-exec.h>
 #include <libgnome/gnome-util.h>
 #include "desktop_file.h"
+#include "indexer_files_view.h"
 #include "string_set.h"
 
 /**
@@ -27,7 +28,6 @@
 
 static struct indexer_source *indexer_application_load_source(struct indexer *self, struct catalog *catalog, int id);
 static gboolean indexer_application_discover(struct indexer *indexer, struct catalog *catalog);
-static struct indexer_source_view *indexer_applications_new_view(struct indexer *indexer);
 
 /* ------------------------- prototypes: indexer_application_source */
 static void indexer_application_source_release(struct indexer_source *source);
@@ -35,11 +35,6 @@ static gboolean index_application_cb(struct catalog *catalog, int source_id, con
 static gboolean indexer_application_source_index(struct indexer_source *self, struct catalog *catalog, GError **err);
 static guint indexer_application_source_notify_add(struct indexer_source *source, struct catalog *catalog, indexer_source_notify_f notify, gpointer userdata);
 static void indexer_application_source_notify_remove(struct indexer_source *source, guint id);
-
-/* ------------------------- prototypes: indexer_source_view */
-static void indexer_applications_source_view_attach(struct indexer_source_view *view, struct indexer_source *);
-static void indexer_applications_source_view_detach(struct indexer_source_view *view);
-static void indexer_applications_source_view_release(struct indexer_source_view *view);
 
 /* ------------------------- prototypes: other */
 static GSList *maybe_add_applications_directory(GSList *path, const char *directory);
@@ -61,7 +56,7 @@ struct indexer indexer_applications = {
         indexer_application_load_source,
         NULL/*new_source*/,
         NULL/*new_source_for_uri*/,
-        indexer_applications_new_view,
+        indexer_files_view_new_pseudo_view,
 };
 
 /* ------------------------- public functions */
@@ -110,23 +105,6 @@ static gboolean indexer_application_discover(struct indexer *indexer, struct cat
 
         g_slist_foreach(paths, (GFunc)g_free, NULL/*no userdata*/);
         g_slist_free(paths);
-        return retval;
-}
-
-static struct indexer_source_view *indexer_applications_new_view(struct indexer *indexer)
-{
-        struct indexer_source_view *retval;
-
-        retval=g_new(struct indexer_source_view, 1);
-        retval->indexer = indexer;
-        retval->widget = gtk_label_new("");
-        g_object_ref(retval->widget);
-        gtk_widget_show(retval->widget);
-
-        retval->attach=indexer_applications_source_view_attach;
-        retval->detach=indexer_applications_source_view_detach;
-        retval->release=indexer_applications_source_view_release;
-
         return retval;
 }
 
@@ -218,30 +196,6 @@ static gboolean indexer_application_source_index(struct indexer_source *self, st
 
         catalog_end_source_update(catalog, self->id);
         return success;
-}
-
-/* ------------------------- member functions (indexer_source_view) */
-static void indexer_applications_source_view_attach(struct indexer_source_view *view, struct indexer_source *source)
-{
-        g_return_if_fail(view!=NULL);
-        g_return_if_fail(source!=NULL);
-
-        view->source_id=source->id;
-        gtk_label_set_text(GTK_LABEL(view->widget),
-                           source->display_name);
-}
-
-static void indexer_applications_source_view_detach(struct indexer_source_view *view)
-{
-        g_return_if_fail(view!=NULL);
-        view->source_id=-1;
-}
-
-static void indexer_applications_source_view_release(struct indexer_source_view *view)
-{
-        g_return_if_fail(view!=NULL);
-        g_object_unref(view->widget);
-        g_free(view);
 }
 
 /* ------------------------- static functions */
