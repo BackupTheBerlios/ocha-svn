@@ -42,7 +42,7 @@ contentlist_check_CFLAGS=$(TEST_CFLAGS)
 contentlist_check_LDADD=$(TEST_LIBS)  $(GNOME_CFLAGS)
 
 result_queue_check_SOURCES=result_queue_check.c \
-	result_queue.c result_queue_check.h \
+	result_queue.c \
 	result.h \
 	queryrunner.h
 result_queue_check_CFLAGS=$(TEST_CFLAGS)
