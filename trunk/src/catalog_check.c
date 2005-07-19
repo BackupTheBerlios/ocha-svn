@@ -60,7 +60,6 @@ static void _assert_source_exists(struct catalog *catalog, const char *type, int
 
 static void setup()
 {
-        printf("---\n");
         g_thread_init_with_errorcheck_mutexes(NULL/*vtable*/);
         unlink_if_exists(PATH);
 }
@@ -68,25 +67,35 @@ static void setup()
 static void teardown()
 {
         unlink(PATH);
-        printf("--- end\n");
 }
 
 static void setup_query()
 {
+        GError *err=NULL;
         int i;
         setup();
-        catalog=catalog_connect(PATH, NULL);
+        unlink_if_exists(PATH);
 
-        fail_unless(catalog_add_source(catalog,
+        catalog=catalog_connect(PATH, &err);
+        fail_unless(err==NULL,
+                    "ERROR from catalog_connect(" PATH "): %s\n",
+                    (err ? err->message:"null"));
+
+        fail_unless(catalog!=NULL, "no catalog");
+        fail_unless(err==NULL, "catalog, but error!=NULL");
+
+        catalog_cmd(catalog,
+                    "create source 'test'",
+                    catalog_add_source(catalog,
                                        "test",
-                                       &source_id),
-                    "source could not be created");
+                                       &source_id));
         for(i=0; i<entries_length; i++) {
                 entries[i].source_id=source_id;
-                fail_unless(catalog_add_entry(catalog,
+                catalog_cmd(catalog,
+                            "create entry",
+                            catalog_add_entry(catalog,
                                               &entries[i],
-                                              &entries_id[i]),
-                            "entry could not be created");
+                                              &entries_id[i]));
         }
 
 
@@ -273,6 +282,7 @@ START_TEST(test_get_source_content)
                               source1_entries,
                               array,
                               FALSE/*not ordered*/);
+        mark_point();
 
         catalog_disconnect(catalog);
 
@@ -659,10 +669,13 @@ START_TEST(test_busy)
         g_mutex_unlock(execute_query_mutex);
 
         printf("test_busy: execute query\n");
+        mark_point();
         execute_query_and_expect("toto.c",
                                  0,
                                  NULL,
                                  FALSE/*not ordered*/);
+        mark_point();
+
         printf("test_busy: query done\n");
         catalog_restart(catalog);
 
@@ -673,10 +686,12 @@ START_TEST(test_busy)
         g_mutex_unlock(execute_query_mutex);
 
 
+        mark_point();
         execute_query_and_expect("toto.c",
                                  1,
                                  goal,
                                  FALSE/*not ordered*/);
+        mark_point();
 
         g_mutex_lock(execute_query_mutex);
         g_cond_broadcast(execute_query_cond); /* tell the thread to finish*/
@@ -764,10 +779,13 @@ END_TEST
 
 static Suite *catalog_check_suite(void)
 {
-        Suite *s = suite_create("catalog");
-        TCase *tc_core = tcase_create("catalog_core");
-        TCase *tc_query = tcase_create("catalog_query");
+        Suite *s;
+        TCase *tc_core;
+        TCase *tc_query;
 
+        s = suite_create("catalog");
+
+        tc_core = tcase_create("catalog_core");
         tcase_add_checked_fixture(tc_core, setup, teardown);
         suite_add_tcase(s, tc_core);
         tcase_add_test(tc_core, test_create);
@@ -784,6 +802,8 @@ static Suite *catalog_check_suite(void)
         tcase_add_test(tc_core, test_check_source_transform);
         tcase_add_test(tc_core, test_timestamp);
 
+        tc_query = tcase_create("catalog_query");
+        tcase_set_timeout(tc_query, 60/*s.*/);
         tcase_add_checked_fixture(tc_query, setup_query, teardown_query);
         suite_add_tcase(s, tc_query);
         tcase_add_test(tc_query, test_execute_query);
@@ -810,7 +830,6 @@ int main(void)
         srunner_run_all (sr, CK_NORMAL);
         nf = srunner_ntests_failed (sr);
         srunner_free (sr);
-        suite_free (s);
         return (nf == 0) ? 0:10;
 }
 
@@ -835,14 +854,17 @@ static void _catalog_cmd(struct catalog *catalog,
 static gboolean exists(const char *path)
 {
         struct stat buf;
-        if(stat(path, &buf)!=0)
+        if(stat(path, &buf)!=0) {
                 return FALSE;
+        }
         return buf.st_size>0;
 }
 
 static void unlink_if_exists(const char *path)
 {
-        unlink(path);
+        if(exists(path)) {
+                unlink(path);
+        }
         fail_unless(!exists(path),
                     path);
 }
@@ -890,10 +912,13 @@ static void execute_query_and_expect(const char *query,
                                      gboolean ordered)
 {
         GArray *array = g_array_new(TRUE/*zero_terminated*/, TRUE/*clear*/, sizeof(char *));
+        mark_point();
         catalog_cmd(catalog,
                     "executequery()",
                     catalog_executequery(catalog, query, collect_result_names_callback, &array));
+        mark_point();
         assert_array_contains(query, goal_length, goal, array, ordered);
+        mark_point();
 }
 static void assert_array_contains(const char *query,
                                   int goal_length,
@@ -957,9 +982,12 @@ static void assert_array_contains(const char *query,
                 }
         }
         mark_point();
-        for(i=0; i<found_length; i++)
+        for(i=0; i<found_length; i++) {
                 g_free(found[i]);
+        }
+        mark_point();
         g_free(array);
+        mark_point();
 }
 
 static gboolean test_source_callback(struct catalog *catalog,

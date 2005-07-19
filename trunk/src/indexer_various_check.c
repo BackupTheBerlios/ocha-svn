@@ -454,7 +454,6 @@ int main(void)
         srunner_run_all (sr, CK_NORMAL);
         nf = srunner_ntests_failed (sr);
         srunner_free (sr);
-        suite_free (s);
         return (nf == 0) ? 0:10;
 }
 

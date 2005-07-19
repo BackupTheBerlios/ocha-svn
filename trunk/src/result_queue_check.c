@@ -256,7 +256,6 @@ int main(int argc, char* argv[])
         srunner_run_all (sr, CK_NORMAL);
         nf = srunner_ntests_failed (sr);
         srunner_free (sr);
-        suite_free (s);
         return (nf == 0) ? 0:10;
 }
 

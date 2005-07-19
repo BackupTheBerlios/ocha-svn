@@ -220,6 +220,7 @@ static Suite *catalog_queryrunner_check_suite(void)
         TCase *tc_core = tcase_create("catalog_queryrunner_core");
 
         suite_add_tcase(s, tc_core);
+        tcase_set_timeout(tc_core, 60/*s.*/);
         tcase_add_checked_fixture(tc_core, setup, teardown);
         tcase_add_test(tc_core, test_fast_typer);
         tcase_add_test(tc_core, test_slow_thinker);
@@ -238,7 +239,6 @@ int main(void)
         srunner_run_all (sr, CK_NORMAL);
         nf = srunner_ntests_failed (sr);
         srunner_free (sr);
-        suite_free (s);
         return (nf == 0) ? 0:10;
 }
 

@@ -7,7 +7,8 @@ noinst_HEADERS= \
 	catalog_queryrunner.h
 bin_PROGRAMS=ocha ochad
 
-noinst_PROGRAMS= \
+if RUN_TESTS
+ noinst_PROGRAMS= \
 	result_queue_check \
 	catalog_check \
 	query_check \
@@ -17,7 +18,7 @@ noinst_PROGRAMS= \
 	contentlist_check \
 	parse_uri_list_next_check
 
-TESTS= \
+  TESTS= \
 	result_queue_check \
 	catalog_check \
 	query_check \
@@ -99,6 +100,14 @@ indexer_various_check_SOURCES=indexer_various_check.c \
         string_set.c 
 indexer_various_check_CFLAGS=$(TEST_CFLAGS) $(GNOME_CFLAGS) 
 indexer_various_check_LDADD=$(TEST_LIBS) 
+
+
+else
+  noinst_PROGRAMS= no_check
+  TESTS= no_check
+
+  no_check_SOURCES = no_check.c
+endif
 
 
 ochad_SOURCES= ochad_main.c \
