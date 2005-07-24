@@ -97,7 +97,7 @@ static int do_install(struct configuration  *config) {
         struct catalog  *catalog;
         struct first_time data;
 
-        catalog =  catalog_connect(config->catalog_path, &err);
+        catalog =  catalog_new_and_connect(config->catalog_path, &err);
         if(catalog==NULL) {
                 fprintf(stderr, "error: could not open or create catalog at '%s': %s\n",
                         config->catalog_path,
@@ -118,7 +118,7 @@ static int do_install(struct configuration  *config) {
         }
 
         catalog_timestamp_update(catalog);
-        catalog_disconnect(catalog);
+        catalog_free(catalog);
 
         if(!data.indexed) {
                 unlink(config->catalog_path);

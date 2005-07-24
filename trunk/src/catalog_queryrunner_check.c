@@ -76,7 +76,7 @@ static void setup()
         g_thread_init(NULL/*vtable*/);
 
 
-        catalog =  catalog_connect(CATALOG_PATH, NULL/*errs*/);
+        catalog =  catalog_new_and_connect(CATALOG_PATH, NULL/*errs*/);
         fail_unless(catalog!=NULL, "no catalog in " CATALOG_PATH);
         fail_unless(catalog_add_source(catalog, "test", &source_id), "add_source");
 
@@ -92,7 +92,7 @@ static void setup()
                                               NULL/*id_out*/),
                             "add source");
         }
-        catalog_disconnect(catalog);
+        catalog_free(catalog);
 
         maincontext=g_main_context_default();
 

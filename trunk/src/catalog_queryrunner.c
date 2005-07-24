@@ -268,10 +268,10 @@ static void catalog_queryrunner_release(struct queryrunner *_self)
 /* ------------------------- static functions */
 static gboolean try_connect(const char *path)
 {
-        struct catalog *catalog=catalog_connect(path, NULL/*errormsg*/);
+        struct catalog *catalog=catalog_new_and_connect(path, NULL/*errormsg*/);
         if(catalog==NULL)
                 return FALSE;
-        catalog_disconnect(catalog);
+        catalog_free(catalog);
         return TRUE;
 }
 
@@ -284,7 +284,7 @@ static void runquery_thread_open_catalog(struct catalog_queryrunner  *queryrunne
 {
         struct catalog *catalog;
 
-        catalog=catalog_connect(queryrunner->path, NULL/*errmsg*/);
+        catalog=catalog_new_and_connect(queryrunner->path, NULL/*errmsg*/);
         if(catalog) {
                 queryrunner->catalog=catalog;
         } else {
@@ -302,7 +302,7 @@ static void runquery_thread_close_catalog(struct catalog_queryrunner  *queryrunn
 {
         struct catalog *catalog = queryrunner->catalog;
         queryrunner->catalog=NULL;
-        catalog_disconnect(catalog);
+        catalog_free(catalog);
         g_string_truncate(queryrunner->running_query, 0);
 }
 

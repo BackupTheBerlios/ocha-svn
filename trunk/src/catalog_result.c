@@ -73,14 +73,14 @@ static gboolean catalog_result_validate(struct result *_self)
 
 static void update_entry_timestamp(const char *catalog_path, int entry_id)
 {
-        struct catalog *catalog = catalog_connect(catalog_path, NULL/*errmsg*/);
+        struct catalog *catalog = catalog_new_and_connect(catalog_path, NULL/*errmsg*/);
         if(catalog) {
                 if(!catalog_update_entry_timestamp(catalog, entry_id)) {
                         fprintf(stderr,
                                 "warning: lastuse timestamp update failed: %s\n",
                                 catalog_error(catalog));
                 }
-                catalog_disconnect(catalog);
+                catalog_free(catalog);
         }
 }
 

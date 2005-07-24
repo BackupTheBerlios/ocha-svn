@@ -191,10 +191,10 @@ static gulong schedule_get_last_update(void)
 {
         if(!last_update_known) {
                 struct catalog *catalog;
-                catalog = catalog_connect(config.catalog_path, NULL/*err*/);
+                catalog = catalog_new_and_connect(config.catalog_path, NULL/*err*/);
                 if(catalog!=NULL) {
                         last_update=catalog_timestamp_get(catalog);
-                        catalog_disconnect(catalog);
+                        catalog_free(catalog);
                 } else {
                         last_update=0;
                 }

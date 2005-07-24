@@ -30,7 +30,7 @@ int mode_preferences(int argc, char *argv[])
         mode_install_if_necessary(&config);
         ocha_init_requires_catalog(config.catalog_path);
 
-        catalog =  catalog_connect(config.catalog_path, &err);
+        catalog =  catalog_new_and_connect(config.catalog_path, &err);
         if(!catalog) {
                 printf("error: invalid catalog at %s: %s\n",
                        config.catalog_path,
@@ -42,7 +42,7 @@ int mode_preferences(int argc, char *argv[])
 
         gtk_main();
 
-        catalog_disconnect(catalog);
+        catalog_free(catalog);
         return 0;
 }
 

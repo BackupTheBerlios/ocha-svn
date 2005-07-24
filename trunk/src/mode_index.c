@@ -66,7 +66,7 @@ int mode_index(int argc, char *argv[])
         ocha_init(PACKAGE, argc, argv, FALSE/*no gui*/, &config);
         ocha_init_requires_catalog(config.catalog_path);
         catalog_path =  config.catalog_path;
-        catalog =  catalog_connect(catalog_path, &err);
+        catalog =  catalog_new_and_connect(catalog_path, &err);
 
         if(curarg!=argc) {
                 fprintf(stderr,
@@ -86,7 +86,7 @@ int mode_index(int argc, char *argv[])
         retval = index_everything(catalog, verbose);
 
         catalog_timestamp_update(catalog);
-        catalog_disconnect(catalog);
+        catalog_free(catalog);
         return retval;
 }
 

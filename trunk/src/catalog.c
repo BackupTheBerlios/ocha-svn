@@ -43,6 +43,9 @@ struct catalog
         int current_source_version;
 };
 
+#define return_unless_connected(catalog) if(!check_connected(catalog, __FILE__, __LINE__)) { return; }
+#define return_val_unless_connected(catalog, val ) if(!check_connected(catalog, __FILE__, __LINE__)) { return (val); }
+
 /* ------------------------- prototypes */
 static int getinteger_callback(void *userdata, int column_count, char **result, char **names);
 static gboolean exists(const char *path);
@@ -59,12 +62,14 @@ static int findid_callback(void *userdata, int column_count, char **result, char
 static int timestamp_callback(void *userdata, int column_count, char **result, char **names);
 static gboolean findentry(struct catalog *catalog, const char *path, int source_id, int *id_out);
 static gboolean source_version(struct catalog *catalog, int source_id, int *version_out);
+static gboolean check_connected(struct catalog *catalog, const char *file, int line);
+static void reset_error(struct catalog *catalog);
 
 /* ------------------------- public functions */
 
 gboolean catalog_add_entry(struct catalog *catalog,
-                                  const struct catalog_entry *entry,
-                                  int *id_out)
+                           const struct catalog_entry *entry,
+                           int *id_out)
 {
         int old_id=-1;
         int version;
@@ -75,6 +80,9 @@ gboolean catalog_add_entry(struct catalog *catalog,
         g_return_val_if_fail(entry->path!=NULL, FALSE);
         g_return_val_if_fail(entry->name!=NULL, FALSE);
         g_return_val_if_fail(entry->long_name!=NULL, FALSE);
+
+        return_val_unless_connected(catalog, FALSE);
+
 
         if(!source_version(catalog, entry->source_id, &version)) {
                 return FALSE;
@@ -121,6 +129,8 @@ gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_o
         g_return_val_if_fail(type!=NULL, FALSE);
         g_return_val_if_fail(id_out!=NULL, FALSE);
 
+        return_val_unless_connected(catalog, FALSE);
+
         if(execute_update_printf(catalog, TRUE/*autocommit*/,
                                  "INSERT INTO sources (id, type, version, enabled) VALUES (NULL, '%q', 0, 1)",
                                  type))
@@ -136,6 +146,8 @@ gboolean catalog_check_source(struct catalog *catalog, const char *type, int sou
         int count;
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(type!=NULL, FALSE);
+
+        return_val_unless_connected(catalog, FALSE);
 
         if(!execute_query_printf(catalog,
                                  getinteger_callback,
@@ -161,62 +173,115 @@ gboolean catalog_check_source(struct catalog *catalog, const char *type, int sou
                                      type);
 }
 
-struct catalog *catalog_connect(const char *path, GError **err)
+struct catalog *catalog_new(const char *path)
 {
-        gboolean newdb;
-        char *errmsg;
-        sqlite *db;
+        struct catalog *catalog;
+        g_return_val_if_fail(path, NULL);
+
+        catalog = g_new(struct catalog, 1);
+        catalog->stop=FALSE;
+        catalog->db=NULL;
+        catalog->error=g_string_new("");
+        catalog->busy_wait_cond=g_cond_new();
+        catalog->busy_wait_mutex=g_mutex_new();
+        catalog->path=g_strdup(path);
+
+        return catalog;
+}
+
+struct catalog *catalog_new_and_connect(const char *path, GError **err)
+{
         struct catalog *catalog;
 
         g_return_val_if_fail(path, NULL);
         g_return_val_if_fail(err==NULL || *err==NULL, NULL);
 
-        newdb = !exists(path);
-        errmsg = NULL;
-        db = sqlite_open(path, 0600, &errmsg);
-        if(!db) {
+        catalog=catalog_new(path);
+        if(!catalog_connect(catalog))
+        {
                 g_set_error(err,
                             catalog_error_quark(),
                             CATALOG_CONNECTION_ERROR,
-                            "opening catalog %s failed: %s\n",
-                            path,
-                            errmsg==NULL ? "unknown error":errmsg);
-                if(errmsg)
-                        sqlite_freemem(errmsg);
+                            catalog_error(catalog));
+                catalog_free(catalog);
                 return NULL;
+        } else {
+                return catalog;
+        }
+}
+
+gboolean catalog_connect(struct catalog *catalog)
+{
+        gboolean newdb;
+        char *errmsg;
+        sqlite *db;
+
+        g_return_val_if_fail(catalog!=NULL, FALSE);
+
+        reset_error(catalog);
+
+        if(catalog_is_connected(catalog)) {
+                g_string_append(catalog->error, "already connected");
+                return FALSE;
+        }
+
+        newdb = !exists(catalog->path);
+        errmsg = NULL;
+        db = sqlite_open(catalog->path, 0600, &errmsg);
+        if(!db) {
+                g_string_append_printf(catalog->error,
+                                       "opening catalog %s failed: %s\n",
+                                       catalog->path,
+                                       errmsg==NULL ? "unknown error":errmsg);
+                if(errmsg) {
+                        sqlite_freemem(errmsg);
+                }
+                return FALSE;
         }
         if(newdb) {
                 if(!create_tables(db, &errmsg)) {
-                        g_set_error(err,
-                                    catalog_error_quark(),
-                                    CATALOG_CANNOT_CREATE_TABLES,
-                                    "initialization of catalog %s failed: %s\n",
-                                    path,
-                                    errmsg==NULL ? "unknown error":errmsg);
-                        if(errmsg)
+                        g_string_append_printf(catalog->error,
+                                               "initialization of catalog %s failed: %s\n",
+                                               catalog->path,
+                                               errmsg==NULL ? "unknown error":errmsg);
+                        if(errmsg) {
                                 sqlite_freemem(errmsg);
+                        }
 
                         sqlite_close(db);
-                        unlink(path);
-                        return NULL;
+                        unlink(catalog->path);
+                        return FALSE;
                 }
         }
 
-
-        catalog = g_new(struct catalog, 1);
-        catalog->stop=FALSE;
         catalog->db=db;
-        catalog->error=g_string_new("");
-        catalog->busy_wait_cond=g_cond_new();
-        catalog->busy_wait_mutex=g_mutex_new();
-        catalog->path=g_strdup(path);
-        return catalog;
+        return TRUE;
 }
 
 void catalog_disconnect(struct catalog *catalog)
 {
         g_return_if_fail(catalog!=NULL);
+
+        reset_error(catalog);
+
+        return_unless_connected(catalog);
+
         sqlite_close(catalog->db);
+        catalog->db=NULL;
+}
+
+gboolean catalog_is_connected(struct catalog *catalog)
+{
+        g_return_val_if_fail(catalog!=NULL, FALSE);
+        return catalog->db!=NULL;
+}
+
+void catalog_free(struct catalog *catalog)
+{
+        g_return_if_fail(catalog!=NULL);
+        if(catalog_is_connected(catalog)) {
+                catalog_disconnect(catalog);
+        }
         g_cond_free(catalog->busy_wait_cond);
         g_mutex_free(catalog->busy_wait_mutex);
         g_string_free(catalog->error, TRUE/*free_segment*/);
@@ -237,6 +302,8 @@ gboolean catalog_executequery(struct catalog *catalog,
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(query!=NULL, FALSE);
         g_return_val_if_fail(callback!=NULL, FALSE);
+
+        return_val_unless_connected(catalog, FALSE);
 
         if(catalog->stop)
                 return TRUE;
@@ -296,8 +363,9 @@ gboolean catalog_executequery(struct catalog *catalog,
 const char *catalog_error(struct catalog *catalog)
 {
         g_return_val_if_fail(catalog!=NULL, NULL);
-        if(catalog->error->len>0)
+        if(catalog->error->len>0) {
                 return catalog->error->str;
+        }
         return "unknown error";
 }
 
@@ -315,6 +383,9 @@ GQuark catalog_error_quark()
 gulong catalog_timestamp_get(struct catalog *catalog)
 {
         gulong ts = 0;
+
+        return_val_unless_connected(catalog, 0);
+
         execute_query_printf(catalog,
                              timestamp_callback,
                              &ts/*userdata*/,
@@ -325,7 +396,11 @@ gulong catalog_timestamp_get(struct catalog *catalog)
 gboolean catalog_timestamp_update(struct catalog *catalog)
 {
         GTimeVal now;
-        gulong old = catalog_timestamp_get(catalog);
+        gulong old;
+
+        return_val_unless_connected(catalog, FALSE);
+
+        old = catalog_timestamp_get(catalog);
         g_get_current_time(&now);
 
         if(old==0) {
@@ -347,6 +422,8 @@ gboolean catalog_get_source_content(struct catalog *catalog,
                                     void *userdata)
 {
         gboolean ret;
+
+        return_val_unless_connected(catalog, FALSE);
 
         catalog->callback=callback;
         catalog->callback_userdata=userdata;
@@ -373,6 +450,8 @@ gboolean catalog_get_source_content_count(struct catalog *catalog,
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(count_out!=NULL, FALSE);
 
+        return_val_unless_connected(catalog, FALSE);
+
         number=0;
         if(execute_query_printf(catalog,
                                 getinteger_callback,
@@ -390,6 +469,8 @@ gboolean catalog_get_source_content_count(struct catalog *catalog,
 void catalog_interrupt(struct catalog *catalog)
 {
         g_return_if_fail(catalog!=NULL);
+        reset_error(catalog);
+
         g_mutex_lock(catalog->busy_wait_mutex);
         catalog->stop=TRUE;
         g_cond_broadcast(catalog->busy_wait_cond);
@@ -403,6 +484,8 @@ gboolean catalog_remove_entry(struct catalog *catalog,
         g_return_val_if_fail(catalog!=NULL, FALSE);
         g_return_val_if_fail(path!=NULL, FALSE);
 
+        return_val_unless_connected(catalog, FALSE);
+
         return execute_update_printf(catalog, TRUE/*autocommit*/,
                                      "DELETE FROM entries "
                                      " WHERE source_id=%d AND path='%q'",
@@ -415,6 +498,7 @@ gboolean catalog_remove_source(struct catalog *catalog,
 {
         g_return_val_if_fail(catalog!=NULL, FALSE);
 
+        return_val_unless_connected(catalog, FALSE);
         return execute_update_printf(catalog, TRUE/*autocommit*/,
                                      "DELETE FROM sources "
                                      " WHERE id=%d; "
@@ -427,6 +511,7 @@ gboolean catalog_remove_source(struct catalog *catalog,
 void catalog_restart(struct catalog *catalog)
 {
         g_return_if_fail(catalog!=NULL);
+        reset_error(catalog);
         g_mutex_lock(catalog->busy_wait_mutex);
         catalog->stop=FALSE;
         g_mutex_unlock(catalog->busy_wait_mutex);
@@ -437,6 +522,8 @@ gboolean catalog_update_entry_timestamp(struct catalog *catalog, int entry_id)
         GTimeVal timeval;
 
         g_return_val_if_fail(catalog, FALSE);
+
+        return_val_unless_connected(catalog, FALSE);
 
         g_get_current_time(&timeval);
         return execute_update_printf(catalog, TRUE/*autocommit*/,
@@ -456,6 +543,8 @@ gboolean catalog_begin_source_update(struct catalog *catalog, int source_id)
 
         g_return_val_if_fail(catalog, FALSE);
         g_return_val_if_fail(source_id>0, FALSE);
+
+        return_val_unless_connected(catalog, FALSE);
 
         if(!source_version(catalog, source_id, &old_version)) {
                 return FALSE;
@@ -481,6 +570,8 @@ gboolean catalog_end_source_update(struct catalog *catalog, int source_id)
         g_return_val_if_fail(catalog, FALSE);
         g_return_val_if_fail(source_id>0, FALSE);
 
+        return_val_unless_connected(catalog, FALSE);
+
         if(!source_version(catalog, source_id, &version)) {
                 return FALSE;
         }
@@ -496,6 +587,8 @@ gboolean catalog_entry_set_enabled(struct catalog *catalog, int entry_id, gboole
 {
         g_return_val_if_fail(catalog, FALSE);
 
+        return_val_unless_connected(catalog, FALSE);
+
         return execute_update_printf(catalog,
                                      TRUE/*autocommit*/,
                                      "UPDATE entries SET enabled=%d WHERE id=%d;",
@@ -506,6 +599,8 @@ gboolean catalog_entry_set_enabled(struct catalog *catalog, int entry_id, gboole
 gboolean catalog_source_set_enabled(struct catalog *catalog, int source_id, gboolean enabled)
 {
         g_return_val_if_fail(catalog, FALSE);
+
+        return_val_unless_connected(catalog, FALSE);
 
         return execute_update_printf(catalog,
                                      TRUE/*autocommit*/,
@@ -520,6 +615,8 @@ gboolean catalog_source_get_enabled(struct catalog *catalog, int source_id, gboo
 
         g_return_val_if_fail(catalog, FALSE);
         g_return_val_if_fail(enabled_out, FALSE);
+
+        return_val_unless_connected(catalog, FALSE);
 
         number=0;
         if(execute_query_printf(catalog,
@@ -564,10 +661,11 @@ static gboolean handle_sqlite_retval(struct catalog *catalog, int retval, char *
 {
         g_return_val_if_fail(catalog!=NULL, FALSE);
 
-        if(retval==SQLITE_OK || retval==SQLITE_ABORT || retval==SQLITE_INTERRUPT)
+        reset_error(catalog);
+        if(retval==SQLITE_OK || retval==SQLITE_ABORT || retval==SQLITE_INTERRUPT) {
                 return TRUE;
+        }
 
-        g_string_truncate(catalog->error, 0);
         if(errmsg==NULL)
         {
                 const char *staticerror=sqlite_error_string(retval);
@@ -660,6 +758,11 @@ static gboolean execute_query_printf(struct catalog *catalog,
         va_list ap;
         char *errmsg=NULL;
         int ret;
+
+        /* callers should call return_(val_)unless_connected before
+         * this function
+         */
+        g_return_val_if_fail(catalog->db!=NULL, FALSE);
 
         va_start(ap, sql);
 
@@ -881,4 +984,27 @@ static gboolean source_version(struct catalog *catalog,
                 return TRUE;
         }
         return FALSE;
+}
+
+/**
+ * If not connected, return FALSE and set the catalog error.
+ */
+static gboolean check_connected(struct catalog *catalog, const char *file, int line)
+{
+        g_return_val_if_fail(catalog, FALSE);
+        if(!catalog_is_connected(catalog)) {
+                reset_error(catalog);
+                g_string_append_printf(catalog->error,
+                                       "%s:%d: not connected. please call catalog_connect() first.",
+                                       file,
+                                       line);
+                return FALSE;
+        }
+        return TRUE;
+}
+
+static void reset_error(struct catalog *catalog)
+{
+        g_return_if_fail(catalog);
+        g_string_truncate(catalog->error, 0);
 }

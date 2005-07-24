@@ -11,8 +11,7 @@
 /** error codes returned by catalog connect */
 typedef enum
 {
-        CATALOG_CONNECTION_ERROR,
-        CATALOG_CANNOT_CREATE_TABLES
+        CATALOG_CONNECTION_ERROR
 } CatalogErrorCodes;
 
 /** get the error quark for the errors returned by catalog */
@@ -75,8 +74,10 @@ struct catalog_query_result
 #define CATALOG_ENTRY_INIT(entry) memset((entry), 0, sizeof(struct catalog_entry))
 
 /**
- * Make a connection to an sqlite catalog,
+ * Create a new catalog structure and make a connection to an sqlite catalog,
  * creating it if necessary.
+ *
+ * This is equivalent to catalog_new() followed by catalog_connect().
  *
  * @param path path to the catalog file
  * @param if non-null and if this function returns
@@ -85,17 +86,53 @@ struct catalog_query_result
  * failed (to be freed with g_error_free())
  * @return NULL if the catalog could not be open/created
  */
-struct catalog *catalog_connect(const char *path, GError **errs);
+struct catalog *catalog_new_and_connect(const char *path, GError **errs);
 
 /**
- * Disconnect from the catalog, free any
- * resource.
+ * Create a new catalog structure, linked to a catalog path, but
+ * do not connect to it.
+ *
+ * Call catalog_connect() to connect to the catalog and make
+ * this catalog usable.
+ * @return a new catalog structure (never null)
+ */
+struct catalog *catalog_new(const char *path);
+
+/**
+ * (Re-)connect to the catalog, create it if necessary.
+ *
+ * @return FALSE if the catalog could not be open/created. Check
+ * the error with catalog_error()
+ */
+gboolean catalog_connect(struct catalog *);
+
+/**
+ * Disconnect from the catalog.
+ *
+ * This ONLY disconnects the catalog. It will not
+ * free the structure. Use catalog_free() if you want
+ * to get rid of the catalog structure.
+ * @param catalog the catalog
+ */
+void catalog_disconnect(struct catalog *catalog);
+
+/**
+ * Free any resources held by the catalog. Disconnect it
+ * if necessary.
  *
  * Results created by this catalog are NOT freed
  * automatically.
  * @param catalog catalog returned by catalog_connect()
  */
-void catalog_disconnect(struct catalog *catalog);
+void catalog_free(struct catalog *catalog);
+
+/**
+ * Check whether the catalog is currently connected.
+ *
+ * @return TRUE if a connection is open, FALSE if there's
+ * no connections
+ */
+gboolean catalog_is_connected(struct catalog *catalog);
 
 /**
  * Receive the results from catalog_executequery().
@@ -115,6 +152,10 @@ typedef gboolean (*catalog_callback_f)(struct catalog *catalog,
  *
  * The timestamp is not updated automatically; update
  * is done using catalog_timestamp_update()
+ *
+ * This method will always return 0 while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @return timestamp, 0 if it was never set
  */
@@ -125,6 +166,10 @@ gulong catalog_timestamp_get(struct catalog *catalog);
  *
  * The current date (# of seconds since the UNIX epoch)
  * is used.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @return return FALSE if there was an error
  */
@@ -137,6 +182,9 @@ gboolean catalog_timestamp_update(struct catalog *gcatalog);
  * If the catalog has been interrupted some time before, th
  * query will return immediately. Use catalog_restart() to
  * recover from an interruption.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
  *
  * @param catalog the catalog
  * @param query query to run
@@ -157,6 +205,9 @@ gboolean catalog_executequery(struct catalog *catalog,
  * query will return immediately. Use catalog_restart() to
  * recover from an interruption.
  *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog the catalog
  * @param source_id source ID
  * @param callback function to call for every results
@@ -170,6 +221,9 @@ gboolean catalog_get_source_content(struct catalog *catalog,
 
 /**
  * Get the size of the content of a source.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
  *
  * @param catalog the catalog
  * @param source_id source ID
@@ -187,6 +241,9 @@ gboolean catalog_get_source_content_count(struct catalog *catalog,
  *
  * Entries with the most up-to-date timestamp will
  * appear first.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
  *
  * @param catalog
  * @param entry_id
@@ -206,6 +263,9 @@ gboolean catalog_update_entry_timestamp(struct catalog *catalog, int entry_id);
  * catalog_interrupt() and catalog_restart() are the only
  * function that are safe to call from another thread
  * than the one running the queries.
+ *
+ * This function does nothing if the catalog is disconnected. It's
+ * safe to call it at any time, though, whether it's connected or not.
  *
  * @param catalog the catalog
  */
@@ -227,12 +287,19 @@ void catalog_interrupt(struct catalog *catalog);
  * function that are safe to call from another thread
  * than the one running the queries.
  *
+ * This function does nothing if the catalog is disconnected. It's
+ * safe to call it at any time, though, whether it's connected or not.
+ *
  * @param catalog the catalog
  */
 void catalog_restart(struct catalog *catalog);
 
 /**
  * Add a source into the catalog.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @param type source type
  * @param id_out this variable will be set to the generated ID of the new source. must not be null.
@@ -247,6 +314,9 @@ gboolean catalog_add_source(struct catalog *catalog, const char *type, int *id_o
  * If the source exists but is of the wrong type, its content will be removed
  * and the source re-created. If the source does not exist, it'll be created.
  *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @param type source type
  * @param source_id source id
@@ -257,6 +327,10 @@ gboolean catalog_check_source(struct catalog *catalog, const char *type, int sou
 
 /**
  * Get rid of a source and of all of its entries
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @param id source id
  */
@@ -264,6 +338,10 @@ gboolean catalog_remove_source(struct catalog *catalog, int source_id);
 
 /**
  * Add an entry into the catalog or refresh/confirm it if it already exists.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @param entry the entry to add
  * @param id_out if non-null, this variable will be set to the generated ID of the entry
@@ -278,6 +356,9 @@ gboolean catalog_add_entry(struct catalog *catalog, const struct catalog_entry *
  * for existing entries. When you later call catalog_end_source_update(),
  * the entries that existed before catalog_begin_source_update() that
  * haven't updated will be removed.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
  *
  * @param catalog
  * @param source_id
@@ -295,6 +376,9 @@ gboolean catalog_begin_source_update(struct catalog *catalog, int source_id);
  *
  * See also catalog_start_source_update()
  *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @param source_id
  * @return TRUE if all has been deleted successfully, FALSE otherwise
@@ -303,6 +387,10 @@ gboolean catalog_end_source_update(struct catalog *catalog, int source_id);
 
 /**
  * Remove a stale entry from the catalog
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @param source_id source
  * @param path local path or URI
@@ -316,6 +404,10 @@ gboolean catalog_remove_entry(struct catalog *catalog, int source_id, const char
  * Disabled entries will not be returned when a query is run. They'll
  * kept on the database and will be returned when getting the source
  * content.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @param entry_id ID of the entry, usally from a query on source content
  * @param enable TRUE => enable, FALSE=> disable
@@ -331,6 +423,9 @@ gboolean catalog_entry_set_enabled(struct catalog *catalog, int entry_id, gboole
  * kept on the database and will be returned when getting the source
  * content.
  *
+ * This method will always fail while the catalog
+ * is disconnected.
+ *
  * @param catalog
  * @param source_id ID of the source
  * @param enable TRUE => enable, FALSE=> disable
@@ -340,6 +435,9 @@ gboolean catalog_source_set_enabled(struct catalog *catalog, int source_id, gboo
 
 /**
  * Check whether a source is enabled.
+ *
+ * This method will always fail while the catalog
+ * is disconnected.
  *
  * @param catalog
  * @param source_id
@@ -351,10 +449,12 @@ gboolean catalog_source_get_enabled(struct catalog *catalog, int source_id, gboo
 /**
  * Get a pointer on the last error that happened with
  * this catalog.
+ *
  * @param catalog catalog to query
  * @return a pointer to the last error message, never NULL. this
  * pointer is only valid until the next call to a catalog_ function
  * on the same catalog
  */
 const char *catalog_error(struct catalog *catalog);
+
 #endif /* CATALOG_H */

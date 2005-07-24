@@ -37,7 +37,7 @@ struct catalog_entry entries[] = {
 #define entries_length (sizeof(entries)/sizeof(struct catalog_entry))
 int entries_id[entries_length];
 
-#define catalog_cmd(catalog, comment, ret) _catalog_cmd(catalog, comment, ret, __FILE__, __LINE__)
+#define catalog_cmd(catalog, comment, ret) _catalog_cmd((catalog), (comment), (ret), __FILE__, __LINE__)
 #define assert_source_exists(catalog, type, sourceid) _assert_source_exists(catalog, type, sourceid, __FILE__, __LINE__)
 
 /* ------------------------- prototypes */
@@ -50,6 +50,7 @@ static void unlink_if_exists(const char *path);
 static void execute_query_and_expect(const char *query, int goal_length, char *goal[], gboolean ordered);
 static void assert_array_contains(const char *query, int goal_length, char *goal[], GArray *array, gboolean ordered);
 static gboolean test_source_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
+static gboolean nevercalled_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
 static gboolean countdown_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
 static gboolean countdown_interrupt_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
 static gpointer execute_query_thread(void *userdata);
@@ -62,27 +63,27 @@ static void setup()
 {
         g_thread_init_with_errorcheck_mutexes(NULL/*vtable*/);
         unlink_if_exists(PATH);
+
+        catalog=catalog_new(PATH);
 }
 
 static void teardown()
 {
+        catalog_free(catalog);
         unlink(PATH);
 }
 
 static void setup_query()
 {
-        GError *err=NULL;
         int i;
         setup();
         unlink_if_exists(PATH);
 
-        catalog=catalog_connect(PATH, &err);
-        fail_unless(err==NULL,
-                    "ERROR from catalog_connect(" PATH "): %s\n",
-                    (err ? err->message:"null"));
-
         fail_unless(catalog!=NULL, "no catalog");
-        fail_unless(err==NULL, "catalog, but error!=NULL");
+
+        catalog_cmd(catalog,
+                    "connect to '" PATH "'",
+                    catalog_connect(catalog));
 
         catalog_cmd(catalog,
                     "create source 'test'",
@@ -103,55 +104,207 @@ static void setup_query()
 
 static void teardown_query()
 {
-        catalog_disconnect(catalog);
         teardown();
 }
 
 
 START_TEST(test_create)
 {
-        GError *err = NULL;
-        struct catalog *catalog;
-
         printf("--- test_create\n");
 
-        catalog = catalog_connect(PATH, &err);
-        if(!catalog) {
-                fail_unless(err!=NULL, "no catalog and no error message");
-                fail(err->message);
-        }
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         fail_unless(exists(PATH), "catalog file not created in " PATH);
+}
+END_TEST
+
+
+START_TEST(test_connect_and_disconnect)
+{
+        printf("--- test_connect_and_disconnect\n");
+
+        fail_unless(!catalog_is_connected(catalog),
+                    "connected? (before connect)");
+
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
+
+        fail_unless(catalog_is_connected(catalog),
+                    "connected? (afterconnect)");
+
+        catalog_disconnect(catalog);
+
+        fail_unless(!catalog_is_connected(catalog),
+                    "connected? (after disconnect)");
+
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
+
+        fail_unless(catalog_is_connected(catalog),
+                    "connected? (after reconnect)");
+
         catalog_disconnect(catalog);
 }
 END_TEST
 
 
+/**
+ * Make sure all these functions don't crash
+ * when called on a disconnected catalog.
+ */
+START_TEST(test_use_disconnected)
+{
+        unsigned int uint_out;
+        int int_out;
+        gboolean boolean_out;
+        struct catalog_entry entry = { "test", "test", "test", "test", 1 };
+
+        printf("--- test_connect_and_disconnect\n");
+
+        mark_point();
+        fail_unless(catalog_timestamp_get(catalog)==0,
+                    "catalog_timestamp_get");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_timestamp_get");
+        mark_point();
+
+        fail_unless(!catalog_timestamp_update(catalog),
+                    "catalog_timestamp_update");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_timestamp_get");
+
+        mark_point();
+        fail_unless(!catalog_executequery(catalog,
+                                          "x",
+                                          nevercalled_callback,
+                                          NULL/*userdata*/),
+                    "catalog_executequery");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_executequery");
+
+        mark_point();
+        fail_unless(!catalog_get_source_content(catalog,
+                                                1/*source_id*/,
+                                                nevercalled_callback,
+                                                NULL/*userdata*/),
+                    "catalog_get_source_content");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_get_source_content");
+
+        mark_point();
+        fail_unless(!catalog_get_source_content_count(catalog,
+                                                      1/*source_id*/,
+                                                      &uint_out),
+                    "catalog_get_source_content_count");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_get_source_content_count");
+
+        mark_point();
+        fail_unless(!catalog_update_entry_timestamp(catalog, 1),
+                    "catalog_update_entry_timestamp");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_update_entry_timestamp");
+
+
+        /* these can be called when the catalog is disconnected,
+         * but they shouldn't do anything
+         */
+        mark_point();
+        catalog_interrupt(catalog);
+
+        mark_point();
+        catalog_restart(catalog);
+
+        mark_point();
+        fail_unless(!catalog_add_source(catalog, "test", &int_out),
+                    "catalog_add_source");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_add_source");
+
+        mark_point();
+        fail_unless(!catalog_check_source(catalog, "test", 1),
+                    "catalog_check_source");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_check_source");
+
+        mark_point();
+        fail_unless(!catalog_remove_source(catalog, 1),
+                    "catalog_remove_source");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_remove_source");
+
+        mark_point();
+        fail_unless(!catalog_add_entry(catalog, &entry, &int_out),
+                    "catalog_add_entry");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_add-entry");
+
+        mark_point();
+        fail_unless(!catalog_begin_source_update(catalog, 1),
+                    "catalog_begin_source_update");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_begin_source_update");
+
+        mark_point();
+        fail_unless(!catalog_end_source_update(catalog, 1),
+                    "catalog_end_source_update");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_end_source_update");
+
+        mark_point();
+        fail_unless(!catalog_remove_entry(catalog, 1, "x"),
+                    "catalog_remove_entry");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_remove_entry");
+
+        mark_point();
+        fail_unless(!catalog_entry_set_enabled(catalog, 1, TRUE),
+                    "catalog_entry_set_enabled");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_entry_set_enabled");
+
+        mark_point();
+        fail_unless(!catalog_source_set_enabled(catalog, 1, TRUE),
+                    "catalog_source_set_enabled");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_source_set_enabled");
+
+        mark_point();
+        fail_unless(!catalog_source_get_enabled(catalog, 1, &boolean_out),
+                    "catalog_source_get_enabled");
+        fail_unless(catalog_error(catalog)!=NULL,
+                    "after catalog_source_get_enabled");
+
+}
+END_TEST
+
 START_TEST(test_addentry)
 {
-        struct catalog *catalog=catalog_connect(PATH, NULL);
         struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
 
         printf("--- test_addentry\n");
-        catalog = catalog_connect(PATH, NULL);
-
-        catalog_add_source(catalog, "test", &entry.source_id);
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_cmd(catalog,
                     "1st addentry(/tmp/toto.txt)",
                     catalog_add_entry(catalog,
                                              &entry,
                                              NULL/*id_out*/));
-        catalog_disconnect(catalog);
 }
 END_TEST
 
 START_TEST(test_addentry_escape)
 {
-        struct catalog *catalog;
         struct catalog_entry entry = CATALOG_ENTRY("To'to", "/tmp/to'to.txt");
         printf("--- test_addentry_escape\n");
 
-        catalog = catalog_connect(PATH, NULL);
-
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_add_source(catalog, "test", &entry.source_id);
         catalog_cmd(catalog,
                     "1st addentry(/tmp/toto.txt)",
@@ -159,21 +312,20 @@ START_TEST(test_addentry_escape)
                                              &entry,
                                              NULL/*id_out*/));
 
-        catalog_disconnect(catalog);
 }
 END_TEST
 
 START_TEST(test_addentry_noduplicate)
 {
-        struct catalog *catalog;
         struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
         int entry_id_1=-1;
         int entry_id_2=-1;
 
         printf("--- test_addentry_noduplicate\n");
 
-        catalog = catalog_connect(PATH, NULL);
-
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_add_source(catalog, "test", &entry.source_id);
 
         fail_unless(catalog_add_entry(catalog,
@@ -187,21 +339,21 @@ START_TEST(test_addentry_noduplicate)
 
         fail_unless(entry_id_1==entry_id_2,
                     "two entries with the same path and source_id but with different IDs");
-        catalog_disconnect(catalog);
         printf("--- test_addentry_noduplicate OK\n");
 }
 END_TEST
 
 START_TEST(test_get_source_content_size)
 {
-        struct catalog *catalog;
         int source1_id = -1;
         int source2_id = -1;
         unsigned int source1_count = -1;
         unsigned int source2_count = -1;
 
         printf("--- test_get_source_content_size\n");
-        catalog = catalog_connect(PATH, NULL);
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog,
@@ -233,15 +385,12 @@ START_TEST(test_get_source_content_size)
                                     source1_count));
         fail_unless(3==source2_count, "wrong count for source 2");
 
-        catalog_disconnect(catalog);
-
         printf("--- test_get_source_content_size_OK\n");
 }
 END_TEST
 
 START_TEST(test_get_source_content)
 {
-        struct catalog *catalog;
         int source1_id = -1;
         int source2_id = -1;
         GArray *array;
@@ -253,8 +402,9 @@ START_TEST(test_get_source_content)
                 "source1-entry-4" };
 
         printf("--- test_get_source_content\n");
-        catalog = catalog_connect(PATH, NULL);
-
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog, "test", &source1_id));
@@ -284,21 +434,19 @@ START_TEST(test_get_source_content)
                               FALSE/*not ordered*/);
         mark_point();
 
-        catalog_disconnect(catalog);
-
         printf("--- test_get_source_content_size_OK\n");
 }
 END_TEST
 
 START_TEST(test_remove_entry)
 {
-        struct catalog *catalog;
         int source_id = -1;
         guint count=-1;
         printf("--- test_remove_entry\n");
 
-        catalog = catalog_connect(PATH, NULL);
-
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog, "test", &source_id));
@@ -326,14 +474,14 @@ END_TEST
 
 START_TEST(test_remove_source)
 {
-        struct catalog *catalog;
         int source1_id = -1;
         guint source1_count=-1;
 
         printf("--- test_remove_source\n");
 
-        catalog = catalog_connect(PATH, NULL);
-
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_cmd(catalog,
                     "add_source(edit)",
                     catalog_add_source(catalog, "test", &source1_id));
@@ -359,14 +507,15 @@ END_TEST
 
 START_TEST(test_source_update)
 {
-        struct catalog *catalog;
         int source1_id;
         unsigned int source1_count;
         struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
 
         printf("--- test_source_update\n");
 
-        catalog = catalog_connect(PATH, NULL);
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
 
         catalog_cmd(catalog,
                     "add_source(edit)",
@@ -401,12 +550,12 @@ END_TEST
 
 START_TEST(test_check_source_create_new)
 {
-        struct catalog *catalog;
 
         printf("--- test_check_source_create_new\n");
 
-        catalog = catalog_connect(PATH, NULL);
-
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_cmd(catalog,
                     "catalog_check_source(catalog, 'test', 9)",
                     catalog_check_source(catalog, "test", 9));
@@ -418,13 +567,14 @@ END_TEST
 
 START_TEST(test_timestamp)
 {
-        struct catalog *catalog;
         GTimeVal now;
         gulong ts;
 
         printf("--- test_timestamp\n");
 
-        catalog = catalog_connect(PATH, NULL);
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
 
         fail_unless(catalog_timestamp_get(catalog)==0,
                     "expected 0 the 1st time");
@@ -437,27 +587,28 @@ START_TEST(test_timestamp)
 
         catalog_disconnect(catalog);
 
-        catalog = catalog_connect(PATH, NULL);
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         ts=catalog_timestamp_get(catalog);
         fail_unless(ts<=now.tv_sec,
                     "expected valid timestamp");
 
-        catalog_disconnect(catalog);
         printf("--- test_timestamp OK\n");
 }
 END_TEST
 
 START_TEST(test_check_source_transform)
 {
-        struct catalog *catalog;
         int source_id=-1;
         unsigned int count;
         struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
 
         printf("--- test_check_source_transform\n");
 
-        catalog = catalog_connect(PATH, NULL);
-
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_cmd(catalog,
                     "create source",
                     catalog_add_source(catalog,
@@ -488,15 +639,15 @@ END_TEST
 
 START_TEST(test_check_source_keep)
 {
-        struct catalog *catalog;
         int source_id=-1;
         unsigned int count;
         struct catalog_entry entry = CATALOG_ENTRY("toto", "/tmp/toto.txt");
 
         printf("--- test_check_source_keep\n");
 
-        catalog = catalog_connect(PATH, NULL);
-
+        catalog_cmd(catalog,
+                    "connnect",
+                    catalog_connect(catalog));
         catalog_cmd(catalog,
                     "create source",
                     catalog_add_source(catalog,
@@ -789,6 +940,8 @@ static Suite *catalog_check_suite(void)
         tcase_add_checked_fixture(tc_core, setup, teardown);
         suite_add_tcase(s, tc_core);
         tcase_add_test(tc_core, test_create);
+        tcase_add_test(tc_core, test_connect_and_disconnect);
+        tcase_add_test(tc_core, test_use_disconnected);
         tcase_add_test(tc_core, test_addentry);
         tcase_add_test(tc_core, test_addentry_noduplicate);
         tcase_add_test(tc_core, test_addentry_escape);
@@ -842,13 +995,12 @@ static void _catalog_cmd(struct catalog *catalog,
                          int line)
 {
         if(!ret) {
-                GString *msg = g_string_new("");
-                g_string_printf(msg,
-                                "catalog function %s failed: %s\n",
-                                comment,
-                                catalog_error(catalog));
-                _fail_unless(0, file, line, msg->str);
-                g_string_free(msg, TRUE/*free content*/);
+                _fail_unless(0,
+                             file,
+                             line,
+                             "%s:%s",
+                             comment,
+                             catalog_error(catalog));
         }
 }
 static gboolean exists(const char *path)
@@ -1001,6 +1153,21 @@ static gboolean test_source_callback(struct catalog *catalog,
                     "wrong launcher");
         *checked=TRUE;
         return TRUE/*continue*/;
+}
+/**
+ * Callback that should never be called
+ *
+ * @param catalog ignored
+ * @param pertinence ignored
+ * @param result released
+ * @param userdata a pointer to an integer (the counter), which will be decremented to 0
+ */
+static gboolean nevercalled_callback(struct catalog *catalog,
+                                     const struct catalog_query_result *result,
+                                     void *userdata)
+{
+        fail("unexpected call to countdown_callback()");
+        return FALSE;
 }
 
 /**
