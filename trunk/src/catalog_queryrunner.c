@@ -9,9 +9,11 @@
 #include "result_queue.h"
 #include "launcher.h"
 #include "launchers.h"
+#include <glib.h>
 #include <stdio.h>
 #include <string.h>
 #include "string_utils.h"
+
 /**
  * Number of results to send without pausing
  * in the "first bunch".
@@ -49,14 +51,6 @@
 #define MAXIMUM 200
 
 #define DEBUG 1
-#ifdef DEBUG
-# define lock(m) printf("%s:%d query_lock\n", __FILE__, __LINE__);g_mutex_lock(m)
-# define unlock(m) printf("%s:%d query_unlock\n", __FILE__, __LINE__);g_mutex_unlock(m)
-#else
-# define lock(m) g_mutex_lock(m)
-# define unlock(m) g_mutex_unlock(m)
-#endif
-
 
 /**
  * Extension of the structure queryrunner for this implementation
@@ -64,28 +58,43 @@
 struct catalog_queryrunner
 {
         struct queryrunner base;
+        /**
+         * Where the result will be sent
+         */
         struct result_queue *queue;
-        const char *path;
 
-        /** catalog, protected by the mutex */
+        /**
+         * Where the thread will read actions
+         * from.
+         * Content will be of the type catalog_queryrunner_msg and
+         * will have to be freed by the receiver.
+         */
+        GAsyncQueue *incoming;
+
+        /**
+         * The catalog.
+         *
+         * Normally belongs to the query thread, but other
+         * threads may call catalog_interrupt while
+         * keeping a lock on the incoming message
+         * queue.
+         */
         struct catalog *catalog;
 
-        /** query to be run, protected by the mutex */
-        GString *query;
-        /** query being run, used only on the thread */
-        GString *running_query;
-        /** number of results found so far, used only on the thread */
-        int count;
+        /**
+         * Catalog path.
+         */
+        char *path;
 
+        /**
+         * The thread, while it's running (joinable)
+         */
         GThread *thread;
-        GMutex *mutex;
 
-        /** tell the thread that query or stopping has changed */
-        GCond *cond;
-
-        /** set to TRUE to tell the thread to end, protected by the mutex */
-        gboolean stopping;
-        /** TRUE between start() and stop() */
+        /**
+         * TRUE between start() and stop(), used
+         * by the main thread exclusively
+         */
         gboolean started;
 };
 
@@ -94,29 +103,78 @@ struct catalog_queryrunner
 /** queryrunner to catalog_queryrunner */
 #define CATALOG_QUERYRUNNER(catalog) ((struct catalog_queryrunner *)(catalog))
 
+enum CatalogQueryrunnerMessageAction {
+        /** connect to the catalog */
+        CATALOG_QUERYRUNNER_ACTION_CONNECT,
+        /** run the query */
+        CATALOG_QUERYRUNNER_ACTION_QUERY,
+        /** disconnect from the catalog */
+        CATALOG_QUERYRUNNER_ACTION_DISCONNECT,
+        /** stop the thread */
+        CATALOG_QUERYRUNNER_ACTION_SHUTDOWN
+};
+
+struct catalog_queryrunner_msg {
+        /* What the thread should do */
+        enum CatalogQueryrunnerMessageAction action;
+        /* query to run, to be freed by g_free (or NULL) */
+        char *query;
+};
+
+
+/**
+ * Data used by the thread
+ */
+struct thread_data {
+        struct catalog_queryrunner *queryrunner;
+
+        /** Query being run or NULL */
+        char *running_query;
+
+        /** Number of results found so far */
+        int count;
+
+        /**
+         * Message read by catalog_queryrunner_msg_wait()
+         * that will be returned by the next call
+         * to catalog_queryrunner_msg_next()
+         */
+        struct catalog_queryrunner_msg *next_msg;
+};
 
 /* ------------------------- prototypes */
-static gboolean try_connect(const char *path);
-static void catalog_queryrunner_release(struct queryrunner *_self);
-static gboolean query_has_changed(struct catalog_queryrunner *queryrunner);
 static gpointer runquery_thread(gpointer userdata);
-static void catalog_queryrunner_start(struct queryrunner *_self);
-static void wait_on_condition(struct catalog_queryrunner *self, int time_ms);
 static gboolean result_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
+static void catalog_queryrunner_msg_send(struct catalog_queryrunner *self, enum CatalogQueryrunnerMessageAction action, const char *msg);
+static void catalog_queryrunner_msg_free(struct catalog_queryrunner_msg *msg);
+static gboolean catalog_queryrunner_msg_wait(struct thread_data *data, unsigned long timeout);
+static struct catalog_queryrunner_msg *catalog_queryrunner_msg_next(struct thread_data *data);
+static void handle_thread_error(struct catalog_queryrunner *self);
+
+/* ------------------------- member functions (queryrunner) */
 static void catalog_queryrunner_run_query(struct queryrunner *_self, const char *query);
 static void catalog_queryrunner_consolidate(struct queryrunner *_self);
+static void catalog_queryrunner_start(struct queryrunner *_self);
 static void catalog_queryrunner_stop(struct queryrunner *_self);
+static void catalog_queryrunner_release(struct queryrunner *_self);
 
 /* ------------------------- public functions */
 struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queue *catalog_queryrunner_queue)
 {
         struct catalog_queryrunner *queryrunner;
+        struct catalog *catalog;
 
-        if(!try_connect(path))
-        {
-                fprintf(stderr, "connection to catalog in %s failed\n", path);
+        catalog = catalog_new(path);
+        if(!catalog_connect(catalog)) {
+                fprintf(stderr,
+                        "connection to catalog in %s failed: %s\n",
+                        path,
+                        catalog_error(catalog));
+                catalog_free(catalog);
                 return NULL;
         }
+        catalog_disconnect(catalog);
+
         queryrunner = g_new(struct catalog_queryrunner, 1);
 
         queryrunner->base.start=catalog_queryrunner_start;
@@ -124,20 +182,15 @@ struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queu
         queryrunner->base.consolidate=catalog_queryrunner_consolidate;
         queryrunner->base.stop=catalog_queryrunner_stop;
         queryrunner->base.release=catalog_queryrunner_release;
-        queryrunner->queue=catalog_queryrunner_queue;
-        queryrunner->query=g_string_new("");
-        queryrunner->running_query=g_string_new("");
         queryrunner->path=g_strdup(path);
-        queryrunner->catalog=NULL;
-        queryrunner->mutex=g_mutex_new();
-        queryrunner->cond=g_cond_new();
-        queryrunner->stopping=FALSE;
+        queryrunner->queue=catalog_queryrunner_queue;
+        queryrunner->incoming=g_async_queue_new();
+        queryrunner->catalog=catalog;
+        queryrunner->started=FALSE;
         queryrunner->thread=g_thread_create(runquery_thread,
                                             queryrunner/*userdata*/,
-                                            FALSE/*not joinable*/,
+                                            TRUE/*joinable*/,
                                             NULL/*error*/);
-
-
         return QUERYRUNNER(queryrunner);
 }
 
@@ -157,10 +210,11 @@ static void catalog_queryrunner_start(struct queryrunner *_self)
 #endif
 
         self = CATALOG_QUERYRUNNER(_self);
-        lock(self->mutex);
-        self->started=TRUE;
-        g_cond_broadcast(self->cond);
-        unlock(self->mutex);
+
+        if(!self->started) {
+                catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_CONNECT, NULL/*no query*/);
+                self->started=TRUE;
+        }
 }
 
 static void catalog_queryrunner_stop(struct queryrunner *_self)
@@ -175,14 +229,10 @@ static void catalog_queryrunner_stop(struct queryrunner *_self)
 
         self = CATALOG_QUERYRUNNER(_self);
 
-        lock(self->mutex)
-                ;
-        self->started=FALSE;
-        g_string_truncate(self->query, 0);
-        if(self->catalog)
-                catalog_interrupt(self->catalog);
-        g_cond_broadcast(self->cond);
-        unlock(self->mutex);
+        if(self->started) {
+                catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_DISCONNECT, NULL/*no query*/);
+                self->started=FALSE;
+        }
 }
 
 
@@ -193,6 +243,7 @@ static void catalog_queryrunner_run_query(struct queryrunner *_self, const char 
         g_return_if_fail(_self!=NULL);
         g_return_if_fail(query!=NULL);
 
+
 #ifdef DEBUG
 
         printf("%s:%d:run_query(%s) enter\n",
@@ -200,37 +251,11 @@ static void catalog_queryrunner_run_query(struct queryrunner *_self, const char 
 #endif
 
         self = CATALOG_QUERYRUNNER(_self);
-        lock(self->mutex);
+        g_return_if_fail(self->started);
 
-        if(!string_equals_ignore_spaces(self->query->str, query))
-        {
-                if(self->catalog) {
-#ifdef DEBUG
-                        printf("%s:%d:run_query(%s) interrupt previous query...\n",
-                               __FILE__, __LINE__, query);
-#endif
-
-                        catalog_interrupt(self->catalog);
-                }
-                g_string_assign(self->query, query);
-                strstrip_on_gstring(self->query);
-
-#ifdef DEBUG
-
-                printf("%s:%d:run_query(%s) assigned, going to broadcast\n",
-                       __FILE__, __LINE__, query);
-#endif
-
-                if(self->query->len>0) {
-                        g_cond_broadcast(self->cond);
-                }
+        if(self->started) {
+                catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_QUERY, query);
         }
-        unlock(self->mutex);
-#ifdef DEBUG
-
-        printf("%s:%d:run_query(%s) all done\n",
-               __FILE__, __LINE__, query);
-#endif
 }
 
 static void catalog_queryrunner_consolidate(struct queryrunner *_self)
@@ -244,189 +269,138 @@ static void catalog_queryrunner_release(struct queryrunner *_self)
         g_return_if_fail(_self!=NULL);
         self = CATALOG_QUERYRUNNER(_self);
 
-        catalog_queryrunner_stop(QUERYRUNNER(self));
 #ifdef DEBUG
-
         printf("%s:%d stopping", __FILE__, __LINE__);
 #endif
 
-        lock(self->mutex)
-                ;
-        self->stopping=TRUE;
-        g_cond_broadcast(self->cond);
-        unlock(self->mutex);
+        catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_SHUTDOWN, NULL);
+        g_thread_join(self->thread);
+
+        g_async_queue_unref(self->incoming);
+        catalog_free(self->catalog);
+        g_free(self->path);
+        g_free(self);
 
 #ifdef DEBUG
-
         printf("%s:%d released\n", __FILE__, __LINE__);
 #endif
-        /* the real release will be done by the
-         * thread when it notices self->stopping==TRUE
-         */
 }
 
 /* ------------------------- static functions */
-static gboolean try_connect(const char *path)
-{
-        struct catalog *catalog=catalog_new_and_connect(path, NULL/*errormsg*/);
-        if(catalog==NULL)
-                return FALSE;
-        catalog_free(catalog);
-        return TRUE;
-}
-
-static gboolean query_has_changed(struct catalog_queryrunner *queryrunner)
-{
-        return strcmp(queryrunner->query->str, queryrunner->running_query->str)!=0;
-}
-
-static void runquery_thread_open_catalog(struct catalog_queryrunner  *queryrunner)
-{
-        struct catalog *catalog;
-
-        catalog=catalog_new_and_connect(queryrunner->path, NULL/*errmsg*/);
-        if(catalog) {
-                queryrunner->catalog=catalog;
-        } else {
-#ifdef DEBUG
-                printf("%s:%d connection to catalog %s failed\n",
-                       __FILE__,
-                       __LINE__,
-                       queryrunner->path);
-#endif
-                ;
-        }
-}
-
-static void runquery_thread_close_catalog(struct catalog_queryrunner  *queryrunner)
-{
-        struct catalog *catalog = queryrunner->catalog;
-        queryrunner->catalog=NULL;
-        catalog_free(catalog);
-        g_string_truncate(queryrunner->running_query, 0);
-}
-
-static void runquery_thread_execute_query(struct catalog_queryrunner  *queryrunner)
-{
-        g_string_assign(queryrunner->running_query,
-                        queryrunner->query->str);
-
-        catalog_restart(queryrunner->catalog);
-        queryrunner->count=0;
-        unlock(queryrunner->mutex);
-#ifdef DEBUG
-
-        printf("%s:%d execute query: %s\n",
-               __FILE__,
-               __LINE__,
-               queryrunner->running_query->str);
-#endif
-
-        if(!catalog_executequery(queryrunner->catalog,
-                                 queryrunner->running_query->str,
-                                 result_callback,
-                                 queryrunner/*userdata*/)) {
-                fprintf(stderr,
-                        "%s:%d run_query(%s,%s) failed: %s\n",
-                        __FILE__,
-                        __LINE__,
-                        queryrunner->path,
-                        queryrunner->running_query->str,
-                        catalog_error(queryrunner->catalog));
-        }
-#ifdef DEBUG
-        printf("%s:%d finished executing query: %s\n",
-               __FILE__,
-               __LINE__,
-               queryrunner->running_query->str);
-#endif
-
-        lock(queryrunner->mutex);
-}
-
-static void runquery_thread_wait(struct catalog_queryrunner  *queryrunner)
-{
-#ifdef DEBUG
-                printf("%s:%d thread: waiting on condition\n", __FILE__, __LINE__);
-#endif
-        g_cond_wait(queryrunner->cond,
-                    queryrunner->mutex);
-#ifdef DEBUG
-                printf("%s:%d thread: woke up\n", __FILE__, __LINE__);
-#endif
-}
-
 static gpointer runquery_thread(gpointer userdata)
 {
-        struct catalog_queryrunner *queryrunner
-                                = (struct catalog_queryrunner *)userdata;
+        struct catalog_queryrunner *queryrunner;
+        struct catalog_queryrunner_msg *msg;
+        gboolean shutdown = FALSE;
+        struct catalog *catalog;
+        GAsyncQueue *queue;
+        struct thread_data data;
+        memset(&data, 0, sizeof(struct thread_data));
 
 #ifdef DEBUG
-        printf("%s:%d thread started\n", __FILE__, __LINE__);
+        printf("%s:%d thread start\n", __FILE__, __LINE__);
 #endif
 
-        lock(queryrunner->mutex);
-        while(!queryrunner->stopping) {
-                if(queryrunner->started) {
-                        runquery_thread_open_catalog(queryrunner);
+        queryrunner = (struct catalog_queryrunner *)userdata;
+        data.queryrunner=queryrunner;
+        g_return_val_if_fail(queryrunner!=NULL, NULL);
+        catalog = queryrunner->catalog;
+        queue = g_async_queue_ref(queryrunner->incoming);
+
+        do {
+                msg = catalog_queryrunner_msg_next(&data);
+
+                switch(msg->action) {
+                case CATALOG_QUERYRUNNER_ACTION_CONNECT:
 #ifdef DEBUG
-                        printf("%s:%d thread catalog opened\n", __FILE__, __LINE__);
+                        printf("%s:%d: thread:connect\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__
+                               );
 #endif
 
-                        while(queryrunner->started) {
-                                if(query_has_changed(queryrunner) && queryrunner->query->len>0) {
-                                        runquery_thread_execute_query(queryrunner);
-                                } else {
-                                        runquery_thread_wait(queryrunner);
+                        if(!catalog_is_connected(catalog)) {
+                                if(!catalog_connect(catalog)) {
+                                        handle_thread_error(queryrunner);
                                 }
                         }
-                        runquery_thread_close_catalog(queryrunner);
-#ifdef DEBUG
-                        printf("%s:%d thread catalog closed\n", __FILE__, __LINE__);
-#endif
+                        break;
 
-                } else {
-                        runquery_thread_wait(queryrunner);
+                case CATALOG_QUERYRUNNER_ACTION_QUERY:
+#ifdef DEBUG
+                        printf("%s:%d: thread:query(%s) %d\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__,
+                               msg->query,
+                               catalog_is_connected(catalog)
+                               );
+#endif
+                        if(msg->query!=NULL && strlen(msg->query)>0) {
+                                if(catalog_is_connected(catalog)) {
+                                        catalog_restart(catalog);
+                                        data.running_query=msg->query;
+                                        data.count=0;
+                                        if(!catalog_executequery(catalog,
+                                                                 msg->query,
+                                                                 result_callback,
+                                                                 &data)) {
+                                                handle_thread_error(queryrunner);
+                                        }
+                                        data.running_query=NULL;
+                                } else {
+                                        g_warning("not connected, "
+                                                  "CATALOG_QUERYRUNNER_ACTION_CONNECT not "
+                                                  "sent before _QUERY");
+                                }
+                        }
+                        printf("%s:%d: query done: %s\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__,
+                               msg->query
+                               );
+
+                        break;
+
+                case CATALOG_QUERYRUNNER_ACTION_SHUTDOWN:
+#ifdef DEBUG
+                        printf("%s:%d: thread:shutdown\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__
+                               );
+#endif
+                        shutdown=TRUE;
+                        /* fallthrough */
+
+                case CATALOG_QUERYRUNNER_ACTION_DISCONNECT:
+#ifdef DEBUG
+                        printf("%s:%d: thread:disconnect\n", /*@nocommit@*/
+                               __FILE__,
+                               __LINE__
+                               );
+#endif
+                        if(catalog_is_connected(catalog)) {
+                                catalog_disconnect(catalog);
+                        }
+                        break;
                 }
-        }
-        unlock(queryrunner->mutex);
+                catalog_queryrunner_msg_free(msg);
+        } while(!shutdown);
+
+        g_async_queue_unref(queryrunner->incoming);
 
 #ifdef DEBUG
-
-        printf("%s:%d thread cleanup\n", __FILE__, __LINE__);
+        printf("%s:%d thread end\n", __FILE__, __LINE__);
 #endif
-
-        g_string_free(queryrunner->query, TRUE/*free content*/);
-        g_string_free(queryrunner->running_query, TRUE/*free content*/);
-        g_free((gpointer)queryrunner->path);
-        g_free(queryrunner);
-#ifdef DEBUG
-
-        printf("%s:%d thread done\n", __FILE__, __LINE__);
-#endif
-
         return NULL;
 }
 
-static void wait_on_condition(struct catalog_queryrunner *self, int time_ms)
-{
-        GTimeVal timeval;
-        g_get_current_time(&timeval);
-        g_time_val_add(&timeval, time_ms*1000);
-
-        lock(self->mutex)
-                ;
-        if(!query_has_changed(self))
-                g_cond_timed_wait(self->cond, self->mutex, &timeval);
-        unlock(self->mutex);
-
-}
 static gboolean result_callback(struct catalog *catalog,
                                 const struct catalog_query_result *qresult,
                                 void *userdata)
 {
         const struct catalog_entry *entry = &qresult->entry;
-        struct catalog_queryrunner *self;
+        struct thread_data *data;
+        struct catalog_queryrunner *queryrunner;
         struct launcher *launcher;
         const char *query;
         struct result *result;
@@ -435,7 +409,10 @@ static gboolean result_callback(struct catalog *catalog,
         g_return_val_if_fail(userdata!=NULL, FALSE);
         g_return_val_if_fail(entry!=NULL, FALSE);
 
-        self = CATALOG_QUERYRUNNER(userdata);
+        data = (struct thread_data *)userdata;
+        queryrunner = data->queryrunner;
+        g_return_val_if_fail(userdata, FALSE);
+
         launcher = launchers_get(entry->launcher);
         if(!launcher)
         {
@@ -450,56 +427,182 @@ static gboolean result_callback(struct catalog *catalog,
                 return TRUE;
         }
 
-        result = catalog_result_create(self->path,
+        printf("%s:%d: create result: %s, %d\n", /*@nocommit@*/
+               __FILE__,
+               __LINE__,
+               launcher->id,
+               qresult->id
+               );
+
+        result = catalog_result_create(queryrunner->path,
                                        launcher,
                                        qresult);
-        query = self->running_query->str;
+        query = data->running_query;
 #ifdef DEBUG
 
         printf("%s:%d:query(%s) add %s\n",
                __FILE__, __LINE__, query, entry->path);
 #endif
 
-        result_queue_add(self->queue,
-                         QUERYRUNNER(self),
+        result_queue_add(queryrunner->queue,
+                         QUERYRUNNER(queryrunner),
                          query,
                          qresult->pertinence,
                          result);
-        count = self->count;
+        count = data->count;
         count++;
-        self->count=count;
-        if(count>=MAXIMUM)
+        data->count=count;
+        if(count>=MAXIMUM) {
                 return FALSE;
+        }
 
-        if(count==FIRST_BUNCH_SIZE)
-{
+        if(count==FIRST_BUNCH_SIZE) {
 #ifdef DEBUG
                 printf("%s:%d:query(%s) wait (1st bunch)\n",
                        __FILE__, __LINE__, query);
 #endif
-
-                wait_on_condition(self, AFTER_FIRST_BUNCH_TIMEOUT);
+                if(catalog_queryrunner_msg_wait(data, AFTER_FIRST_BUNCH_TIMEOUT)) {
+                        return FALSE;
+                }
 #ifdef DEBUG
 
                 printf("%s:%d:query(%s) wait (1st bunch) done\n",
                        __FILE__, __LINE__, query);
 #endif
 
-        } else if(count%LATER_BUNCH_SIZE==0)
-        {
+        } else if(count%LATER_BUNCH_SIZE==0) {
 #ifdef DEBUG
                 printf("%s:%d:query(%s) wait (later bunch)\n",
                        __FILE__, __LINE__, query);
 #endif
 
-                wait_on_condition(self, LATER_BUNCH_TIMEOUT);
+                if(catalog_queryrunner_msg_wait(data, LATER_BUNCH_TIMEOUT)) {
+                        return FALSE;
+                }
 #ifdef DEBUG
 
                 printf("%s:%d:query(%s) wait (later bunch) done\n",
                        __FILE__, __LINE__, query);
 #endif
-
         }
+
         return TRUE;
 }
 
+static void catalog_queryrunner_msg_send(struct catalog_queryrunner *self, enum CatalogQueryrunnerMessageAction action, const char *query)
+{
+        struct catalog_queryrunner_msg *msg;
+
+        g_return_if_fail(self);
+
+        msg = g_new(struct catalog_queryrunner_msg, 1);
+        msg->action = action;
+        msg->query = query ? g_strdup(query):NULL;
+
+
+#ifdef DEBUG
+        printf("%s:%d:push(%d, %s)\n",
+               __FILE__, __LINE__, action, query);
+#endif
+        g_async_queue_lock(self->incoming);
+        {
+                g_async_queue_push_unlocked(self->incoming, msg);
+                catalog_interrupt(self->catalog);
+
+        }
+        g_async_queue_unlock(self->incoming);
+
+#ifdef DEBUG
+        printf("%s:%d:pushed(%d, %s)\n",
+               __FILE__, __LINE__, action, query);
+#endif
+}
+static void catalog_queryrunner_msg_free(struct catalog_queryrunner_msg *msg)
+{
+        g_return_if_fail(msg);
+
+        if(msg->query) {
+                g_free((char *)msg->query);
+        }
+        g_free(msg);
+}
+
+static struct catalog_queryrunner_msg *catalog_queryrunner_msg_next(struct thread_data *data)
+{
+        struct catalog_queryrunner_msg *msg;
+        GAsyncQueue *queue;
+
+#ifdef DEBUG
+        printf("%s:%d:pop())\n",
+               __FILE__, __LINE__);
+#endif
+        queue = data->queryrunner->incoming;
+
+        g_async_queue_lock(queue);
+        if(data->next_msg) {
+                msg=data->next_msg;
+                data->next_msg=NULL;
+        } else {
+                msg=g_async_queue_pop_unlocked(queue);
+        }
+
+        while(msg->action==CATALOG_QUERYRUNNER_ACTION_QUERY) {
+                struct catalog_queryrunner_msg *msg2;
+                msg2 = (struct catalog_queryrunner_msg *)g_async_queue_try_pop_unlocked(queue);
+                if(msg2==NULL) {
+                        break;
+                } else {
+                        catalog_queryrunner_msg_free(msg);
+                        msg=msg2;
+                }
+        }
+        g_async_queue_unlock(queue);
+#ifdef DEBUG
+        printf("%s:%d:poped(): %d, %s\n",
+               __FILE__, __LINE__, msg->action, msg->query);
+#endif
+
+        return msg;
+}
+
+/**
+ * Ideally there would be a message I could send through the queue
+ * to tell the UI there was something wrong.
+ */
+static void handle_thread_error(struct catalog_queryrunner *self)
+{
+        g_return_if_fail(self);
+        fprintf(stderr,
+                "SQL ERROR: %s\n",
+                catalog_error(self->catalog));
+}
+
+/**
+ * Wait for a message.
+ *
+ * This function will wait for a message and return TRUE if one was found at
+ * the end of the timeout. The message will be kept inside the thread data
+ *
+ * @param data thread data
+ * @param timeout timeout, in milliseconds
+ * @return TRUE if a message was found on the queue
+ */
+static gboolean catalog_queryrunner_msg_wait(struct thread_data *data, unsigned long timeout)
+{
+        struct catalog_queryrunner_msg *msg;
+        GTimeVal tv;
+
+        if(data->next_msg) {
+                return TRUE;
+        }
+
+        g_get_current_time(&tv);
+        g_time_val_add(&tv, timeout*1000);
+
+        msg = (struct catalog_queryrunner_msg *)g_async_queue_timed_pop(data->queryrunner->incoming, &tv);
+        if(msg!=NULL) {
+                data->next_msg=msg;
+                return TRUE;
+        }
+        return FALSE;
+}

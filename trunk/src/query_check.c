@@ -352,5 +352,5 @@ static void assertHighlightIs(const char *query, const char *name, const char *p
 
 static void _assertTrue(const char *msg, gboolean expression, const char *file, int line)
 {
-        _fail_unless(expression, file, line, msg);
+        _fail_unless(expression, file, line, "failure", msg, NULL);
 }

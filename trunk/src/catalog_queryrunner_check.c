@@ -287,15 +287,21 @@ static void _get_results_counted(const char *query, int count, const char *file,
                        expected_result_count,
                        timed_out ? "true":"false");
         }
-        if(timed_out)
-                _fail_unless(0, file, line, "timed out while waiting for query results");
+        if(timed_out) {
+                _fail_unless(0, file, line, "failure", "timed out while waiting for query results", NULL);
+        }
         g_source_remove(timeout_1);
         if(current_result_count==expected_result_count) {
                 gboolean timed_out_2 = FALSE;
                 g_timeout_add(300, timeout_callback, &timed_out_2);
                 while(!timed_out_2) {
                         g_main_context_iteration(maincontext, TRUE/*may block*/);
-                        _fail_unless(current_result_count==expected_result_count, file, line, "too many results");
+                        _fail_unless(current_result_count==expected_result_count,
+                                     file,
+                                     line,
+                                     "current_result_count==expected_result_count",
+                                     "too many results",
+                                     NULL);
                 }
         }
 
@@ -337,21 +343,27 @@ static void result_handler(struct queryrunner *caller,
         _fail_unless(caller==runner,
                      location->file,
                      location->line,
-                     "wrong caller passed to callback");
+                     "caller==runner",
+                     "wrong caller passed to callback",
+                     NULL);
         _fail_unless(strcmp(query, expected_query)==0,
                      location->file,
                      location->line,
-                     g_strdup_printf("expected %d results for query '%s', but got a result for query '%s'",
-                                     expected_result_count-current_result_count,
-                                     expected_query,
-                                     query));
+                     "strcmp(query, expected_query)==0,",
+                     "expected %d results for query '%s', but got a result for query '%s'",
+                     expected_result_count-current_result_count,
+                     expected_query,
+                     query,
+                     NULL);
         _fail_unless(current_result_count<expected_result_count,
                      location->file,
                      location->line,
-                     g_strdup_printf("expected %d results for query '%s', got %d so far",
-                                     expected_result_count,
-                                     query,
-                                     current_result_count+1));
+                     "current_result_count<expected_result_count",
+                     "expected %d results for query '%s', got %d so far",
+                     expected_result_count,
+                     query,
+                     current_result_count+1,
+                     NULL);
         current_result_count++;
 }
 

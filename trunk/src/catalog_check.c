@@ -998,9 +998,9 @@ static void _catalog_cmd(struct catalog *catalog,
                 _fail_unless(0,
                              file,
                              line,
-                             "%s:%s",
                              comment,
-                             catalog_error(catalog));
+                             catalog_error(catalog),
+                             NULL);
         }
 }
 static gboolean exists(const char *path)
@@ -1318,5 +1318,7 @@ static void _assert_source_exists(struct catalog *catalog, const char *type, int
         _fail_unless(count==0,
                      file,
                      line,
-                     "source does not exist: no entries found");
+                     "count==0 assertion failed",
+                     "source does not exist: no entries found",
+                     NULL);
 }
