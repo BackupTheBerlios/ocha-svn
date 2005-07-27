@@ -29,7 +29,7 @@
  * it probably means that more results will
  * help.
  */
-#define AFTER_FIRST_BUNCH_TIMEOUT 1300
+#define AFTER_FIRST_BUNCH_TIMEOUT 800
 
 /**
  * Time to wait between several "later bunches" (ms).
