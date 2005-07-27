@@ -1,0 +1,167 @@
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+     "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd">
+<reference>
+  <title>Manual Pages</title>
+   <refentry id="ocha">
+      <refentryinfo>
+         <date>2005-07-27</date>
+         <productname>ocha</productname>
+         <title>ocha</title>
+      </refentryinfo>
+
+      <refmeta>              
+         <refentrytitle>ocha</refentrytitle>
+         <manvolnum>1</manvolnum>
+      </refmeta>
+
+      <refnamediv>   
+         <refname>ocha</refname>
+         <refpurpose>Ocha controller and preferences</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<title>Synopsis</title>
+	<cmdsynopsis>
+	  <command>ocha</command>
+	  <arg choice="opt">
+	    <group>
+	      <arg>preferences</arg>
+	      <arg>index</arg>
+	      <arg>install</arg>
+	      <arg>stop</arg>
+	    </group>
+	  </arg>
+	  <arg choice="opt" rep="repeat">standard gnome arguments</arg>
+	</cmdsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title> 
+	<para>
+	  This command executes widely different actions depending on
+	  the first argument that it receives:
+	</para>
+	<variablelist>
+	  <varlistentry>
+	    <term><userinput>ocha</userinput> or <userinput>ocha preferences</userinput></term>
+	    <listitem>
+	      <para>
+		Open ocha's preference screen, described in details in ocha's GNOME
+		documentation.
+	      </para>
+	    </listitem>
+	  </varlistentry>
+	  <varlistentry>
+	    <term><userinput>ocha index</userinput></term>
+	    <listitem>
+	      <para>
+		(Re-)index all sources.
+	      </para>
+	    </listitem>
+	  </varlistentry>
+	  <varlistentry>
+	    <term><userinput>ocha install</userinput></term>
+	    <listitem>
+	      <para>
+		Run first-time installation. This is executed automatically
+		the very first time ocha is started. 
+	      </para>
+	      <para>
+		The first-time installation runs a GNOME druid that will
+		create a default configuration for ocha and index everything.
+		It'll then start <link linkend="ochad">ochad</link>.
+	      </para>
+	    </listitem>
+	  </varlistentry>
+	  <varlistentry>
+	    <term><userinput>ocha stop</userinput></term>
+	    <para>
+	      Stop any running instance of <link linkend="ochad">ochad</link>.
+	    </para>
+	    <para>
+	      This is not quite the same as stopping <link linkend="ochad">ochad</link>; it'll
+	      make sure that the gnome session manager won't restart it.
+	    </para>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+
+      <refsect1>
+	<title>Author</title> 
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    Stephane Zermatten <email>szermatt@gmx.net</email>
+	  </para>
+	</listitem>
+      </itemizedlist>
+      </refsect1>
+      <refsect1>
+	<title>See Also</title>
+	<para><link linkend="ochad">ochad</link>, Ocha's GNOME documentation</para>
+      </refsect1>
+   </refentry>
+   <refentry id="ochad">
+      <refentryinfo>
+         <date>2005-07-27</date>
+         <productname>ocha</productname>
+         <title>ochad</title>
+      </refentryinfo>
+
+      <refmeta>              
+         <refentrytitle>ochad</refentrytitle>
+         <manvolnum>1</manvolnum>
+      </refmeta>
+
+      <refnamediv>   
+         <refname>ochad</refname>
+         <refpurpose>Ocha daemon</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<title>Synopsis</title>
+	<cmdsynopsis>
+	  <command>ochad</command>
+	  <arg choice="opt" rep="repeat">standard gnome arguments</arg>
+	</cmdsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title> 
+	<para>
+	  This is the ocha daemon. It'll listen for the key accelerator
+	  and open the query window when it is pressed.
+	  See ocha's GNOME documentation for details.
+	</para>
+	<para>
+	  <command>ochad</command> registers itself to
+	  the GNOME session managers and makes sure it'll be
+	  restarted automatically next time the current user
+	  logs in.
+	</para>
+	<para>
+	  If you don't use the GNOME session manager, you'll need
+	  to start the ocha daemon every time you log in. This might
+	  be done by adding the command <userinput>ochad&amp;</userinput> to
+	  <filename>~/.xinitrc</filename> or <filename>~/.Xsession</filename>
+	</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Author</title> 
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    Stephane Zermatten <email>szermatt@gmx.net</email>
+	  </para>
+	</listitem>
+      </itemizedlist>
+      </refsect1>
+      <refsect1>
+	<title>See Also</title>
+	<para><link linkend="ocha">ocha</link>, Ocha's GNOME documentation</para>
+      </refsect1>
+   </refentry>
+
+</reference>
+
