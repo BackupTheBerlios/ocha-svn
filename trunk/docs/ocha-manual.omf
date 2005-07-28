@@ -1,0 +1,27 @@
+<?xml version="1.0" standalone="no"?>
+<omf>
+  <resource>
+    <creator>
+      szermatt@gmx.net (Stephane Zermatten)
+    </creator>
+    <title>
+     Ocha Manual
+    </title>
+    <date>
+     2005-07-28
+    </date>
+    <version identifier="0.1" date="2005-07-28" description="First release"/>
+    <subject category="GNOME|Applications|System Tools"/>
+    <description>
+      This document explains how to use ocha once it's been installed on
+      your system.
+    </description>
+    <type>
+     manual
+    </type>
+    <format mime="text/xml" dtd="-//OASIS//DTD DocBook XML V4.1.2//EN"/>
+    <identifier url=""/>
+    <language code="C"/>
+    <rights type="GNU FDL" license.version="1.1" holder="Stephane Zermatten"/>
+  </resource>
+</omf>

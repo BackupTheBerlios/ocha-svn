@@ -1,0 +1,547 @@
+<?xml version="1.0"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN" 
+"/usr/share/apps/ksgmltools2/docbook/xml-dtd-4.1.2/docbookx.dtd" [
+  <!ENTITY legal SYSTEM "legal.xml">
+  <!ENTITY appversion "0.1">
+  <!ENTITY manrevision "0.1">
+  <!ENTITY date "July 2005">
+  <!ENTITY app "<application>Ocha</application>">
+  <!ENTITY shortcut "<keycap>&lt;Alt&gt;Space</keycap>">
+  <!-- Information about the entities
+       The legal.xml file contains legal information, there is no need to edit the file. 
+       Use the appversion entity to specify the version of the application.
+       Use the manrevision entity to specify the revision number of this manual.
+       Use the date entity to specify the release date of this manual.
+       Use the app entity to specify the name of the application. -->
+]>
+<!-- 
+      (Do not remove this comment block.)
+  Maintained by the GNOME Documentation Project
+  http://developer.gnome.org/projects/gdp
+  Template version: 2.0 beta
+  Template last modified Apr 11, 2002
+-->
+<!-- =============Document Header ============================= -->
+<article id="index" lang="en">
+  <articleinfo> 
+    <title>&app; Manual V&manrevision;</title>       
+
+    <copyright> 
+      <year>2005</year> 
+      <holder>Stephane Zermatten</holder> 
+    </copyright> 
+<!-- translators: uncomment this:
+
+  <copyright>
+   <year>2002</year>
+   <holder>ME-THE-TRANSLATOR (Latin translation)</holder>
+  </copyright>
+
+   -->
+
+   &legal;
+   <!-- This file  contains link to license for the documentation (GNU FDL), and 
+        other legal stuff such as "NO WARRANTY" statement. Please do not change 
+	any of this. -->
+
+    <authorgroup> 
+      <author> 
+		<firstname>Stephane</firstname> 
+		<surname>Zermatten</surname> 
+		<affiliation> 
+	  		<address> <email>szermatt@gmx.net</email> </address> 
+		</affiliation> 
+      </author> 
+      
+<!-- This is appropriate place for other contributors: translators,
+     maintainers,  etc. Commented out by default.
+     
+      <othercredit role="translator">
+		<firstname>Latin</firstname> 
+		<surname>Translator 1</surname> 
+		<affiliation> 
+	  		<orgname>Latin Translation Team</orgname> 
+	  		<address> <email>translator@gnome.org</email> </address> 
+		</affiliation>
+		<contrib>Latin translation</contrib>
+      </othercredit>
+-->
+    </authorgroup>
+
+
+<!-- According to GNU FDL, revision history is mandatory if you are -->
+<!-- modifying/reusing someone else's document.  If not, you can omit it. -->
+<!-- Remember to remove the &manrevision; entity from the revision entries other
+-->
+<!-- than the current revision. -->
+<!-- The revision numbering system for GNOME manuals is as follows: -->
+<!-- * the revision number consists of two components -->
+<!-- * the first component of the revision number reflects the release version of the GNOME desktop. -->
+<!-- * the second component of the revision number is a decimal unit that is incremented with each revision of the manual. -->
+<!-- For example, if the GNOME desktop release is V2.x, the first version of the manual that -->
+<!-- is written in that desktop timeframe is V2.0, the second version of the manual is V2.1, etc. -->
+<!-- When the desktop release version changes to V3.x, the revision number of the manual changes -->
+<!-- to V3.0, and so on. -->  
+    <revhistory>
+      <revision> 
+		<revnumber>Ocha Manual V&manrevision;</revnumber> 
+		<date>&date;</date> 
+		<revdescription> 
+	  		<para role="author">Stephane Zermatten<email>szermatt@gmx.net</email></para>
+		</revdescription> 
+      </revision> 
+    </revhistory> 
+
+    <releaseinfo>
+      This manual describes version &appversion; of Ocha
+    </releaseinfo> 
+    <legalnotice> 
+      <title>Feedback</title> 
+      <para>To report a bug or make a suggestion regarding the &app; application or
+      this manual, post a message on the <ulink url="https://developer.berlios.de/forum/forum.php?forum_id=10451">Help forum</ulink>
+      on &app;'s project page on berlios.de.
+      </para>
+<!-- Translators may also add here feedback address for translations -->
+    </legalnotice> 
+  </articleinfo> 
+
+  <indexterm zone="index"> 
+    <primary>Ocha</primary> 
+  </indexterm> 
+  <indexterm zone="index"> 
+    <primary>ocha</primary> 
+  </indexterm>
+
+  <sect1 id="ocha-introduction"> 
+    <title>Introduction</title> 
+    <para>
+	Ocha keeps a searchable database of your user files, bookmarks and applications and offers 
+	quick searching and launching for these files. 
+    </para>
+    <para>
+      This application is inspired from Quicksilver for OSX, but for the GNOME desktop.
+    </para>
+    <para>&app; provides quick access to:</para> 
+    
+    <itemizedlist> 
+      <listitem> 
+	<para>
+	  Applications
+	</para>
+      </listitem>
+      <listitem>
+	<para>
+	  User files
+	</para>
+      </listitem>
+      <listitem>
+	<para>
+	  Firefox and Mozilla bookmarks
+	</para>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+
+<!-- =========== Getting Started ============================== -->
+<!-- Use the Getting Started section to describe the steps required
+     to start the application and to describe the user interface components
+     of the application. If there is other information that it is important
+     for readers to know before they start using the application, you should
+     also include this information here. 
+     If the information about how to get started is very short, you can 
+     include it in the Introduction and omit this section. -->
+
+  <sect1 id="ocha-getting-started"> 
+    <title>Getting Started</title> 
+
+    <sect2 id="ocha-start">
+    <title>To Start &app;</title>
+    <para>You can start <application>&app;</application> in the following ways:
+    </para> 
+    <variablelist>
+    	<varlistentry>
+	  <term><guimenu>Applications</guimenu> menu</term>
+	  <listitem>
+	    <para>Choose 
+	    <menuchoice>
+	      <guisubmenu>Utilities </guisubmenu>
+	      <guimenuitem>Ocha</guimenuitem>
+	    </menuchoice>. </para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term>Command line</term>
+	  <listitem>
+	    <para>To start <application>&app;</application> from a command line, type the following command, 
+	    then press <keycap>Return</keycap>:</para>
+	    <para> 
+	      <command>ocha</command> 
+	    </para> 
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term>Using Ocha itself</term>
+	  <listitem>
+	    <para>Press &shortcut;, type <quote>ocha</quote> and then press <keycap>Return</keycap> (Provided ocha daemon is already running)</para>
+	  </listitem>
+	</varlistentry>
+    </variablelist>
+    </sect2>
+
+    <sect2 id="ocha-when-start">
+      <title>When You Start &app; for the first time</title>
+      <para>
+	When you <link linkend="ocha-start">start</link> &app; for the first time, it'll need to go through your files and index
+	them. This shouldn't take long, unless you have many files in your home directory or 
+	<filename>My Documents</filename>. 
+      </para>
+      <para>
+	&app; will open a wizard telling you what it is doing. At the end of the process,
+	&app; will have been launched and ran on your system. You'll be able to invoke
+	&app; at any time by pressing &shortcut; (This keyboard accelerator can be modified on
+	the <link linkend="ocha-prefs">preference screen</link>)
+      </para>
+      <para>
+	Later, when you <link linkend="ocha-start">start the application</link> again, 
+	the <link linkend="ocha-prefs">preference screen</link> will open. 
+      </para>
+
+    </sect2>
+  </sect1>
+<!-- ================ Usage ================================ -->
+<!-- Use this section to describe how to use the application to perform the tasks for 
+  which the application is designed. -->
+  <sect1 id="ocha-usage"> 
+    <title>Usage</title> 
+    <para>Common uses:
+      <itemizedlist> 
+	<listitem> 
+	  <para> 
+	    <xref linkend="ocha-search-and-launch"/></para> 
+	</listitem> 
+	<listitem> 
+	  <para> 
+	    <xref linkend="ocha-prefs"/></para> 
+	</listitem> 
+      </itemizedlist> </para>
+    <!-- ================ Usage Subsection ================================ -->
+    <sect2 id="ocha-search-and-launch"> 
+      <title>Search and Launch</title> 
+      <para>To look for a file, application or bookmarked link, press 
+      &shortcut; (or whatever keyboard accelerater you <link linkend="ocha-prefs">assigned</link>
+      to &app;). This will open the query window.</para>
+      <para>Then type a portion of the filename/title you're looking for. After each keypress,
+      &app; ocha will present you with a list of possible files, application or link. Once you've
+      found what you were looking for, select it using the <keycap>up</keycap> and <keycap>down</keycap>
+      arrow and press <keycap>Return</keycap> to launch it.
+      </para>
+
+      <para>To cancel a search, press <keycap>Esc</keycap>.</para>
+
+      <para>Press <keycap>Space</keycap> to separate portions of the filename/title you're looking for. 
+      For example, if you type <userinput>holiday greece</userinput>, it'll match <literal>My holidays in Greece in 2005</literal>
+      as well as <literal>Greece Holiday.mpg</literal>.</para>
+    </sect2> 
+  </sect1>
+  <!-- ============= Customization ============================= -->
+  <!-- Use this section to describe how to customize the application. -->
+  <sect1 id="ocha-prefs"> 
+    <title>Settings</title> 
+    <para>
+      To configure &app;, either choose
+      <menuchoice>
+	<guisubmenu>Utilities </guisubmenu>
+	<guimenuitem>Ocha</guimenuitem>
+	</menuchoice> on the GNOME menu or, if ocha daemon is running, press &shortcut;, type <quote>ocha</quote> and then press <keycap>Return</keycap>.
+    </para>
+    <para>
+      This will open the 
+      <guilabel>Preferences</guilabel> dialog, which contains the following tabbed sections:
+    </para>
+    <itemizedlist> 
+      <listitem> 
+	<para> 
+	  <xref linkend="ocha-prefs-general"/></para> 
+      </listitem> 
+      <listitem> 
+	<para> 
+	  <xref linkend="ocha-prefs-catalog"/></para> 
+      </listitem> 
+      <listitem> 
+	<para> 
+	  <xref linkend="ocha-prefs-stop"/></para> 
+      </listitem> 
+    </itemizedlist>
+<!-- =============== Customization Subsection ================ -->
+<!-- Use a new section to describe different tabbed sections on the Settings or Preferences
+	     dialog. -->
+    <sect2 id="ocha-prefs-general"> 
+      <title>General</title> 
+      <variablelist> 
+	<varlistentry> 
+	  <term> 
+	    <guilabel>Accelerator</guilabel> 
+	  </term> 
+	  <listitem> 
+	    <para>This is the keyboard shortcut that will open 
+	    the <link linkend="ocha-search-and-launch">query window</link>. 
+	    </para>
+	    <para>
+	      To change the accelerator, click on the button and 
+	      press the key you'd like to use to start a query. 
+	    </para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term>
+	    <guilabel>Catalog Updates</guilabel>
+	  </term>
+	  <listitem>
+	    <para>
+	      Choose here how often you'd like &app; to refresh
+	      its cache. It'll take that long for a new file or bookmark 
+	      to be taken into account when running a query &app;, so
+	      you might want to set a small value here. On the other hand,
+	      updating the catalog will access your hard disk and might slow
+	      down your computer while it is in action. 
+	    </para>
+	    <para>
+	      Choose one of the following:
+	    </para>
+	    <itemizedlist> 
+	      <listitem> 
+		<para> 
+		  <guilabel>Manually</guilabel> 
+		</para> 
+		<para>
+		  Select this option if you don't want ocha to
+		  ever run an automatic update of the index.
+		</para>
+		<para>
+		  If you choose this option, the index will never
+		  be updated unless you refresh a source manually
+		  from <link linkend="ocha-prefs-catalog">the catalog
+		  tab</link>
+		</para>
+		<para>
+		  You might want to select this option so that you
+		  can choose the exact time at which the catalog
+		  is updated. Run the command <userinput>ocha index</userinput>
+		  from a <application>cron</application> job or from the
+		  command line when you want ocha to update the catalog.
+		</para>
+	      </listitem> 
+	      <listitem> 
+		<para> 
+		  <guilabel>Every 10 minutes</guilabel> 
+		</para> 
+		<para>
+		  Choose this option if you want &app; to update
+		  the catalog every 10 minutes. 
+		</para>
+		<para>
+		  That might be too often,
+		  especially if you've got a slow hard disk.
+		</para>
+	      </listitem> 
+	      <listitem> 
+		<para> 
+		  <guilabel>Every half hour</guilabel> 
+		</para> 
+		<para>
+		  Choose this option if you want &app; to update
+		  the catalog every 30 minutes. 
+		</para>
+	      </listitem> 
+	      <listitem> 
+		<para> 
+		  <guilabel>Every hour</guilabel> 
+		</para> 
+		<para>
+		  Choose this option if you want &app; to update
+		  the catalog every hour. 
+		</para>
+	      </listitem> 
+	      <listitem> 
+		<para> 
+		  <guilabel>Every day</guilabel> 
+		</para> 
+		<para>
+		  Choose this option if you want &app; to update
+		  the catalog once a day. 
+		</para>
+	      </listitem> 
+	    </itemizedlist> 
+	  </listitem> 
+	</varlistentry> 
+      </variablelist> 
+    </sect2>
+    <!-- ============= Customization Subsection ===================== -->
+    <!-- Another tabbed section on the Preferences dialog. -->
+    <sect2 id="ocha-prefs-catalog"> 
+      <title>Catalog</title> 
+      <para>
+	On this tab, you'll find a list of indexed applications,
+	directories or bookmarks. 
+      </para>
+      <para>
+	On this list, you'll always find:
+      </para>
+      <variablelist>
+	<varlistentry>
+	  <term>Desktop</term>
+	  <listitem>
+	    <para>
+	      Your GNOME/KDE desktop.
+	    </para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term>Applications</term>
+	  <listitem>
+	    <para>
+	      The applications installed on your 
+	      system.
+	    </para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+      <para>
+	You might also see the <application>Mozilla</application> or
+	<application>Firefox</application> profiles ocha detected
+	on your system. Each profile corresponds to a bookmark file.
+      </para>
+
+      <para>
+	Here's what you can do on this tab:
+      </para>
+      <sect3>
+	<title>Add new directories to be indexed</title>
+	<para>
+	  To add new directories, you can click on <guilabel>New</guilabel>,
+	  then choose the directory. 
+	</para>
+	<para>
+	  Faster: drop directories from nautilus into the catalog
+	  list. 
+	</para>
+	<para>
+	  After adding a new directory, select the directory and
+	  click <guilabel>Refresh</guilabel> for its content to be
+	  indexer.
+	</para>
+      </sect3>
+      <sect3>
+	<title>Refresh individual sources</title>
+	<para>
+	  If you have added a new file, application or 
+	  bookmark entry and would like it to be immediately
+	  available for searching, select the source
+	  that has been modified and click on <guilabel>Refresh</guilabel>.
+	</para>
+      </sect3>
+      <sect3>
+	  <title>Delete directory sources</title>
+	  <para>
+	    To remove an indexed directory, select the directory and
+	    click on <guilabel>Delete</guilabel>.
+	  </para>
+	  <para>
+	    Sources added automatically by &app; cannot be deleted. You
+	    might achieve the same result by unchecking 
+	    the sources you don't want. Sources without a checkmark
+	    on the right won't be taken into account while searching
+	  </para>
+      </sect3>
+      <sect3>
+	  <title>Ignore irrelevant sources</title>
+	  <para>
+	    Remove the checkmark on the right of
+	    the entry for its content to be ignored while
+	    searching.
+	  </para>
+      </sect3>
+      <sect3>
+	  <title>Ignore annoying entries</title>
+	  <para>
+	    If a source contains an entry you know you'll
+	    never want, you might disable that entry.
+	  </para>
+	  <para>
+	    To do so, double-click on the source, then
+	    go to the tab <guilabel>Contents</guilabel>, 
+	    look for the entry and uncheck it.
+	  </para>
+	  <para>
+	    Alternatively, for directories you added 
+	    manually, you migth double-click on the
+	    entry, then type in patterns of files
+	    that must be ignored in this directory in the
+	    <guilabel>Exclude</guilabel>textbox.
+	  </para>
+      </sect3>
+    </sect2>
+    <!-- ============= Customization Subsection ===================== -->
+    <!-- Another tabbed section on the Preferences dialog. -->
+    <sect2 id="ocha-prefs-stop"> 
+      <title>Stop</title> 
+      <para>
+	This tab contains one button, <guilabel>Stop Ocha Daemon</guilabel>.
+	Click on it if you don't want &app; to run on your system anymore.
+      </para>
+      <para>
+	You might decide to reinstall &app; ocha by running 
+	the command 
+	<userinput>ochad</userinput> from the terminal.
+      </para>
+    </sect2>
+  </sect1>
+<!-- ============= Bugs ================================== -->
+<!-- This section is optional and is commented out by default. 
+     You can use it to describe known bugs and limitations of the 
+	  program if there are any - please be frank and list all
+     problems you know of. 
+     -->
+  
+  <sect1 id="mayapp-bugs">
+    <title>Known Bugs and Limitations</title>
+    <itemizedlist>
+      <listitem>
+	<para>
+	  Indexing of remote (SMB/NFS) directories might overtax
+	  your network. 
+	</para>
+      </listitem>
+      <listitem>
+	<para>
+	  It's much too ugly and needs nice icans.
+	</para>
+      </listitem>
+    </itemizedlist>
+ </sect1>
+<!-- ============= About ================================== -->
+<!-- This section contains info about the program (not docs), such as
+      author's name(s), web page, license, feedback address. This
+      section is optional: primary place for this info is "About.." box of
+      the program. However, if you do wish to include this info in the
+      manual, this is the place to put it. Alternatively, you can put this information in the title page.-->
+  <sect1 id="ocha-about"> 
+    <title>About &app;</title> 
+    <para> &app; was written by Stephane Zermatten
+      (<email>szermatt@gmx.net</email>). To find more information about
+      &app;, please visit the 
+      <ulink url="http://ocha.berlios.de" type="http">Ocha Homepage</ulink>.
+    </para>
+    <para>
+      To report a bug or make a suggestion regarding this application or
+      this manual, post a message on the <ulink url="https://developer.berlios.de/forum/forum.php?forum_id=10451">Help forum</ulink>
+    </para>
+
+    <para> This program is distributed under the terms of the GNU
+      General Public license as published by the Free Software
+      Foundation; either version 2 of the License, or (at your option)
+      any later version. A copy of this license can be found at this
+      <ulink url="ghelp:gpl" type="help">link</ulink>, or in the file
+      COPYING included with the source code of this program. </para>
+  </sect1> 
+</article>
