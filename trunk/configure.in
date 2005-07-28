@@ -25,6 +25,7 @@ dnl Checks for programs.
 AC_PROG_INSTALL
 AC_PROG_CC
 AC_PROG_LIBTOOL
+AC_PATH_PROG(XSLTPROC, xsltproc, no)
 
 
 dnl Checks for libraries.
@@ -72,6 +73,9 @@ if test "x$has_check" = "xy" ; then
 fi
 AM_CONDITIONAL(RUN_TESTS, test x$has_check = xy)
 
+AM_CONDITIONAL(HAS_XSLTPROC, test x$XSLTPROC != xn)
+
+AC_SUBST([XSLTPROC])
 AC_SUBST([TEST_CFLAGS])
 AC_SUBST([TEST_LIBS])
 AC_SUBST([SQLITE_CFLAGS])

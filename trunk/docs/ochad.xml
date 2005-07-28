@@ -1,0 +1,69 @@
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+     "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd">
+<?xml-stylesheet type="text/xsl"   href="http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl"?>
+<reference>
+  <title>Manual Pages</title>
+   <refentry id="ochad">
+      <refentryinfo>
+         <date>2005-07-27</date>
+         <productname>ocha</productname>
+         <title>ochad</title>
+      </refentryinfo>
+
+      <refmeta>              
+         <refentrytitle>ochad</refentrytitle>
+         <manvolnum>1</manvolnum>
+      </refmeta>
+
+      <refnamediv>   
+         <refname>ochad</refname>
+         <refpurpose>Ocha daemon</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<title>Synopsis</title>
+	<cmdsynopsis>
+	  <command>ochad</command>
+	  <arg choice="opt" rep="repeat">standard gnome arguments</arg>
+	</cmdsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title> 
+	<para>
+	  This is the ocha daemon. It'll listen for the key accelerator
+	  and open the query window when it is pressed.
+	  See ocha's GNOME documentation for details.
+	</para>
+	<para>
+	  <command>ochad</command> registers itself to
+	  the GNOME session managers and makes sure it'll be
+	  restarted automatically next time the current user
+	  logs in.
+	</para>
+	<para>
+	  If you don't use the GNOME session manager, you'll need
+	  to start the ocha daemon every time you log in. This might
+	  be done by adding the command <userinput>ochad&amp;</userinput> to
+	  <filename>~/.xinitrc</filename> or <filename>~/.Xsession</filename>
+	</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Author</title> 
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    Stephane Zermatten <email>szermatt@gmx.net</email>
+	  </para>
+	</listitem>
+      </itemizedlist>
+      </refsect1>
+      <refsect1>
+	<title>See Also</title>
+	<para>ocha manpage, Ocha's GNOME documentation</para>
+      </refsect1>
+   </refentry>
+
+</reference>
+

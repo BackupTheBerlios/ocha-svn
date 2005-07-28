@@ -14,6 +14,7 @@
        Use the date entity to specify the release date of this manual.
        Use the app entity to specify the name of the application. -->
 ]>
+<?xml-stylesheet type="text/xsl" href="http://docbook.sourceforge.net/release/xsl/current/html/docbook.xsl"?>
 <!-- 
       (Do not remove this comment block.)
   Maintained by the GNOME Documentation Project
