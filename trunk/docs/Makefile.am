@@ -2,7 +2,7 @@ docname=ocha-manual
 omffile=ocha-manual.omf
 entities=ocha-manual.xml legal.xml
 lang=C
-include $(top_srcdir)/docs/xmldocs.make
+include $(top_srcdir)/doc/xmldocs.make
 dist-hook: app-dist-hook
 
 if HAS_XSLTPROC

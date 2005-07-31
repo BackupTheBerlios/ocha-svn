@@ -45,7 +45,7 @@ omf_dir=$(top_srcdir)/omf-install
 EXTRA_DIST = $(xml_files) $(omffile)
 CLEANFILES = omf_timestamp
 
-include $(top_srcdir)/docs/omf.make
+include $(top_srcdir)/doc/omf.make
 
 all: omf
 
