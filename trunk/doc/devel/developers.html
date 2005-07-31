@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <title>Checking out and compiling ocha</title>
+  </head>
+  <body>
+    <h1>Checking out and compiling ocha</h1>
+
+    <p>
+      This document quickly describes how to checkout ocha from subversion
+      and compile it. It is meant for developers. Most people will be
+      happy downloading the distribution and following the instructions
+      given in the documentation or on the <a href="http://ocha.berlios.de/">homepage</a>
+    </p>
+    
+    <p>
+      Why would you want to compile ocha straight out of subversion ? Maybe because
+      you would like to fix it. Maybe you would like to get access to the latest
+      version with all the unstable features. Maybe you just like danger... Whatever
+      the reason, here's what you should do:
+    </p>
+
+    <h2>1. Checkout out the latest version</h2>
+
+    <p>A <a href="https://developer.berlios.de/docman/display_doc.php?docid=394&amp;group_id=2">Subversion HOWTO</a> 
+    is available on berlios.de. I won't get into details here, just give the command 
+    you need to type to checkout the main version of ocha:</p>
+
+    <pre>
+svn checkout svn://svn.berlios.de/ocha/trunk
+    </pre>
+
+    <p><strong>Warning:</strong> the version of ocha on subversion may not work 
+    at all, may not do anything useful or may not even compile at all. Don't be 
+    surprised if something goes wrong; just report it on the 
+    <a href="https://developer.berlios.de/forum/forum.php?forum_id=10452">developers forum</a>
+    </p>
+
+    <h2>2. Make sure you've got everything</h2>
+    
+    <p>
+      In addition to everything you need to compile and run ocha that's listed
+      in the documentation, you'll need the following software to build ocha
+      straight out of subversion:
+    </p>
+
+    <ul>
+      <li>gnome-autogen.sh</li>
+      <li>autoconf >= 2.53</li>
+      <li>automake >= 1.6</li>
+      <li>libtool >= 1.5</li>
+      <li>pkg-config >= 0.14.0</li>
+    </ul>
+
+    <p>
+      The most important of all these and the hardest to find is probably <code>gnome-autogen.sh</code>. It's
+      the script that does all the work of generating the <code>configure</code> script you'll need to
+      compile the application. 
+    </p>
+    <p>
+      You will find <code>gnome-autogen.sh</code> in a package called <code>gnome-common</code> 
+      in most distribution (at least Debian and Fedora.) GNOME distribute it under this name as well.
+    </p>
+
+    <h3>3. Generate the configure script</h3>
+
+    <p>
+      Go into the ocha's <code>trunk</code> directory and run <code>./autogen.sh</code>. It'll
+      generate <code>configure</code> and run it for the first time.
+    </p>
+
+    <p>
+      Once this is done, you can edit the source files and run <code>make</code> to compile it, as
+      usual.
+    </p>
+
+    <h3>4. Run the test cases (make check)</h3>
+    
+    <p>
+      Depending on what you're working on, you might want to run the test cases using <code>make check</code>. 
+      This won't work unless you've got the library <code>check</code> version <code>0.9.2</code> or more
+      installed on your system. 
+    </p>
+    <p>
+      Download it from <a href="http://check.sourceforge.net">check.sourceforge.net</a>. It is also
+      available in a Debian package called <code>check</code>.
+    </p>
+
+    <h4>5. Generate the API documentation (make doxygen)</h4>
+    
+    <p>
+      The API documentation might help you find your way into the code. To generate it, first
+      install <a href="http://www.doxygen.org">doxygen</a>. Then go into the directory <code>src</code>
+      and type <code>make doxygen</code>. You'll then find the generated API documentation in HTML in <code>doc/devel/api/html</code>.
+    </p>
+  </body>
+</html>
