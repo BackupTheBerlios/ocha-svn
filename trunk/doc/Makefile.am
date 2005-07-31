@@ -1,3 +1,4 @@
+SUBDIRS=C
 
 if HAS_XSLTPROC
 
