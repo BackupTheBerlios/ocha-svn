@@ -231,6 +231,17 @@
       <para>To look for a file, application or bookmarked link, press 
       &shortcut; (or whatever keyboard accelerater you <link linkend="ocha-prefs">assigned</link>
       to &app;). This will open the query window.</para>
+
+      <!-- ==== Figure ==== -->
+      <figure id="querywin-fig">
+	<title>The query window</title> 
+	<screenshot>
+	  <screeninfo>The query window</screeninfo> 
+	  <graphic format="png" fileref="figures/querywin.png"/>
+	</screenshot>
+      </figure>
+      <!-- ==== End of Figure ==== -->
+      
       <para>Then type a portion of the filename/title you're looking for. After each keypress,
       &app; ocha will present you with a list of possible files, application or link. Once you've
       found what you were looking for, select it using the <keycap>up</keycap> and <keycap>down</keycap>
@@ -278,6 +289,16 @@
 	     dialog. -->
     <sect2 id="ocha-prefs-general"> 
       <title>General</title> 
+      <!-- ==== Figure ==== -->
+      <figure id="prefs_main-fig">
+	<title>Preferences, General Tab</title> 
+	<screenshot>
+	  <screeninfo>Preferences, General Tab</screeninfo> 
+	  <graphic format="png" fileref="figures/prefs_main.png"/>
+	</screenshot>
+      </figure>
+      <!-- ==== End of Figure ==== -->
+
       <variablelist> 
 	<varlistentry> 
 	  <term> 
@@ -412,6 +433,17 @@
 	<application>Firefox</application> profiles ocha detected
 	on your system. Each profile corresponds to a bookmark file.
       </para>
+
+      <!-- ==== Figure ==== -->
+      <figure id="prefs_catalog-fig">
+	<title>Preferences, Catalog Tab</title> 
+	<screenshot>
+	  <screeninfo>Preferences, Catalog Tab</screeninfo> 
+	  <graphic format="png" fileref="figures/prefs_catalog.png"/>
+	</screenshot>
+      </figure>
+      <!-- ==== End of Figure ==== -->
+
 
       <para>
 	Here's what you can do on this tab:
