@@ -1,23 +1,39 @@
-	vpsdecoder - library for accessing and manipulating VPS data
+ocha - Search and Launch
+http://ocha.berlios.de
 
+WHAT IS IT ?
+------------
 
+Ocha periodically indexes your files, applications and 
+Mozilla/Firefox bookmarks and then you open a file by 
+typing parts of its name. 
 
-  Copyright (C) 2003 Stephane Zermatten
+This is inspired from Quicksilver, that runs on OSX.
 
-  vpsdecoder is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
+INSTALLATION
+--------
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+- run the configure script: (see INSTALL)
+  ./configure 
+- build the executables
+  make 
+- install (as root):
+  make install
 
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+USAGE
+-----
 
-Comments are welcome.
+Quickstart: type 'ocha' on the command line
 
-	- Stephane Zermatten <szermatt@gmx.net>
+Usage is described in ocha-manual and in the man pages 
+ocha(1) and ochad(1).
+
+To see ocha-manual, here's what you can do:
+
+1. See installed HTML version in 
+  /usr/share/doc/ocha/ocha-manual.html
+  PACKAGEDIR/doc/ocha-manual.html
+2. Use scrollkeeper (yelp):
+  yelp PACKAGEDIR/doc/ocha-manual.xml
+
+        Stephane Zermatten <szermatt@gmx.net>
