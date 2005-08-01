@@ -21,6 +21,39 @@
  */
 
 /**
+ * Element of a result queue that's passed to the
+ * result queue handler.
+ *
+ * This structure and all its element are only valid
+ * for the duration of the call to the result queue
+ * handler, except for the result itself (struct result *)
+ * which needs to be freed explicitely using result_release()
+ * before it is discarded.
+ */
+struct result_queue_element
+{
+        /**
+         * Origin of this element
+         */
+        struct queryrunner *caller;
+        /**
+         * Query that's being run
+         */
+        char *query;
+
+        /**
+         * ID of the query, as returned by queryrunner_execute()
+         */
+        QueryId query_id;
+
+        /**
+         * The result itself, to be freed with
+         * result->release()
+         */
+        struct result *result;
+};
+
+/**
  * A new result was added into the query queue.
  *
  * There's always only one handler running at a time
@@ -28,19 +61,14 @@
  * from the queryrunner's thread so care must be taken
  * when making calls to queryrunner.
  *
- * @param caller the queryrunner that added this result. the caller
- * must exist at least as long as the result is not released. once
- * the result has been released, no calls should be made on the queryrunner.
- * @param query the query that caused this result to be added. this pointer
- * will only be valid for the duration of this function call
- * @param pertinence pertinence of this result, according to the query runner, between 0 and 1,
- * 1 meaning an exact match.
- * @param result the result itself. The function is responsible for freeing
- * the result. A correct empty implementation would call result_delete() on all results
- * it gets and then return.
- * @param userdata userdata passed to the constructor of the result queue
+ * The content of the structure result_queue_element
+ * is only valid until this function return, except for
+ * the result itself with needs to be released by
+ * the handler.
+ * @param element
+ * @param userdata passed to result_queue_new
  */
-typedef void (*result_queue_handler_f)(struct queryrunner *caller, const char *query, float pertinence, struct result *result, gpointer userdata);
+typedef void (*result_queue_handler_f)(struct result_queue_element *element, gpointer userdata);
 
 /**
  * Create a new result queue.
@@ -73,12 +101,13 @@ void result_queue_delete(struct result_queue* queue);
  * as long as all the results it added into the queue have been released.
  * @param query the query that's currently run by the query runner; this pointer will only be
  * available until the function returns
+ * @param query_id ID of the query that's being run, as returned from queryrunner's execute_query
  * @param pertinence pertinence of this result, according to the query runner, between 0 and 1,
  * 1 meaning an exact match.
  * @param result the result itself. once this call is made, the caller should not
  * use the result in any way, unless the result implementation is thread-safe. The query
  * queue is responsible for freeing the result.
  */
-void result_queue_add(struct result_queue *queue, struct queryrunner *caller, const char *query, float pertinence, struct result *result);
+void result_queue_add(struct result_queue *queue, struct queryrunner *caller, QueryId query_id, struct result *result);
 
 #endif /*RESULT_QUEUE_H*/

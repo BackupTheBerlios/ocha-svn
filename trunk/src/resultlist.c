@@ -11,8 +11,6 @@ struct resultholder
 {
         /** the result */
         struct result *result;
-        /** pertinence of the result, passed to resultlist_add() */
-        float pertinence;
         /** pango markup for the label */
         const char *label_markup;
         /** true if it's been executed */
@@ -49,8 +47,8 @@ static GtkTreeSelection *selection;
 static void row_inserted_cb(GtkTreeModel *model, GtkTreePath *path, GtkTreeIter *iter, gpointer userdata);
 static void row_deleted_cb(GtkTreeModel *model, GtkTreePath *path, gpointer userdata);
 static void select_first_row_if_no_selection(void);
-static struct resultholder *resultholder_new(const char *query, float pertinence, struct result *result);
-static void resultholder_refresh(const char *query, struct resultholder *self, float pertinence);
+static struct resultholder *resultholder_new(const char *query, struct result *result);
+static void resultholder_refresh(const char *query, struct resultholder *self);
 static void resultholder_delete(struct resultholder *self);
 static void append_markup_escaped(GString *gstr, const char *str);
 static void append_query_pango_highlight(GString *gstr, const char *query, const char *str, const char *on, const char *off);
@@ -146,7 +144,7 @@ void resultlist_set_current_query(const char *query)
                         struct resultholder *holder;
                         gtk_tree_model_get(GTK_TREE_MODEL(model), &iter, 0, &holder, -1);
                         if(query_result_ismatch(query, holder->result)) {
-                                /* update the label */resultholder_refresh(query, holder, holder->pertinence);
+                                /* update the label */resultholder_refresh(query, holder);
                                 /* make sure viewers are told about this change */
                                 gtk_list_store_set(model, &iter,
                                                    0,
@@ -181,14 +179,15 @@ struct result *resultlist_get_selected()
         return NULL;
 }
 
-void resultlist_add_result(const char *query, float pertinence, struct result *result)
+void resultlist_add_result(const char *query, struct result *result)
 {
         GtkTreeIter iter;
         const char *path = result->path;
+
         if(g_hash_table_lookup(hash, path) || !result->validate(result)) {
                 result->release(result);
         } else {
-                struct resultholder *holder = resultholder_new(query, pertinence, result);
+                struct resultholder *holder = resultholder_new(query, result);
                 gtk_list_store_append(model, &iter);
                 gtk_list_store_set(model, &iter,
                                    0,
@@ -265,12 +264,10 @@ static void select_first_row_if_no_selection()
 /**
  * Create a new result holder.
  *
- * @param pertinence
  * @param result
  * @return a resultholder linked to the result
  */
 static struct resultholder *resultholder_new(const char *query,
-                                             float pertinence,
                                              struct result *result)
 {
         struct resultholder *retval;
@@ -279,7 +276,6 @@ static struct resultholder *resultholder_new(const char *query,
 
         retval =  g_new(struct resultholder, 1);
         retval->result=result;
-        retval->pertinence=pertinence;
         retval->label_markup=create_highlighted_label_markup(query, result);
         retval->executed=FALSE;
         return retval;
@@ -289,17 +285,14 @@ static struct resultholder *resultholder_new(const char *query,
  * Refresh a result holder, after a query has
  * changed, for example.
  * @param self old result holder
- * @param pertinence new pertinence value
  * @see #query_str
  */
 static void resultholder_refresh(const char *query,
-                                 struct resultholder *self,
-                                 float pertinence)
+                                 struct resultholder *self)
 {
         g_return_if_fail(self);
         g_free((void *)self->label_markup);
-        self->pertinence=pertinence;
-        self->label_markup=create_highlighted_label_markup(query, self->result);
+         self->label_markup=create_highlighted_label_markup(query, self->result);
 }
 
 /**

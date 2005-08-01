@@ -53,6 +53,9 @@ struct catalog_query_result
         /** result pertinence */
         float pertinence;
 
+        /** query id */
+        QueryId query_id;
+
         /**
          * TRUE if the entry is enabled.
          * Only enabled entries are sent by run_query, so

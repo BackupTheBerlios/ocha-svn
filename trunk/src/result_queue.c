@@ -36,8 +36,7 @@ struct event
         struct result_queue *queue;
         struct queryrunner *caller;
         struct result *result;
-        float pertinence;
-        char *query;
+        QueryId query_id;
 };
 
 /** Number of result queues on the system.
@@ -54,7 +53,7 @@ static gboolean result_queue_source_dispatch(GSource *source, GSourceFunc callba
 static void result_queue_source_finalize(GSource *source);
 
 /* ------------------------- prototypes: other */
-static struct event *event_new(struct result_queue *queue, struct queryrunner *caller, const char *query, float pertinence, struct result *result);
+static struct event *event_new(struct result_queue *queue, struct queryrunner *caller, QueryId query_id, struct result *result);
 static void event_free(struct event *queue);
 static gboolean source_callback(gpointer data);
 
@@ -113,18 +112,16 @@ void result_queue_delete(struct result_queue* queue)
 
 void result_queue_add(struct result_queue *queue,
                       struct queryrunner *caller,
-                      const char *query,
-                      float pertinence,
+                      QueryId query_id,
                       struct result *result)
 {
         struct event *ev;
 
         /* WARNING: can be used by more than one thread at a time */
         g_return_if_fail(queue);
-        g_return_if_fail(query);
         g_return_if_fail(result);
 
-        ev = event_new(queue, caller, query, pertinence, result);
+        ev = event_new(queue, caller, query_id, result);
         g_async_queue_push(queue->async_queue, ev);
         g_main_context_wakeup(queue->main_context);
 }
@@ -225,13 +222,11 @@ static void result_queue_source_finalize(GSource *source)
 
 static struct event *event_new(struct result_queue *queue,
                                struct queryrunner *caller,
-                               const char *query,
-                               float pertinence,
+                               QueryId query_id,
                                struct result *result)
 {
         struct event *retval;
 
-        g_return_val_if_fail(query!=NULL, NULL);
         g_return_val_if_fail(result!=NULL, NULL);
 
 
@@ -239,14 +234,12 @@ static struct event *event_new(struct result_queue *queue,
         retval->queue=queue;
         retval->caller=caller;
         retval->result=result;
-        retval->pertinence=pertinence;
-        retval->query=g_strdup(query);
+        retval->query_id=query_id;
         return retval;
 }
 static void event_free(struct event *event)
 {
         g_return_if_fail(event);
-        g_free(event->query);
         g_free(event);
 }
 
@@ -259,15 +252,15 @@ static void event_free(struct event *event)
 static gboolean source_callback(gpointer data)
 {
         struct event *ev;
+        struct result_queue_element element;
 
         g_return_val_if_fail(data!=NULL, TRUE);
 
         ev = (struct event*)data;
-        ev->queue->handler(ev->caller,
-                           ev->query,
-                           ev->pertinence,
-                           ev->result,
-                           ev->queue->userdata);
+        element.caller=ev->caller;
+        element.query_id=ev->query_id;
+        element.result=ev->result;
+        ev->queue->handler(&element, ev->queue->userdata);
 
         return TRUE;
 }

@@ -10,6 +10,10 @@
  * created in different ways.
  */
 
+/** Uniquely identifies an ID */
+typedef unsigned long QueryId;
+
+
 /**
  * This is the public part of a query runner.
  *
@@ -31,8 +35,10 @@ struct queryrunner
         /**
          * Set or reset the query to be run.
          * @param query the query
+         * @return an identifier for the query that makes it possible
+         * to link results with a specific query
          */
-        void (*run_query)(struct queryrunner *self, const char *query);
+        QueryId (*run_query)(struct queryrunner *self, const char *query);
 
         /**
          * Tell the query runner that it's free to

@@ -1,6 +1,7 @@
 #include "querywin.h"
 #include "resultlist.h"
 #include "string_utils.h"
+#include "query.h"
 #include <string.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
@@ -16,6 +17,7 @@ static GtkWidget *treeview;
 static GtkWidget *scroll;
 static GString* query_str;
 static GString* running_query;
+static QueryId running_query_id;
 static guint32 last_keypress;
 #define query_label_text_len 256
 static char query_label_text[256];
@@ -37,7 +39,7 @@ static gboolean verified=-1;
 /* ------------------------- prototypes */
 static gboolean focus_out_cb(GtkWidget* widget, GdkEventFocus* ev, gpointer userdata);
 static gboolean map_event_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata);
-static void result_handler_cb(struct queryrunner *caller, const char *query, float pertinence, struct result *result, gpointer userdata);
+static void result_handler_cb(struct result_queue_element *element, gpointer userdata);
 static gboolean run_query(gpointer userdata);
 static void set_query_string(void);
 static void reset_query_string(void);
@@ -167,16 +169,16 @@ static gboolean map_event_cb(GtkWidget *widget, GdkEvent *ev, gpointer userdata)
  *
  * This adds a new result into the result list
  */
-static void result_handler_cb(struct queryrunner *caller,
-                              const char *query,
-                              float pertinence,
-                              struct result *result,
-                              gpointer userdata)
+static void result_handler_cb(struct result_queue_element *element, gpointer userdata)
 {
-        g_return_if_fail(result);
+        struct result *result;
+        g_return_if_fail(element);
+        result=element->result;
 
-        if(strcmp(running_query->str, query)==0) {
-                resultlist_add_result(query, pertinence, result);
+        if(running_query_id==element->query_id
+           || query_result_ismatch(running_query->str, result)) {
+                resultlist_add_result(running_query->str,
+                                      result);
         } else {
                 result->release(result);
         }
@@ -194,7 +196,7 @@ static gboolean run_query(gpointer userdata)
         if(strcmp(running_query->str, query_str->str)!=0) {
                 g_string_assign(running_query, query_str->str);
                 strstrip_on_gstring(running_query);
-                queryrunner->run_query(queryrunner, running_query->str);
+                running_query_id=queryrunner->run_query(queryrunner, running_query->str);
         }
         return FALSE;
 }
@@ -210,6 +212,7 @@ static void set_query_string()
         strncpy(query_label_text, query_str->str, query_label_text_len-1);
         gtk_label_set_text(GTK_LABEL(query_label), query_label_text);
         resultlist_set_current_query(query_str->str);
+        running_query_id=0;
         g_timeout_add(300, run_query, NULL/*userdata*/);
 }
 

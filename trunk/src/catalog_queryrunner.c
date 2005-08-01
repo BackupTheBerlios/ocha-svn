@@ -96,6 +96,11 @@ struct catalog_queryrunner
          * by the main thread exclusively
          */
         gboolean started;
+
+        /**
+         * ID of the last query (starts at 0)
+         */
+        QueryId current_query_id;
 };
 
 /** catalog_queryrunner to queryrunner */
@@ -117,8 +122,13 @@ enum CatalogQueryrunnerMessageAction {
 struct catalog_queryrunner_msg {
         /* What the thread should do */
         enum CatalogQueryrunnerMessageAction action;
+
+        /* Id of the query 0=> no query*/
+        QueryId query_id;
+
         /* query to run, to be freed by g_free (or NULL) */
         char *query;
+
 };
 
 
@@ -128,8 +138,8 @@ struct catalog_queryrunner_msg {
 struct thread_data {
         struct catalog_queryrunner *queryrunner;
 
-        /** Query being run or NULL */
-        char *running_query;
+        /** ID of the query currently being run or 0 */
+        QueryId query_id;
 
         /** Number of results found so far */
         int count;
@@ -145,14 +155,14 @@ struct thread_data {
 /* ------------------------- prototypes */
 static gpointer runquery_thread(gpointer userdata);
 static gboolean result_callback(struct catalog *catalog, const struct catalog_query_result *result, void *userdata);
-static void catalog_queryrunner_msg_send(struct catalog_queryrunner *self, enum CatalogQueryrunnerMessageAction action, const char *msg);
+static void catalog_queryrunner_msg_send(struct catalog_queryrunner *self, enum CatalogQueryrunnerMessageAction action, QueryId query_id, const char *msg);
 static void catalog_queryrunner_msg_free(struct catalog_queryrunner_msg *msg);
 static gboolean catalog_queryrunner_msg_wait(struct thread_data *data, unsigned long timeout);
 static struct catalog_queryrunner_msg *catalog_queryrunner_msg_next(struct thread_data *data);
 static void handle_thread_error(struct catalog_queryrunner *self);
 
 /* ------------------------- member functions (queryrunner) */
-static void catalog_queryrunner_run_query(struct queryrunner *_self, const char *query);
+static QueryId catalog_queryrunner_run_query(struct queryrunner *_self, const char *query);
 static void catalog_queryrunner_consolidate(struct queryrunner *_self);
 static void catalog_queryrunner_start(struct queryrunner *_self);
 static void catalog_queryrunner_stop(struct queryrunner *_self);
@@ -182,6 +192,7 @@ struct queryrunner *catalog_queryrunner_new(const char *path, struct result_queu
         queryrunner->base.consolidate=catalog_queryrunner_consolidate;
         queryrunner->base.stop=catalog_queryrunner_stop;
         queryrunner->base.release=catalog_queryrunner_release;
+        queryrunner->current_query_id=0;
         queryrunner->path=g_strdup(path);
         queryrunner->queue=catalog_queryrunner_queue;
         queryrunner->incoming=g_async_queue_new();
@@ -212,7 +223,7 @@ static void catalog_queryrunner_start(struct queryrunner *_self)
         self = CATALOG_QUERYRUNNER(_self);
 
         if(!self->started) {
-                catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_CONNECT, NULL/*no query*/);
+                catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_CONNECT, 0/*query_id*/, NULL/*no query*/);
                 self->started=TRUE;
         }
 }
@@ -230,18 +241,19 @@ static void catalog_queryrunner_stop(struct queryrunner *_self)
         self = CATALOG_QUERYRUNNER(_self);
 
         if(self->started) {
-                catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_DISCONNECT, NULL/*no query*/);
+                catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_DISCONNECT, 0/*query_id*/, NULL/*no query*/);
                 self->started=FALSE;
         }
 }
 
 
-static void catalog_queryrunner_run_query(struct queryrunner *_self, const char *query)
+static QueryId catalog_queryrunner_run_query(struct queryrunner *_self, const char *query)
 {
         struct catalog_queryrunner *self;
+        QueryId query_id;
 
-        g_return_if_fail(_self!=NULL);
-        g_return_if_fail(query!=NULL);
+        g_return_val_if_fail(_self!=NULL, 0);
+        g_return_val_if_fail(query!=NULL, 0);
 
 
 #ifdef DEBUG
@@ -251,11 +263,17 @@ static void catalog_queryrunner_run_query(struct queryrunner *_self, const char 
 #endif
 
         self = CATALOG_QUERYRUNNER(_self);
-        g_return_if_fail(self->started);
+        g_return_val_if_fail(self->started, 0);
 
+        self->current_query_id++;
+        query_id = self->current_query_id;
         if(self->started) {
-                catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_QUERY, query);
+                catalog_queryrunner_msg_send(self,
+                                             CATALOG_QUERYRUNNER_ACTION_QUERY,
+                                             query_id,
+                                             query);
         }
+        return query_id;
 }
 
 static void catalog_queryrunner_consolidate(struct queryrunner *_self)
@@ -273,7 +291,7 @@ static void catalog_queryrunner_release(struct queryrunner *_self)
         printf("%s:%d stopping", __FILE__, __LINE__);
 #endif
 
-        catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_SHUTDOWN, NULL);
+        catalog_queryrunner_msg_send(self, CATALOG_QUERYRUNNER_ACTION_SHUTDOWN, 0/*query_id*/, NULL);
         g_thread_join(self->thread);
 
         g_async_queue_unref(self->incoming);
@@ -338,7 +356,7 @@ static gpointer runquery_thread(gpointer userdata)
                         if(msg->query!=NULL && strlen(msg->query)>0) {
                                 if(catalog_is_connected(catalog)) {
                                         catalog_restart(catalog);
-                                        data.running_query=msg->query;
+                                        data.query_id=msg->query_id;
                                         data.count=0;
                                         if(!catalog_executequery(catalog,
                                                                  msg->query,
@@ -346,7 +364,7 @@ static gpointer runquery_thread(gpointer userdata)
                                                                  &data)) {
                                                 handle_thread_error(queryrunner);
                                         }
-                                        data.running_query=NULL;
+                                        data.query_id=0;
                                 } else {
                                         g_warning("not connected, "
                                                   "CATALOG_QUERYRUNNER_ACTION_CONNECT not "
@@ -402,7 +420,6 @@ static gboolean result_callback(struct catalog *catalog,
         struct thread_data *data;
         struct catalog_queryrunner *queryrunner;
         struct launcher *launcher;
-        const char *query;
         struct result *result;
         int count;
 
@@ -437,17 +454,9 @@ static gboolean result_callback(struct catalog *catalog,
         result = catalog_result_create(queryrunner->path,
                                        launcher,
                                        qresult);
-        query = data->running_query;
-#ifdef DEBUG
-
-        printf("%s:%d:query(%s) add %s\n",
-               __FILE__, __LINE__, query, entry->path);
-#endif
-
         result_queue_add(queryrunner->queue,
                          QUERYRUNNER(queryrunner),
-                         query,
-                         qresult->pertinence,
+                         data->query_id,
                          result);
         count = data->count;
         count++;
@@ -457,39 +466,22 @@ static gboolean result_callback(struct catalog *catalog,
         }
 
         if(count==FIRST_BUNCH_SIZE) {
-#ifdef DEBUG
-                printf("%s:%d:query(%s) wait (1st bunch)\n",
-                       __FILE__, __LINE__, query);
-#endif
                 if(catalog_queryrunner_msg_wait(data, AFTER_FIRST_BUNCH_TIMEOUT)) {
                         return FALSE;
                 }
-#ifdef DEBUG
-
-                printf("%s:%d:query(%s) wait (1st bunch) done\n",
-                       __FILE__, __LINE__, query);
-#endif
-
         } else if(count%LATER_BUNCH_SIZE==0) {
-#ifdef DEBUG
-                printf("%s:%d:query(%s) wait (later bunch)\n",
-                       __FILE__, __LINE__, query);
-#endif
-
                 if(catalog_queryrunner_msg_wait(data, LATER_BUNCH_TIMEOUT)) {
                         return FALSE;
                 }
-#ifdef DEBUG
-
-                printf("%s:%d:query(%s) wait (later bunch) done\n",
-                       __FILE__, __LINE__, query);
-#endif
         }
 
         return TRUE;
 }
 
-static void catalog_queryrunner_msg_send(struct catalog_queryrunner *self, enum CatalogQueryrunnerMessageAction action, const char *query)
+static void catalog_queryrunner_msg_send(struct catalog_queryrunner *self,
+                                         enum CatalogQueryrunnerMessageAction action,
+                                         QueryId query_id,
+                                         const char *query)
 {
         struct catalog_queryrunner_msg *msg;
 
@@ -497,6 +489,7 @@ static void catalog_queryrunner_msg_send(struct catalog_queryrunner *self, enum 
 
         msg = g_new(struct catalog_queryrunner_msg, 1);
         msg->action = action;
+        msg->query_id = query_id;
         msg->query = query ? g_strdup(query):NULL;
 
 

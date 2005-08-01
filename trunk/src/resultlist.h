@@ -42,10 +42,9 @@ void resultlist_clear(void);
  * Add a result to the list.
  *
  * @param query query for this result
- * @param pertinence
  * @param result
  */
-void resultlist_add_result(const char *query, float pertinence, struct result *);
+void resultlist_add_result(const char *query, struct result *);
 
 /**
  * Tell the list that the given result has been executed.

@@ -49,14 +49,14 @@ static gboolean mock_result_validate(struct result *);
 
 /* ------------------------- prototypes: other */
 static Suite *result_queue_check_suite(void);
-static void handler_not_called(struct queryrunner *caller, const char *query, float pertinence, struct result *result, gpointer userdata);
-static void handler_release(struct queryrunner *caller, const char *query, float pertinence, struct result *result, gpointer userdata);
+static void handler_not_called(struct result_queue_element *element, gpointer userdata);
+static void handler_release(struct result_queue_element *element, gpointer userdata);
 static void add_result(struct result_queue  *queue, int i);
 static void loop_as_long_as_necessary(void);
 static struct result_queue* process_queue(void);
 static void assert_all_released(void);
 static gpointer producer_thread(gpointer mocks);
-static void test_add_result_from_several_thread_handler(struct queryrunner *caller, const char *query, float pertinence, struct result *result, gpointer userdata);
+static void test_add_result_from_several_thread_handler(struct result_queue_element *element, gpointer userdata);
 
 /* ------------------------- definitions */
 static struct mock_result results[] = {
@@ -260,30 +260,23 @@ int main(int argc, char* argv[])
 }
 
 /* ------------------------- static functions */
-static void handler_not_called(struct queryrunner *caller,
-                               const char *query,
-                               float pertinence,
-                               struct result *result,
+static void handler_not_called(struct result_queue_element *element,
                                gpointer userdata)
 {
         fail("unexpected call");
 }
 
-static void handler_release(struct queryrunner *caller,
-                            const char *query,
-                            float pertinence,
-                            struct result *result,
+static void handler_release(struct result_queue_element *element,
                             gpointer userdata)
 {
-        result->release(result);
+        element->result->release(element->result);
 }
 
 static void add_result(struct result_queue  *queue, int i)
 {
         result_queue_add(queue,
                          NULL/*query runner*/,
-                         "myquery",
-                         0.0/*pertinence*/,
+                         19/*query_id*/,
                          &results[i].result);
 }
 
@@ -343,23 +336,19 @@ static gpointer producer_thread(gpointer mocks)
                 mock[i].released=FALSE;
                 result_queue_add(queue,
                                  NULL/*runner*/,
-                                 "myquery",
-                                 1.0/*pertinence*/,
+                                 19/*query_id*/,
                                  &mock[i].result);
                 g_thread_yield();
         }
         return NULL;
 }
 
-static void test_add_result_from_several_thread_handler(struct queryrunner *caller,
-                                                        const char *query,
-                                                        float pertinence,
-                                                        struct result *result,
+static void test_add_result_from_several_thread_handler(struct result_queue_element *element,
                                                         gpointer userdata)
 {
 
         fail_unless(g_private_get(thread_identity)==NULL, "not on main thread");
-        result->release(result);
+        element->result->release(element->result);
         result_count++;
         if(result_count>=(PRODUCER_COUNT*PRODUCER_THREAD_RESULT_COUNT))
         {
