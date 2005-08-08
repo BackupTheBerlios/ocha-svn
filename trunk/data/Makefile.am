@@ -2,7 +2,7 @@ desktopdir = $(datadir)/applications
 desktop_DATA = ocha.desktop 
 
 icondir = $(datadir)/pixmaps
-icon_DATA = ocha.png ocha.svg
+icon_DATA = ocha.png 
 
 applicationsdir = $(datadir)/application-registry
 applications_DATA = ocha.applications
