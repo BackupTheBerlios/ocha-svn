@@ -41,7 +41,7 @@ gboolean launcher_application_execute(struct launcher *launcher,
 {
         char *exec = NULL;
         gboolean retval = FALSE;
-        gboolean terminal;
+        gboolean terminal = FALSE;
 
         g_return_val_if_fail(launcher!=NULL, FALSE);
         g_return_val_if_fail(launcher==&launcher_application, FALSE);
